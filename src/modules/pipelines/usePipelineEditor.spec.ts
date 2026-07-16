@@ -1,0 +1,111 @@
+import { describe, it, expect, beforeEach } from 'vitest'
+import { usePipelineEditor } from './usePipelineEditor'
+import { newDraft } from './pipelines.service'
+import type { Pipeline } from '@/shared/types/pipeline'
+
+function fresh(): Pipeline {
+  return { ...newDraft(), id: 'pl_test' }
+}
+
+describe('usePipelineEditor', () => {
+  let editor: ReturnType<typeof usePipelineEditor>
+  beforeEach(() => {
+    editor = usePipelineEditor(fresh())
+  })
+
+  it('creates a node on the canvas', () => {
+    const n = editor.addNode('source-database', 100, 120)
+    expect(editor.pipeline.nodes).toHaveLength(1)
+    expect(n.kind).toBe('source-database')
+    expect(editor.selection.value.has(n.id)).toBe(true)
+  })
+
+  it('moves a node by a delta', () => {
+    const n = editor.addNode('filter', 100, 100)
+    editor.moveNodes([n.id], 40, -20)
+    expect(n.x).toBe(140)
+    expect(n.y).toBe(80)
+  })
+
+  it('creates an edge between two nodes', () => {
+    const a = editor.addNode('source-database', 0, 0)
+    const b = editor.addNode('filter', 300, 0)
+    const ok = editor.connect(a.id, 'out', b.id, 'in')
+    expect(ok).toBe(true)
+    expect(editor.pipeline.edges).toHaveLength(1)
+  })
+
+  it('prevents duplicate edges into the same target port', () => {
+    const a = editor.addNode('source-database', 0, 0)
+    const b = editor.addNode('filter', 300, 0)
+    editor.connect(a.id, 'out', b.id, 'in')
+    const second = editor.connect(a.id, 'out', b.id, 'in')
+    expect(second).toBe(false)
+    expect(editor.pipeline.edges).toHaveLength(1)
+  })
+
+  it('selects nodes additively', () => {
+    const a = editor.addNode('source-database', 0, 0)
+    const b = editor.addNode('filter', 300, 0)
+    editor.selectNode(a.id)
+    editor.selectNode(b.id, true)
+    expect(editor.selection.value.size).toBe(2)
+  })
+
+  it('supports undo and redo', () => {
+    editor.addNode('source-database', 0, 0)
+    expect(editor.pipeline.nodes).toHaveLength(1)
+    editor.addNode('filter', 200, 0)
+    expect(editor.pipeline.nodes).toHaveLength(2)
+    editor.undo()
+    expect(editor.pipeline.nodes).toHaveLength(1)
+    editor.redo()
+    expect(editor.pipeline.nodes).toHaveLength(2)
+  })
+
+  it('deletes nodes and their connected edges', () => {
+    const a = editor.addNode('source-database', 0, 0)
+    const b = editor.addNode('filter', 300, 0)
+    editor.connect(a.id, 'out', b.id, 'in')
+    editor.deleteNodes([a.id])
+    expect(editor.pipeline.nodes).toHaveLength(1)
+    expect(editor.pipeline.edges).toHaveLength(0)
+  })
+
+  it('duplicates a node offset from the original', () => {
+    const a = editor.addNode('filter', 100, 100)
+    editor.duplicateNodes([a.id])
+    expect(editor.pipeline.nodes).toHaveLength(2)
+    const copy = editor.pipeline.nodes[1]
+    expect(copy.x).toBe(140)
+    expect(copy.id).not.toBe(a.id)
+  })
+
+  it('copies and pastes nodes', () => {
+    const a = editor.addNode('filter', 0, 0)
+    editor.selectNode(a.id)
+    editor.copySelection()
+    editor.paste()
+    expect(editor.pipeline.nodes).toHaveLength(2)
+  })
+
+  it('flags a disconnected transform node as an error', () => {
+    editor.addNode('filter', 0, 0)
+    const report = editor.validate()
+    expect(report.valid).toBe(false)
+    expect(report.issues.some((i) => i.code === 'DISCONNECTED')).toBe(true)
+  })
+
+  it('flags missing required configuration', () => {
+    editor.addNode('source-file', 0, 0) // requires path
+    const report = editor.validate()
+    expect(report.issues.some((i) => i.code === 'REQ')).toBe(true)
+  })
+
+  it('tracks dirty state and clears it on markSaved', () => {
+    editor.addNode('filter', 0, 0)
+    expect(editor.dirty.value).toBe(true)
+    editor.markSaved()
+    expect(editor.dirty.value).toBe(false)
+  })
+})
