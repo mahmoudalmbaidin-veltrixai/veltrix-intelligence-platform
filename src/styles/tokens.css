@@ -1,0 +1,220 @@
+/**
+ * VIP Design Tokens
+ * ------------------
+ * Single source of truth for the VIP enterprise design language.
+ * Components must consume semantic tokens (var(--vip-*)) and never hard-code
+ * colors, spacing, radii, shadows, or typography.
+ *
+ * Themes are switched via [data-theme="light" | "dark"] on <html>.
+ * Tenant branding overrides --vip-brand-* at runtime (see theme store).
+ */
+
+:root {
+  /* ---- Typography ---- */
+  --vip-font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --vip-font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+
+  --vip-fs-2xs: 10.5px;
+  --vip-fs-xs: 11.5px;
+  --vip-fs-sm: 12.5px;
+  --vip-fs-md: 13.5px;
+  --vip-fs-lg: 15px;
+  --vip-fs-xl: 17px;
+  --vip-fs-2xl: 21px;
+  --vip-fs-3xl: 27px;
+  --vip-fs-4xl: 34px;
+
+  --vip-fw-regular: 400;
+  --vip-fw-medium: 500;
+  --vip-fw-semibold: 600;
+  --vip-fw-bold: 700;
+
+  --vip-lh-tight: 1.2;
+  --vip-lh-snug: 1.35;
+  --vip-lh-normal: 1.5;
+  --vip-ls-tight: -0.01em;
+  --vip-ls-wide: 0.02em;
+
+  /* ---- Spacing (4px base) ---- */
+  --vip-sp-0: 0;
+  --vip-sp-1: 2px;
+  --vip-sp-2: 4px;
+  --vip-sp-3: 6px;
+  --vip-sp-4: 8px;
+  --vip-sp-5: 12px;
+  --vip-sp-6: 16px;
+  --vip-sp-7: 20px;
+  --vip-sp-8: 24px;
+  --vip-sp-9: 32px;
+  --vip-sp-10: 40px;
+  --vip-sp-11: 48px;
+  --vip-sp-12: 64px;
+
+  /* ---- Radius ---- */
+  --vip-radius-xs: 3px;
+  --vip-radius-sm: 5px;
+  --vip-radius-md: 7px;
+  --vip-radius-lg: 10px;
+  --vip-radius-xl: 14px;
+  --vip-radius-full: 999px;
+
+  /* ---- Breakpoints (reference) ---- */
+  --vip-bp-tablet: 768px;
+  --vip-bp-laptop: 1024px;
+  --vip-bp-desktop: 1440px;
+
+  /* ---- Z-index ---- */
+  --vip-z-base: 1;
+  --vip-z-sticky: 100;
+  --vip-z-dropdown: 1000;
+  --vip-z-drawer: 1100;
+  --vip-z-modal: 1200;
+  --vip-z-popover: 1300;
+  --vip-z-toast: 1400;
+  --vip-z-tooltip: 1500;
+
+  /* ---- Motion ---- */
+  --vip-motion-fast: 110ms;
+  --vip-motion-base: 170ms;
+  --vip-motion-slow: 260ms;
+  --vip-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --vip-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+
+  /* ---- Brand (tenant-overridable) ---- */
+  --vip-brand-500: #6d5efc;
+  --vip-brand-600: #5b4de0;
+  --vip-brand-400: #8a7dff;
+  --vip-brand-accent: #22c1a6;
+
+  /* ---- Data visualization categorical palette (shared across themes) ---- */
+  --vip-viz-1: #6d5efc;
+  --vip-viz-2: #22c1a6;
+  --vip-viz-3: #f2a93b;
+  --vip-viz-4: #e2607a;
+  --vip-viz-5: #4aa3ff;
+  --vip-viz-6: #b06cf0;
+  --vip-viz-7: #4fbf67;
+  --vip-viz-8: #f0725a;
+}
+
+/* =========================================================
+   DARK THEME (default)
+   ========================================================= */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --vip-bg-app: #0e1016;
+  --vip-bg-canvas: #12141c;
+  --vip-surface-1: #171a23;
+  --vip-surface-2: #1d2029;
+  --vip-surface-3: #23262f;
+  --vip-surface-hover: #262a35;
+  --vip-surface-active: #2d323e;
+  --vip-surface-inset: #0b0d12;
+
+  --vip-border-subtle: #23262f;
+  --vip-border: #2c3039;
+  --vip-border-strong: #3a3f4b;
+
+  --vip-text-primary: #e9ecf2;
+  --vip-text-secondary: #b3b9c6;
+  --vip-text-muted: #7d8494;
+  --vip-text-disabled: #565c69;
+  --vip-text-inverse: #0e1016;
+  --vip-text-on-brand: #ffffff;
+
+  --vip-brand-soft: rgba(109, 94, 252, 0.16);
+  --vip-brand-text: #a99bff;
+
+  --vip-focus-ring: #8a7dff;
+  --vip-selection: rgba(109, 94, 252, 0.32);
+
+  --vip-success: #3fb96b;
+  --vip-success-soft: rgba(63, 185, 107, 0.15);
+  --vip-success-text: #63d68c;
+  --vip-warning: #e0a52e;
+  --vip-warning-soft: rgba(224, 165, 46, 0.15);
+  --vip-warning-text: #f2bd52;
+  --vip-danger: #e5544b;
+  --vip-danger-soft: rgba(229, 84, 75, 0.15);
+  --vip-danger-text: #ff7b73;
+  --vip-info: #4aa3ff;
+  --vip-info-soft: rgba(74, 163, 255, 0.15);
+  --vip-info-text: #78bbff;
+
+  --vip-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --vip-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --vip-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --vip-shadow-focus: 0 0 0 2px var(--vip-bg-app), 0 0 0 4px var(--vip-focus-ring);
+
+  --vip-grid-line: rgba(255, 255, 255, 0.045);
+  --vip-grid-dot: rgba(255, 255, 255, 0.09);
+  --vip-scrim: rgba(6, 8, 12, 0.6);
+}
+
+/* =========================================================
+   LIGHT THEME
+   ========================================================= */
+[data-theme='light'] {
+  color-scheme: light;
+
+  --vip-bg-app: #f4f5f8;
+  --vip-bg-canvas: #eceef2;
+  --vip-surface-1: #ffffff;
+  --vip-surface-2: #f7f8fa;
+  --vip-surface-3: #eef0f4;
+  --vip-surface-hover: #f0f1f5;
+  --vip-surface-active: #e6e8ee;
+  --vip-surface-inset: #f0f1f4;
+
+  --vip-border-subtle: #eaecf1;
+  --vip-border: #dcdfe6;
+  --vip-border-strong: #c4c9d4;
+
+  --vip-text-primary: #171a21;
+  --vip-text-secondary: #454b58;
+  --vip-text-muted: #6b7280;
+  --vip-text-disabled: #a0a6b0;
+  --vip-text-inverse: #ffffff;
+  --vip-text-on-brand: #ffffff;
+
+  --vip-brand-soft: rgba(109, 94, 252, 0.1);
+  --vip-brand-text: #5b4de0;
+
+  --vip-focus-ring: #6d5efc;
+  --vip-selection: rgba(109, 94, 252, 0.18);
+
+  --vip-success: #1f9d57;
+  --vip-success-soft: rgba(31, 157, 87, 0.12);
+  --vip-success-text: #157a42;
+  --vip-warning: #c07d0a;
+  --vip-warning-soft: rgba(192, 125, 10, 0.13);
+  --vip-warning-text: #97620a;
+  --vip-danger: #d63b32;
+  --vip-danger-soft: rgba(214, 59, 50, 0.11);
+  --vip-danger-text: #b32b23;
+  --vip-info: #2b7fe0;
+  --vip-info-soft: rgba(43, 127, 224, 0.12);
+  --vip-info-text: #1d6bc4;
+
+  --vip-shadow-sm: 0 1px 2px rgba(20, 24, 33, 0.08);
+  --vip-shadow-md: 0 4px 14px rgba(20, 24, 33, 0.1);
+  --vip-shadow-lg: 0 12px 40px rgba(20, 24, 33, 0.16);
+  --vip-shadow-focus: 0 0 0 2px var(--vip-bg-app), 0 0 0 4px var(--vip-focus-ring);
+
+  --vip-grid-line: rgba(20, 24, 33, 0.05);
+  --vip-grid-dot: rgba(20, 24, 33, 0.11);
+  --vip-scrim: rgba(20, 24, 33, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
