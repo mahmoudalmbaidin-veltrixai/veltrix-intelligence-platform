@@ -50,10 +50,13 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Analytics',
     items: [
       { label: 'Dashboards', to: '/dashboards', icon: 'chart', permission: 'dashboard:read', entitlement: 'dashboards', keywords: ['bi', 'visual', 'powerbi'] },
+      { label: 'Dashboard Studio', to: '/dashboards/new', icon: 'grid', permission: 'dashboard:write', entitlement: 'dashboards', keywords: ['build', 'author', 'create', 'widgets', 'canvas'] },
+      { label: 'Dashboard Templates', to: '/dashboards/templates', icon: 'layers', permission: 'dashboard:read', entitlement: 'dashboards', keywords: ['starter', 'gallery'] },
+      { label: 'Published Dashboards', to: '/dashboards/published', icon: 'eye', permission: 'dashboard:read', entitlement: 'dashboards', keywords: ['live', 'shared'] },
       { label: 'Insights', to: '/insights', icon: 'sparkles', permission: 'insight:read', keywords: ['ai', 'trend', 'anomaly', 'analyze'] },
       { label: 'Explore', to: '/explore', icon: 'trendUp', permission: 'dashboard:read', keywords: ['adhoc', 'analysis', 'discover'] },
       { label: 'Reports', to: '/reports', icon: 'report', permission: 'report:read' },
-      { label: 'Scheduled Deliveries', to: '/reports/deliveries', icon: 'calendar', permission: 'report:read' },
+      { label: 'Scheduled Deliveries', to: '/dashboards/deliveries', icon: 'calendar', permission: 'dashboard:read', entitlement: 'dashboards', keywords: ['email', 'schedule', 'subscribe'] },
     ],
   },
   {

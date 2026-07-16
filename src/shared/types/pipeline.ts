@@ -52,7 +52,7 @@ export interface NodeTypeSpec {
 
 export type NodeConfigFieldType =
   | 'text' | 'textarea' | 'number' | 'select' | 'multiselect'
-  | 'boolean' | 'columns' | 'code' | 'keyvalue' | 'secret'
+  | 'boolean' | 'columns' | 'code' | 'keyvalue' | 'secret' | 'formula'
 
 export interface NodeConfigField {
   key: string

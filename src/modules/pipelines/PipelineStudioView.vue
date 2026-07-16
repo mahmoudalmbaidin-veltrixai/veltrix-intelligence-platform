@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { pipelineService, newDraft } from './pipelines.service'
 import { usePipelineEditor } from './usePipelineEditor'
@@ -25,7 +25,9 @@ const ui = useUiStore()
 const platform = usePlatformStore()
 
 const loading = ref(true)
-const editor = ref<ReturnType<typeof usePipelineEditor>>()
+// shallowRef (not ref) so the composable's inner refs are NOT unwrapped by
+// reactive() — the studio + canvas access them as refs (`.value`).
+const editor = shallowRef<ReturnType<typeof usePipelineEditor>>()
 const runner = usePipelineRunner()
 const canvasRef = ref<InstanceType<typeof PipelineCanvas>>()
 

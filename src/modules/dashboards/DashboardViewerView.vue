@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, shallowRef, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { dashboardService, LAST_REFRESH } from './dashboards.service'
 import { useDashboardEditor } from './useDashboardEditor'
@@ -10,6 +10,7 @@ import type { QueryFilter } from '@/shared/types/semantic'
 import { relativeTime } from '@/shared/lib/format'
 import DashboardGridCanvas from './DashboardGridCanvas.vue'
 import DashboardFilterBar from './DashboardFilterBar.vue'
+import DashboardShareDialog from './DashboardShareDialog.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
@@ -22,7 +23,8 @@ const ui = useUiStore()
 const platform = usePlatformStore()
 
 const loading = ref(true)
-const editor = ref<ReturnType<typeof useDashboardEditor>>()
+// shallowRef so the composable's inner refs stay intact (reactive() unwraps them).
+const editor = shallowRef<ReturnType<typeof useDashboardEditor>>()
 const crossFilters = ref<QueryFilter[]>([])
 const refreshedAt = ref(LAST_REFRESH)
 const activePageId = computed<string>({
@@ -47,12 +49,20 @@ function refresh() {
 }
 const shareItems = [
   { key: 'link', label: 'Copy link', icon: 'link' },
-  { key: 'export-pdf', label: 'Export as PDF', icon: 'download' },
+  { key: 'export', label: 'Export (PDF/PNG/CSV)', icon: 'download' },
   { key: 'snapshot', label: 'Save snapshot', icon: 'image' },
-  { key: 'subscribe', label: 'Subscribe to updates', icon: 'bell' },
+  { key: 'email', label: 'Email delivery & schedule', icon: 'report' },
 ]
+const shareOpen = ref(false)
+const shareTab = ref<'export' | 'snapshot' | 'email'>('export')
 function onShare(key: string) {
-  ui.pushToast({ kind: 'info', title: shareItems.find((i) => i.key === key)?.label ?? '', message: 'Delivery & sharing connect to backend services.' })
+  if (key === 'link') {
+    navigator.clipboard?.writeText(window.location.href)
+    ui.pushToast({ kind: 'success', title: 'Link copied' })
+    return
+  }
+  shareTab.value = key as 'export' | 'snapshot' | 'email'
+  shareOpen.value = true
 }
 const fav = computed(() => editor.value?.dashboard.favorite ?? false)
 function toggleFav() {
@@ -95,6 +105,8 @@ onMounted(load)
         <DashboardGridCanvas :editor="editor" :cross-filters="crossFilters" :editable="false" @cross-filter="onCrossFilter" />
       </div>
     </template>
+
+    <DashboardShareDialog v-if="editor" :open="shareOpen" :dashboard="editor.dashboard" :initial-tab="shareTab" @close="shareOpen = false" />
   </div>
 </template>
 

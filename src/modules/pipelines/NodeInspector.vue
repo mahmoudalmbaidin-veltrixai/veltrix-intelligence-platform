@@ -11,6 +11,7 @@ import VipSegmented from '@/shared/ui/VipSegmented.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
+import FormulaEditor from './FormulaEditor.vue'
 
 const props = defineProps<{ editor: PipelineEditor }>()
 
@@ -111,6 +112,7 @@ const columnsModel = (key: string) => ({
             <VipInput v-else-if="f.type === 'secret'" type="password" :label="f.label" :model-value="(val(f.key) as string) ?? ''" :required="f.required" help="Secrets are resolved from the connection vault at run time — never stored in the pipeline." @update:model-value="set(f.key, $event)" />
             <VipTextarea v-else-if="f.type === 'textarea'" :label="f.label" :model-value="(val(f.key) as string) ?? ''" :placeholder="f.placeholder" :required="f.required" :help="f.help" @update:model-value="set(f.key, $event)" />
             <VipTextarea v-else-if="f.type === 'code'" mono :rows="6" :label="`${f.label}${f.language ? ` (${f.language.toUpperCase()})` : ''}`" :model-value="(val(f.key) as string) ?? ''" :placeholder="f.placeholder" :required="f.required" :help="f.help" @update:model-value="set(f.key, $event)" />
+            <FormulaEditor v-else-if="f.type === 'formula'" :label="f.label" :model-value="(val(f.key) as string) ?? ''" :columns="node.outputSchema" @update:model-value="set(f.key, $event)" />
             <VipSelect v-else-if="f.type === 'select'" :label="f.label" :model-value="(val(f.key) as string) ?? ''" :options="f.options ?? []" :required="f.required" :help="f.help" placeholder="Select…" @update:model-value="set(f.key, $event)" />
             <VipInput v-else-if="f.type === 'columns'" :label="f.label" :model-value="columnsModel(f.key).get()" placeholder="col_a, col_b" :help="f.help ?? 'Comma-separated column names.'" @update:model-value="columnsModel(f.key).set($event as string)" />
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { dashboardService, newDashboard } from './dashboards.service'
 import { useDashboardEditor } from './useDashboardEditor'
@@ -13,6 +13,7 @@ import FieldsPanel from './FieldsPanel.vue'
 import DashboardGridCanvas from './DashboardGridCanvas.vue'
 import WidgetInspector from './WidgetInspector.vue'
 import DashboardFilterBar from './DashboardFilterBar.vue'
+import DashboardShareDialog from './DashboardShareDialog.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
@@ -25,13 +26,15 @@ const ui = useUiStore()
 const platform = usePlatformStore()
 
 const loading = ref(true)
-const editor = ref<ReturnType<typeof useDashboardEditor>>()
+// shallowRef so the composable's inner refs stay intact (reactive() unwraps them).
+const editor = shallowRef<ReturnType<typeof useDashboardEditor>>()
 const modelId = ref('sm_sales')
 const mode = ref<'edit' | 'preview'>('edit')
 const saving = ref(false)
 const savedAt = ref<string | null>(null)
 const crossFilters = ref<QueryFilter[]>([])
 const fullscreen = ref(false)
+const shareOpen = ref(false)
 
 const left = useResizable({ key: 'dash.left', initial: 256, min: 200, max: 380 })
 const right = useResizable({ key: 'dash.right', initial: 320, min: 260, max: 460, invert: true })
@@ -160,6 +163,7 @@ onBeforeUnmount(() => {
           <VipButton variant="ghost" size="sm" icon="redo" title="Redo" :disabled="!canRedo" @click="editor?.redo()" />
         </div>
         <VipButton variant="secondary" size="sm" icon="save" :loading="saving" :disabled="!canEdit" @click="save">Save</VipButton>
+        <VipButton variant="secondary" size="sm" icon="share" @click="shareOpen = true">Share</VipButton>
         <VipButton variant="primary" size="sm" icon="upload" :disabled="!canEdit" @click="publish">Publish</VipButton>
         <VipButton variant="ghost" size="sm" :icon="fullscreen ? 'minimize' : 'maximize'" @click="fullscreen = !fullscreen" />
       </div>
@@ -208,6 +212,8 @@ onBeforeUnmount(() => {
         <WidgetInspector :editor="editor" />
       </div>
     </div>
+
+    <DashboardShareDialog v-if="editor" :open="shareOpen" :dashboard="editor.dashboard" @close="shareOpen = false" />
   </div>
 </template>
 

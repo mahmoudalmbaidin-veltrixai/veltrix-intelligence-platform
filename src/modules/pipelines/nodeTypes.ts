@@ -132,7 +132,7 @@ export const NODE_TYPES: Record<PipelineNodeKind, NodeTypeSpec> = {
     inputs: IN, outputs: OUT,
     config: [
       { key: 'columnName', label: 'New column name', type: 'text', required: true, placeholder: 'margin_pct' },
-      { key: 'expression', label: 'Expression', type: 'code', language: 'sql', required: true, placeholder: 'profit / NULLIF(revenue, 0)' },
+      { key: 'expression', label: 'Formula', type: 'formula', required: true, placeholder: 'IF([revenue] > 0, ROUND([profit] / [revenue], 2), 0)' },
     ],
   },
   'type-convert': {

@@ -36,6 +36,9 @@ const routes: RouteRecordRaw[] = [
 
   // Analytics (priority)
   { path: '/dashboards', name: 'dashboards', component: () => import('@/modules/dashboards/DashboardListView.vue'), meta: { title: 'Dashboards', layout: 'app', requiresAuth: true, permission: 'dashboard:read', entitlement: 'dashboards' } },
+  { path: '/dashboards/templates', name: 'dashboard-templates', component: () => import('@/modules/dashboards/DashboardTemplatesView.vue'), meta: { title: 'Dashboard Templates', layout: 'app', requiresAuth: true, permission: 'dashboard:read', entitlement: 'dashboards' } },
+  { path: '/dashboards/published', name: 'dashboards-published', component: () => import('@/modules/dashboards/DashboardListView.vue'), meta: { title: 'Published Dashboards', layout: 'app', requiresAuth: true, permission: 'dashboard:read', entitlement: 'dashboards' } },
+  { path: '/dashboards/deliveries', name: 'dashboard-deliveries', component: () => import('@/modules/dashboards/DashboardDeliveriesView.vue'), meta: { title: 'Scheduled Deliveries', layout: 'app', requiresAuth: true, permission: 'dashboard:read', entitlement: 'dashboards' } },
   { path: '/dashboards/new', name: 'dashboard-new', component: () => import('@/modules/dashboards/DashboardStudioView.vue'), meta: { title: 'New Dashboard', layout: 'studio', requiresAuth: true, permission: 'dashboard:write', entitlement: 'dashboards', fullBleed: true } },
   { path: '/dashboards/:id/edit', name: 'dashboard-studio', component: () => import('@/modules/dashboards/DashboardStudioView.vue'), meta: { title: 'Dashboard Studio', layout: 'studio', requiresAuth: true, permission: 'dashboard:write', entitlement: 'dashboards', fullBleed: true } },
   { path: '/dashboards/:id', name: 'dashboard-viewer', component: () => import('@/modules/dashboards/DashboardViewerView.vue'), meta: { title: 'Dashboard', layout: 'app', requiresAuth: true, permission: 'dashboard:read', fullBleed: true } },

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { dashboardService } from './dashboards.service'
 import { usePlatformStore } from '@/shared/stores/platform'
@@ -18,8 +18,9 @@ const router = useRouter()
 const platform = usePlatformStore()
 const { data, isLoading } = useQuery('dashboards:list', () => dashboardService.list())
 
+const route = useRoute()
 const search = ref('')
-const filter = ref<'all' | 'favorites' | 'published'>('all')
+const filter = ref<'all' | 'favorites' | 'published'>(route.name === 'dashboards-published' ? 'published' : 'all')
 
 const items = computed(() => {
   let list = data.value ?? []
@@ -35,6 +36,8 @@ const items = computed(() => {
   <div>
     <VipPageHeader title="Dashboards" description="Explore and author interactive analytics dashboards.">
       <template #actions>
+        <VipButton variant="tertiary" icon="layers" @click="router.push('/dashboards/templates')">Templates</VipButton>
+        <VipButton variant="tertiary" icon="calendar" @click="router.push('/dashboards/deliveries')">Deliveries</VipButton>
         <VipButton v-if="platform.can('dashboard:write')" variant="primary" icon="plus" @click="router.push('/dashboards/new')">New dashboard</VipButton>
       </template>
     </VipPageHeader>
