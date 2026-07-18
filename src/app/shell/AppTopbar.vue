@@ -8,11 +8,14 @@ import { useThemeStore } from '@/shared/stores/theme'
 import { QUICK_CREATE } from '@/app/navigation'
 import { ROLES } from '@/shared/permissions/roles'
 import type { RoleKey } from '@/shared/types/identity'
+import { config } from '@/shared/config/env'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipMenu from '@/shared/ui/VipMenu.vue'
 import VipAvatar from '@/shared/ui/VipAvatar.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
+import VipTooltip from '@/shared/ui/VipTooltip.vue'
 
+const isMockMode = config.apiMode === 'mock'
 const platform = usePlatformStore()
 const auth = useAuthStore()
 const ui = useUiStore()
@@ -117,6 +120,12 @@ async function onUserSelect(key: string) {
         <VipIcon name="bell" :size="17" />
         <span v-if="ui.unreadNotifications" class="vip-icon-btn__badge">{{ ui.unreadNotifications }}</span>
       </button>
+
+      <VipTooltip v-if="isMockMode" text="Mock mode — data and actions are simulated, no backend calls are made.">
+        <span class="vip-mock-pill" aria-label="Application is running in mock mode">
+          <VipIcon name="info" :size="12" /> Mock
+        </span>
+      </VipTooltip>
 
       <VipMenu :items="roleItems" @select="platform.setRole($event as RoleKey)">
         <template #trigger>
@@ -276,6 +285,21 @@ async function onUserSelect(key: string) {
   justify-content: center;
 }
 
+.vip-mock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  height: 24px;
+  padding: 0 var(--vip-sp-4);
+  border-radius: var(--vip-radius-full);
+  background: var(--vip-warning-soft);
+  color: var(--vip-warning-text);
+  font-size: var(--vip-fs-2xs);
+  font-weight: var(--vip-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  white-space: nowrap;
+}
 .vip-role {
   display: inline-flex;
   align-items: center;
