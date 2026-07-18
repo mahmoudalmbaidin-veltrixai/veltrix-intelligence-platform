@@ -5,10 +5,23 @@ Every mocked service documents its intended backend contract inline (search
 workspace-scoped and require the noted permission; the backend is the security
 boundary (frontend checks are UX only).
 
-## Auth / tenancy (prerequisite)
-- `GET  /api/v1/me` → `AuthContext` (user, org, workspace, role, permissions, entitlements, feature flags)
-- `GET  /api/v1/organizations`, `GET /api/v1/workspaces`
-- Org/workspace switch, session, MFA, SSO — currently simulated in `platform` store.
+## Configuration & transport (see src/shared/config/env.ts, lib/apiClient.ts)
+- `VITE_API_MODE=live` + `VITE_API_BASE_URL` switch every service to the live
+  adapter via `defineService`. Client sends `Authorization: Bearer` (or cookie
+  session), `X-Organization-Id`, `X-Workspace-Id`, `X-Locale`, `X-Timezone`,
+  `X-Correlation-Id`. Error bodies: `{ message, errors: [{ field, message }] }`.
+  Status codes map to normalized `ApiErrorKind` (401→unauthorized, 409→conflict,
+  429→rate-limit, 503→maintenance, …).
+
+## Auth / session (prerequisite — adapters wired, see services/auth)
+- `POST /auth/login` `{email,password}` → `Session`
+- `POST /auth/logout` → 204
+- `GET  /auth/me` → `AuthContext` (user, org, workspace, role, permissions, entitlements, feature flags)
+- `POST /auth/refresh` → `Session`
+- Prefer secure http-only cookie sessions (`credentials: 'include'`); a 401 on
+  any request forces reauthentication (login route, intended-route restored).
+- `GET  /organizations`, `GET /workspaces`; switching invalidates all scoped caches.
+- MFA, SSO — backend responsibilities; frontend surfaces state only.
 
 ## Semantic layer (powers dashboards, insights, explore, home)
 - `GET  /api/v1/semantic/models` → `SemanticModel[]`
