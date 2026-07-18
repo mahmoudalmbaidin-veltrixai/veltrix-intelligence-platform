@@ -8,7 +8,8 @@
  */
 
 export type FieldRole = 'dimension' | 'measure' | 'metric' | 'time'
-export type DataType = 'string' | 'number' | 'integer' | 'currency' | 'percent' | 'boolean' | 'date' | 'datetime' | 'geo'
+export type DataType =
+  'string' | 'number' | 'integer' | 'currency' | 'percent' | 'boolean' | 'date' | 'datetime' | 'geo'
 
 export type Aggregation = 'sum' | 'avg' | 'min' | 'max' | 'count' | 'count_distinct' | 'median' | 'none'
 
@@ -76,9 +77,18 @@ export interface QueryDimension {
 }
 
 export type FilterOperator =
-  | 'eq' | 'neq' | 'in' | 'nin'
-  | 'gt' | 'gte' | 'lt' | 'lte' | 'between'
-  | 'contains' | 'starts' | 'ends'
+  | 'eq'
+  | 'neq'
+  | 'in'
+  | 'nin'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'between'
+  | 'contains'
+  | 'starts'
+  | 'ends'
   | 'relative-date'
 
 export interface QueryFilter {

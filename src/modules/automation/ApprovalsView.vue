@@ -14,14 +14,26 @@ import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
 const ui = useUiStore()
 const { data } = useQuery('automation:approvals', () => automationService.listApprovals())
 const local = ref<Approval[]>([])
-watch(data, (d) => { if (d) local.value = d.map((a) => ({ ...a })) }, { immediate: true })
+watch(
+  data,
+  (d) => {
+    if (d) local.value = d.map((a) => ({ ...a }))
+  },
+  { immediate: true },
+)
 
 const tab = ref<'pending' | 'decided'>('pending')
-const list = computed(() => local.value.filter((a) => (tab.value === 'pending' ? a.status === 'pending' : a.status !== 'pending')))
+const list = computed(() =>
+  local.value.filter((a) => (tab.value === 'pending' ? a.status === 'pending' : a.status !== 'pending')),
+)
 
 function decide(a: Approval, status: 'approved' | 'rejected') {
   a.status = status
-  ui.pushToast({ kind: status === 'approved' ? 'success' : 'warning', title: status === 'approved' ? 'Approved' : 'Rejected', message: a.title })
+  ui.pushToast({
+    kind: status === 'approved' ? 'success' : 'warning',
+    title: status === 'approved' ? 'Approved' : 'Rejected',
+    message: a.title,
+  })
 }
 function tone(s: Approval['status']) {
   return s === 'approved' ? 'success' : s === 'rejected' ? 'danger' : 'warning'
@@ -32,7 +44,14 @@ function tone(s: Approval['status']) {
   <div class="apr">
     <VipPageHeader title="Approvals" description="Human sign-off gates raised by automations and workflows.">
       <template #actions>
-        <VipSegmented v-model="tab" :options="[{ value: 'pending', label: 'Pending' }, { value: 'decided', label: 'Decided' }]" size="sm" />
+        <VipSegmented
+          v-model="tab"
+          :options="[
+            { value: 'pending', label: 'Pending' },
+            { value: 'decided', label: 'Decided' },
+          ]"
+          size="sm"
+        />
       </template>
     </VipPageHeader>
 
@@ -52,17 +71,53 @@ function tone(s: Approval['status']) {
         </div>
       </VipCard>
     </div>
-    <VipEmptyState v-else icon="check" title="Nothing here" :description="tab === 'pending' ? 'No approvals awaiting your decision.' : 'No decided approvals yet.'" />
+    <VipEmptyState
+      v-else
+      icon="check"
+      title="Nothing here"
+      :description="tab === 'pending' ? 'No approvals awaiting your decision.' : 'No decided approvals yet.'"
+    />
   </div>
 </template>
 
 <style scoped>
-.apr-list { display: flex; flex-direction: column; gap: var(--vip-sp-5); max-width: 900px; }
-.apr-card { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.apr-head { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-4); }
-.apr-title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); }
-.apr-ctx { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
-.apr-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-4); }
-.apr-meta { font-size: var(--vip-fs-xs); color: var(--vip-text-disabled); }
-.apr-actions { display: flex; gap: var(--vip-sp-3); }
+.apr-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+  max-width: 900px;
+}
+.apr-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.apr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-4);
+}
+.apr-title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+}
+.apr-ctx {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
+.apr-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-4);
+}
+.apr-meta {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-disabled);
+}
+.apr-actions {
+  display: flex;
+  gap: var(--vip-sp-3);
+}
 </style>

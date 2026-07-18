@@ -20,9 +20,28 @@ import NotificationDrawer from '@/app/shell/NotificationDrawer.vue'
 </template>
 
 <style scoped>
-.vip-app { display: flex; height: 100vh; overflow: hidden; background: var(--vip-bg-app); }
-.vip-app__sidebar { flex: none; }
-.vip-app__col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.vip-app__main { flex: 1; overflow-y: auto; }
-@media (max-width: 768px) { .vip-app__sidebar { display: none; } }
+.vip-app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--vip-bg-app);
+}
+.vip-app__sidebar {
+  flex: none;
+}
+.vip-app__col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.vip-app__main {
+  flex: 1;
+  overflow-y: auto;
+}
+@media (max-width: 768px) {
+  .vip-app__sidebar {
+    display: none;
+  }
+}
 </style>

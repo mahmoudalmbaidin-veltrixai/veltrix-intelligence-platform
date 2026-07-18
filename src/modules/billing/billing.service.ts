@@ -7,15 +7,59 @@ import { latency, isoAgo } from '@/shared/lib/mock'
 import { apiClient } from '@/shared/lib/apiClient'
 import { defineService } from '@/shared/services/serviceFactory'
 
-export interface Plan { key: string; name: string; price: number; features: string[]; current: boolean }
-export interface Invoice { id: string; number: string; date: string; amount: number; status: 'paid' | 'due' | 'overdue' }
-export interface PaymentMethod { brand: string; last4: string; expiry: string }
-export interface UsageLine { label: string; used: number; limit: number; unit: string }
+export interface Plan {
+  key: string
+  name: string
+  price: number
+  features: string[]
+  current: boolean
+}
+export interface Invoice {
+  id: string
+  number: string
+  date: string
+  amount: number
+  status: 'paid' | 'due' | 'overdue'
+}
+export interface PaymentMethod {
+  brand: string
+  last4: string
+  expiry: string
+}
+export interface UsageLine {
+  label: string
+  used: number
+  limit: number
+  unit: string
+}
 
 const PLANS: Plan[] = [
-  { key: 'team', name: 'Team', price: 0, features: ['5 pipelines', '10 dashboards', 'Community support'], current: false },
-  { key: 'business', name: 'Business', price: 1200, features: ['100 pipelines', '250 dashboards', 'AI assistant', 'Email support'], current: false },
-  { key: 'enterprise', name: 'Enterprise', price: 4800, features: ['Unlimited pipelines & dashboards', 'AI agents & automation', 'SSO & advanced governance', 'Dedicated support'], current: true },
+  {
+    key: 'team',
+    name: 'Team',
+    price: 0,
+    features: ['5 pipelines', '10 dashboards', 'Community support'],
+    current: false,
+  },
+  {
+    key: 'business',
+    name: 'Business',
+    price: 1200,
+    features: ['100 pipelines', '250 dashboards', 'AI assistant', 'Email support'],
+    current: false,
+  },
+  {
+    key: 'enterprise',
+    name: 'Enterprise',
+    price: 4800,
+    features: [
+      'Unlimited pipelines & dashboards',
+      'AI agents & automation',
+      'SSO & advanced governance',
+      'Dedicated support',
+    ],
+    current: true,
+  },
 ]
 const INVOICES: Invoice[] = [
   { id: 'inv_1', number: 'VIP-2026-004', date: isoAgo(60 * 24 * 5), amount: 4800, status: 'paid' },
@@ -39,10 +83,22 @@ export interface BillingService {
 }
 
 const mockBillingService: BillingService = {
-  async listPlans() { await latency(); return PLANS.map((p) => ({ ...p })) },
-  async listInvoices() { await latency(); return INVOICES.map((i) => ({ ...i })) },
-  async getPaymentMethod(): Promise<PaymentMethod> { await latency(); return { brand: 'Visa', last4: '6411', expiry: '08/28' } },
-  async getUsage() { await latency(); return USAGE.map((u) => ({ ...u })) },
+  async listPlans() {
+    await latency()
+    return PLANS.map((p) => ({ ...p }))
+  },
+  async listInvoices() {
+    await latency()
+    return INVOICES.map((i) => ({ ...i }))
+  },
+  async getPaymentMethod(): Promise<PaymentMethod> {
+    await latency()
+    return { brand: 'Visa', last4: '6411', expiry: '08/28' }
+  },
+  async getUsage() {
+    await latency()
+    return USAGE.map((u) => ({ ...u }))
+  },
 }
 
 const apiBillingService: BillingService = {

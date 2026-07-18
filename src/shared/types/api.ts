@@ -88,7 +88,10 @@ export class ApiError extends Error {
   }
 
   /** Map an HTTP status code to a normalized error. */
-  static fromStatus(status: number, opts?: { message?: string; correlationId?: string; fieldErrors?: FieldError[]; detail?: string }): ApiError {
+  static fromStatus(
+    status: number,
+    opts?: { message?: string; correlationId?: string; fieldErrors?: FieldError[]; detail?: string },
+  ): ApiError {
     const kind = statusToKind(status)
     return new ApiError(kind, opts?.message ?? FRIENDLY[kind], { ...opts, status })
   }

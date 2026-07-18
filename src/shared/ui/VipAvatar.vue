@@ -20,7 +20,8 @@ const initials = computed(() =>
       fontSize: `${Math.round(size * 0.4)}px`,
     }"
     :title="name"
-  >{{ initials }}</span>
+    >{{ initials }}</span
+  >
 </template>
 
 <style scoped>

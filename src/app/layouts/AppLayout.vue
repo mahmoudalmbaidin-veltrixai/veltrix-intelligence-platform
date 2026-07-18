@@ -29,13 +29,37 @@ const fullBleed = computed(() => route.meta.fullBleed === true)
 </template>
 
 <style scoped>
-.vip-app { display: flex; height: 100vh; overflow: hidden; background: var(--vip-bg-app); }
-.vip-app__sidebar { flex: none; }
-.vip-app__col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.vip-app__main { flex: 1; overflow-y: auto; padding: var(--vip-sp-8) var(--vip-sp-9); }
-.vip-app__main.is-full-bleed { padding: 0; overflow: hidden; display: flex; }
+.vip-app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--vip-bg-app);
+}
+.vip-app__sidebar {
+  flex: none;
+}
+.vip-app__col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.vip-app__main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--vip-sp-8) var(--vip-sp-9);
+}
+.vip-app__main.is-full-bleed {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+}
 @media (max-width: 768px) {
-  .vip-app__sidebar { display: none; }
-  .vip-app__main { padding: var(--vip-sp-6); }
+  .vip-app__sidebar {
+    display: none;
+  }
+  .vip-app__main {
+    padding: var(--vip-sp-6);
+  }
 }
 </style>

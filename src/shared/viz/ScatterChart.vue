@@ -9,9 +9,15 @@ const PAD = 44
 const maxX = computed(() => Math.max(1, ...props.points.map((p) => p.x)))
 const maxY = computed(() => Math.max(1, ...props.points.map((p) => p.y)))
 const maxS = computed(() => Math.max(1, ...props.points.map((p) => p.size ?? 1)))
-function cx(x: number) { return PAD + (x / maxX.value) * (W - PAD * 1.5) }
-function cy(y: number) { return H - PAD - (y / maxY.value) * (H - PAD * 1.5) }
-function r(s?: number) { return 4 + ((s ?? 1) / maxS.value) * 14 }
+function cx(x: number) {
+  return PAD + (x / maxX.value) * (W - PAD * 1.5)
+}
+function cy(y: number) {
+  return H - PAD - (y / maxY.value) * (H - PAD * 1.5)
+}
+function r(s?: number) {
+  return 4 + ((s ?? 1) / maxS.value) * 14
+}
 </script>
 
 <template>
@@ -33,8 +39,19 @@ function r(s?: number) { return 4 + ((s ?? 1) / maxS.value) * 14 }
 </template>
 
 <style scoped>
-.scatter { width: 100%; height: 100%; }
-.scatter__axis { stroke: var(--vip-border); stroke-width: 1; }
-.scatter__pt { opacity: 0.7; transition: opacity var(--vip-motion-fast); }
-.scatter__pt:hover { opacity: 1; }
+.scatter {
+  width: 100%;
+  height: 100%;
+}
+.scatter__axis {
+  stroke: var(--vip-border);
+  stroke-width: 1;
+}
+.scatter__pt {
+  opacity: 0.7;
+  transition: opacity var(--vip-motion-fast);
+}
+.scatter__pt:hover {
+  opacity: 1;
+}
 </style>

@@ -29,7 +29,9 @@ const crossFilters = ref<QueryFilter[]>([])
 const refreshedAt = ref(LAST_REFRESH)
 const activePageId = computed<string>({
   get: () => editor.value?.activePageId.value ?? '',
-  set: (v: string) => { if (editor.value) editor.value.activePageId.value = v },
+  set: (v: string) => {
+    if (editor.value) editor.value.activePageId.value = v
+  },
 })
 
 async function load() {
@@ -41,7 +43,11 @@ async function load() {
 function onCrossFilter({ field, value }: { field: string; value: string }) {
   const existing = crossFilters.value.find((f) => f.fieldId === field && f.value === value)
   if (existing) crossFilters.value = crossFilters.value.filter((f) => f !== existing)
-  else crossFilters.value = [...crossFilters.value.filter((f) => f.fieldId !== field), { fieldId: field, operator: 'eq', value, label: `${field} = ${value}` }]
+  else
+    crossFilters.value = [
+      ...crossFilters.value.filter((f) => f.fieldId !== field),
+      { fieldId: field, operator: 'eq', value, label: `${field} = ${value}` },
+    ]
 }
 function refresh() {
   refreshedAt.value = new Date().toISOString()
@@ -66,7 +72,10 @@ function onShare(key: string) {
 }
 const fav = computed(() => editor.value?.dashboard.favorite ?? false)
 function toggleFav() {
-  if (editor.value) { editor.value.dashboard.favorite = !editor.value.dashboard.favorite; dashboardService.toggleFavorite(editor.value.dashboard.id) }
+  if (editor.value) {
+    editor.value.dashboard.favorite = !editor.value.dashboard.favorite
+    dashboardService.toggleFavorite(editor.value.dashboard.id)
+  }
 }
 onMounted(load)
 </script>
@@ -76,13 +85,29 @@ onMounted(load)
     <header class="dview__header">
       <div class="dview__head-left">
         <h1 class="dview__title">{{ editor?.dashboard.name }}</h1>
-        <VipBadge :tone="editor?.dashboard.status === 'published' ? 'success' : 'neutral'" size="sm">{{ editor?.dashboard.status }}</VipBadge>
+        <VipBadge :tone="editor?.dashboard.status === 'published' ? 'success' : 'neutral'" size="sm">{{
+          editor?.dashboard.status
+        }}</VipBadge>
         <span class="dview__fresh"><VipIcon name="clock" :size="13" /> Refreshed {{ relativeTime(refreshedAt) }}</span>
       </div>
       <div class="dview__head-right">
-        <VipButton variant="ghost" size="sm" :icon="fav ? 'star' : 'star'" :class="{ 'is-fav': fav }" :title="fav ? 'Unfavorite' : 'Favorite'" @click="toggleFav" />
+        <VipButton
+          variant="ghost"
+          size="sm"
+          :icon="fav ? 'star' : 'star'"
+          :class="{ 'is-fav': fav }"
+          :title="fav ? 'Unfavorite' : 'Favorite'"
+          @click="toggleFav"
+        />
         <VipButton variant="ghost" size="sm" icon="refresh" title="Refresh" @click="refresh" />
-        <VipButton v-if="platform.can('dashboard:write')" variant="secondary" size="sm" icon="settings" @click="router.push(`/dashboards/${editor?.dashboard.id}/edit`)">Edit</VipButton>
+        <VipButton
+          v-if="platform.can('dashboard:write')"
+          variant="secondary"
+          size="sm"
+          icon="settings"
+          @click="router.push(`/dashboards/${editor?.dashboard.id}/edit`)"
+          >Edit</VipButton
+        >
         <VipMenu :items="shareItems" @select="onShare">
           <template #trigger><VipButton variant="primary" size="sm" icon="share">Share</VipButton></template>
         </VipMenu>
@@ -98,29 +123,106 @@ onMounted(load)
           class="dview__page"
           :class="{ 'is-active': activePageId === p.id }"
           @click="activePageId = p.id"
-        >{{ p.name }}</button>
+        >
+          {{ p.name }}
+        </button>
       </div>
-      <DashboardFilterBar :dashboard="editor.dashboard" :cross-filters="crossFilters" @clear-cross="crossFilters = []" @remove-cross="(f) => crossFilters = crossFilters.filter((x) => x !== f)" />
+      <DashboardFilterBar
+        :dashboard="editor.dashboard"
+        :cross-filters="crossFilters"
+        @clear-cross="crossFilters = []"
+        @remove-cross="(f) => (crossFilters = crossFilters.filter((x) => x !== f))"
+      />
       <div class="dview__canvas">
-        <DashboardGridCanvas :editor="editor" :cross-filters="crossFilters" :editable="false" @cross-filter="onCrossFilter" />
+        <DashboardGridCanvas
+          :editor="editor"
+          :cross-filters="crossFilters"
+          :editable="false"
+          @cross-filter="onCrossFilter"
+        />
       </div>
     </template>
 
-    <DashboardShareDialog v-if="editor" :open="shareOpen" :dashboard="editor.dashboard" :initial-tab="shareTab" @close="shareOpen = false" />
+    <DashboardShareDialog
+      v-if="editor"
+      :open="shareOpen"
+      :dashboard="editor.dashboard"
+      :initial-tab="shareTab"
+      @close="shareOpen = false"
+    />
   </div>
 </template>
 
 <style scoped>
-.dview { display: flex; flex-direction: column; height: 100%; width: 100%; }
-.dview__header { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-5); padding: var(--vip-sp-6) var(--vip-sp-8); border-bottom: 1px solid var(--vip-border-subtle); flex: none; }
-.dview__head-left { display: flex; align-items: center; gap: var(--vip-sp-4); }
-.dview__title { font-size: var(--vip-fs-xl); font-weight: var(--vip-fw-semibold); }
-.dview__fresh { display: inline-flex; align-items: center; gap: var(--vip-sp-2); font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.dview__head-right { display: flex; align-items: center; gap: var(--vip-sp-3); }
-.dview__head-right :deep(.is-fav) { color: var(--vip-warning); }
-.dview__loading { flex: 1; display: flex; align-items: center; justify-content: center; }
-.dview__pages { display: flex; gap: var(--vip-sp-2); padding: var(--vip-sp-3) var(--vip-sp-8) 0; border-bottom: 1px solid var(--vip-border-subtle); }
-.dview__page { padding: var(--vip-sp-4); background: none; border: none; border-bottom: 2px solid transparent; color: var(--vip-text-muted); font-size: var(--vip-fs-sm); font-weight: var(--vip-fw-medium); margin-bottom: -1px; }
-.dview__page.is-active { color: var(--vip-text-primary); border-bottom-color: var(--vip-brand-500); }
-.dview__canvas { flex: 1; overflow: auto; padding: var(--vip-sp-8); background: var(--vip-bg-app); }
+.dview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+.dview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-5);
+  padding: var(--vip-sp-6) var(--vip-sp-8);
+  border-bottom: 1px solid var(--vip-border-subtle);
+  flex: none;
+}
+.dview__head-left {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+}
+.dview__title {
+  font-size: var(--vip-fs-xl);
+  font-weight: var(--vip-fw-semibold);
+}
+.dview__fresh {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.dview__head-right {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+}
+.dview__head-right :deep(.is-fav) {
+  color: var(--vip-warning);
+}
+.dview__loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dview__pages {
+  display: flex;
+  gap: var(--vip-sp-2);
+  padding: var(--vip-sp-3) var(--vip-sp-8) 0;
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.dview__page {
+  padding: var(--vip-sp-4);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-medium);
+  margin-bottom: -1px;
+}
+.dview__page.is-active {
+  color: var(--vip-text-primary);
+  border-bottom-color: var(--vip-brand-500);
+}
+.dview__canvas {
+  flex: 1;
+  overflow: auto;
+  padding: var(--vip-sp-8);
+  background: var(--vip-bg-app);
+}
 </style>

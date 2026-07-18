@@ -23,18 +23,37 @@ const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
 </template>
 
 <style scoped>
-.vip-check { display: inline-flex; align-items: center; gap: var(--vip-sp-4); cursor: pointer; }
-.vip-check.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.vip-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  cursor: pointer;
+}
+.vip-check.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .vip-check__box {
-  width: 16px; height: 16px;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--vip-surface-2);
   border: 1px solid var(--vip-border-strong);
   border-radius: var(--vip-radius-xs);
   color: #fff;
   padding: 0;
-  transition: background var(--vip-motion-fast), border-color var(--vip-motion-fast);
+  transition:
+    background var(--vip-motion-fast),
+    border-color var(--vip-motion-fast);
 }
-.vip-check__box.is-on { background: var(--vip-brand-500); border-color: var(--vip-brand-500); }
-.vip-check__label { font-size: var(--vip-fs-md); color: var(--vip-text-secondary); }
+.vip-check__box.is-on {
+  background: var(--vip-brand-500);
+  border-color: var(--vip-brand-500);
+}
+.vip-check__label {
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-secondary);
+}
 </style>

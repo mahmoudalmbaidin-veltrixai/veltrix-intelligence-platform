@@ -47,7 +47,7 @@ const kpiValue = computed(() => {
 const kpiDelta = computed(() => {
   // simulate a PoP delta from row variance
   const v = kpiValue.value
-  return v === 0 ? 0 : ((Math.round(v) % 23) - 8)
+  return v === 0 ? 0 : (Math.round(v) % 23) - 8
 })
 const kpiSpark = computed(() => {
   const cart = cartesian.value
@@ -105,7 +105,11 @@ void onBarClick
     <template v-else>
       <div v-if="showTable" class="viz__datatable" role="region" aria-label="Data table view">
         <table>
-          <thead><tr><th v-for="c in result!.columns" :key="c.key">{{ c.label }}</th></tr></thead>
+          <thead>
+            <tr>
+              <th v-for="c in result!.columns" :key="c.key">{{ c.label }}</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="(r, i) in result!.rows.slice(0, 100)" :key="i">
               <td v-for="c in result!.columns" :key="c.key">{{ cellFmt(c, r[c.key]) }}</td>
@@ -139,27 +143,52 @@ void onBarClick
 
       <!-- progress -->
       <div v-else-if="widget.type === 'progress'" class="viz__progress">
-        <div class="viz__progress-track"><div class="viz__progress-fill" :style="{ width: `${Math.min(100, (kpiValue % 100))}%` }" /></div>
+        <div class="viz__progress-track">
+          <div class="viz__progress-fill" :style="{ width: `${Math.min(100, kpiValue % 100)}%` }" />
+        </div>
         <div class="viz__progress-val">{{ (kpiValue % 100).toFixed(0) }}%</div>
       </div>
 
       <!-- gauge -->
-      <GaugeChart v-else-if="widget.type === 'gauge'" :value="Math.min(100, kpiValue % 100)" :max="100" :label="widget.general.name" suffix="%" />
+      <GaugeChart
+        v-else-if="widget.type === 'gauge'"
+        :value="Math.min(100, kpiValue % 100)"
+        :max="100"
+        :label="widget.general.name"
+        suffix="%"
+      />
 
       <!-- table / pivot -->
       <div v-else-if="widget.type === 'table' || widget.type === 'pivot'" class="viz__datatable">
         <table>
-          <thead><tr><th v-for="c in result!.columns" :key="c.key">{{ c.label }}</th></tr></thead>
+          <thead>
+            <tr>
+              <th v-for="c in result!.columns" :key="c.key">{{ c.label }}</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="(r, i) in result!.rows.slice(0, 100)" :key="i">
-              <td v-for="c in result!.columns" :key="c.key" :class="{ 'is-num': c.role === 'measure' || c.role === 'metric' }">{{ cellFmt(c, r[c.key]) }}</td>
+              <td
+                v-for="c in result!.columns"
+                :key="c.key"
+                :class="{ 'is-num': c.role === 'measure' || c.role === 'metric' }"
+              >
+                {{ cellFmt(c, r[c.key]) }}
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
 
       <!-- pie / donut -->
-      <PieChart v-else-if="widget.type === 'pie' || widget.type === 'donut'" :slices="pie.slices" :donut="widget.type === 'donut'" :format="pie.format as Partial<NumberFormat>" :scheme="widget.format.colorScheme" :show-legend="widget.format.showLegend" />
+      <PieChart
+        v-else-if="widget.type === 'pie' || widget.type === 'donut'"
+        :slices="pie.slices"
+        :donut="widget.type === 'donut'"
+        :format="pie.format as Partial<NumberFormat>"
+        :scheme="widget.format.colorScheme"
+        :show-legend="widget.format.showLegend"
+      />
 
       <!-- scatter -->
       <ScatterChart v-else-if="widget.type === 'scatter'" :points="scatterPoints" :scheme="widget.format.colorScheme" />
@@ -174,7 +203,7 @@ void onBarClick
       <CartesianChart
         v-else
         :data="cartesian"
-        :kind="(widget.type as 'bar' | 'column' | 'stacked-bar' | 'line' | 'area')"
+        :kind="widget.type as 'bar' | 'column' | 'stacked-bar' | 'line' | 'area'"
         :show-legend="widget.format.showLegend"
         :show-labels="widget.format.showDataLabels"
         :show-gridlines="widget.format.showGridlines"
@@ -184,7 +213,7 @@ void onBarClick
 
     <!-- accessible toggle -->
     <button
-      v-if="hasData && !['text','rich-text','image','filter','date-filter'].includes(widget.type)"
+      v-if="hasData && !['text', 'rich-text', 'image', 'filter', 'date-filter'].includes(widget.type)"
       type="button"
       class="viz__a11y"
       :aria-pressed="showTable"
@@ -197,46 +226,193 @@ void onBarClick
 </template>
 
 <style scoped>
-.viz { position: relative; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; }
-.viz__state { flex: 1; display: flex; align-items: center; justify-content: center; }
+.viz {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.viz__state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-.viz__text { padding: var(--vip-sp-4); font-size: var(--vip-fs-md); color: var(--vip-text-secondary); overflow: auto; white-space: pre-wrap; }
-.viz__image, .viz__map { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--vip-sp-4); color: var(--vip-text-muted); font-size: var(--vip-fs-sm); text-align: center; padding: var(--vip-sp-5); }
-.viz__filter { display: flex; align-items: center; gap: var(--vip-sp-3); padding: var(--vip-sp-4); background: var(--vip-surface-2); border: 1px solid var(--vip-border); border-radius: var(--vip-radius-md); color: var(--vip-text-secondary); font-size: var(--vip-fs-sm); }
+.viz__text {
+  padding: var(--vip-sp-4);
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-secondary);
+  overflow: auto;
+  white-space: pre-wrap;
+}
+.viz__image,
+.viz__map {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vip-sp-4);
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-sm);
+  text-align: center;
+  padding: var(--vip-sp-5);
+}
+.viz__filter {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  padding: var(--vip-sp-4);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-md);
+  color: var(--vip-text-secondary);
+  font-size: var(--vip-fs-sm);
+}
 
-.viz__kpi { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: var(--vip-sp-3); }
-.viz__kpi-value { font-size: var(--vip-fs-3xl); font-weight: var(--vip-fw-bold); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.viz__kpi-delta { display: inline-flex; align-items: center; gap: var(--vip-sp-2); font-size: var(--vip-fs-sm); font-weight: var(--vip-fw-medium); }
-.viz__kpi-delta.is-up { color: var(--vip-success-text); }
-.viz__kpi-delta.is-down { color: var(--vip-danger-text); }
-.viz__kpi-spark { height: 40px; margin-top: var(--vip-sp-3); }
+.viz__kpi {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--vip-sp-3);
+}
+.viz__kpi-value {
+  font-size: var(--vip-fs-3xl);
+  font-weight: var(--vip-fw-bold);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.viz__kpi-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-medium);
+}
+.viz__kpi-delta.is-up {
+  color: var(--vip-success-text);
+}
+.viz__kpi-delta.is-down {
+  color: var(--vip-danger-text);
+}
+.viz__kpi-spark {
+  height: 40px;
+  margin-top: var(--vip-sp-3);
+}
 
-.viz__metric { flex: 1; display: flex; align-items: center; justify-content: space-around; gap: var(--vip-sp-4); }
-.viz__metric-main { text-align: center; }
-.viz__metric-value { font-size: var(--vip-fs-2xl); font-weight: var(--vip-fw-bold); font-variant-numeric: tabular-nums; }
-.viz__metric-value.is-muted { color: var(--vip-text-muted); }
-.viz__metric-label { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); margin-top: var(--vip-sp-2); }
-.viz__metric-vs { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); }
-.viz__metric-vs.is-up { color: var(--vip-success-text); }
-.viz__metric-vs.is-down { color: var(--vip-danger-text); }
+.viz__metric {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: var(--vip-sp-4);
+}
+.viz__metric-main {
+  text-align: center;
+}
+.viz__metric-value {
+  font-size: var(--vip-fs-2xl);
+  font-weight: var(--vip-fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+.viz__metric-value.is-muted {
+  color: var(--vip-text-muted);
+}
+.viz__metric-label {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  margin-top: var(--vip-sp-2);
+}
+.viz__metric-vs {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+}
+.viz__metric-vs.is-up {
+  color: var(--vip-success-text);
+}
+.viz__metric-vs.is-down {
+  color: var(--vip-danger-text);
+}
 
-.viz__progress { flex: 1; display: flex; align-items: center; gap: var(--vip-sp-5); }
-.viz__progress-track { flex: 1; height: 10px; background: var(--vip-surface-3); border-radius: var(--vip-radius-full); overflow: hidden; }
-.viz__progress-fill { height: 100%; background: linear-gradient(90deg, var(--vip-brand-500), var(--vip-brand-accent)); border-radius: var(--vip-radius-full); }
-.viz__progress-val { font-weight: var(--vip-fw-semibold); font-variant-numeric: tabular-nums; }
+.viz__progress {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+}
+.viz__progress-track {
+  flex: 1;
+  height: 10px;
+  background: var(--vip-surface-3);
+  border-radius: var(--vip-radius-full);
+  overflow: hidden;
+}
+.viz__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--vip-brand-500), var(--vip-brand-accent));
+  border-radius: var(--vip-radius-full);
+}
+.viz__progress-val {
+  font-weight: var(--vip-fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
 
-.viz__datatable { flex: 1; overflow: auto; }
-.viz__datatable table { width: 100%; border-collapse: collapse; font-size: var(--vip-fs-sm); }
-.viz__datatable th { position: sticky; top: 0; background: var(--vip-surface-1); text-align: left; padding: var(--vip-sp-3) var(--vip-sp-4); color: var(--vip-text-muted); font-size: var(--vip-fs-xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); border-bottom: 1px solid var(--vip-border); white-space: nowrap; }
-.viz__datatable td { padding: var(--vip-sp-3) var(--vip-sp-4); border-bottom: 1px solid var(--vip-border-subtle); color: var(--vip-text-secondary); }
-.viz__datatable td.is-num { text-align: right; font-variant-numeric: tabular-nums; }
+.viz__datatable {
+  flex: 1;
+  overflow: auto;
+}
+.viz__datatable table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--vip-fs-sm);
+}
+.viz__datatable th {
+  position: sticky;
+  top: 0;
+  background: var(--vip-surface-1);
+  text-align: left;
+  padding: var(--vip-sp-3) var(--vip-sp-4);
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  border-bottom: 1px solid var(--vip-border);
+  white-space: nowrap;
+}
+.viz__datatable td {
+  padding: var(--vip-sp-3) var(--vip-sp-4);
+  border-bottom: 1px solid var(--vip-border-subtle);
+  color: var(--vip-text-secondary);
+}
+.viz__datatable td.is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 .viz__a11y {
-  position: absolute; top: 2px; right: 2px;
-  width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
-  background: var(--vip-surface-2); border: 1px solid var(--vip-border); border-radius: var(--vip-radius-sm);
-  color: var(--vip-text-muted); opacity: 0; transition: opacity var(--vip-motion-fast);
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-sm);
+  color: var(--vip-text-muted);
+  opacity: 0;
+  transition: opacity var(--vip-motion-fast);
 }
-.viz:hover .viz__a11y { opacity: 1; }
-.viz__a11y:hover { color: var(--vip-text-primary); }
+.viz:hover .viz__a11y {
+  opacity: 1;
+}
+.viz__a11y:hover {
+  color: var(--vip-text-primary);
+}
 </style>

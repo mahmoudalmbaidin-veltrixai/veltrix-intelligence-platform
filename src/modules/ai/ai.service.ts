@@ -300,11 +300,7 @@ export interface AiService {
   listAgents(): Promise<Agent[]>
   listAgentRuns(): Promise<AgentRun[]>
   getAgentRun(id: string): Promise<AgentRun | undefined>
-  streamReply(
-    prompt: string,
-    onChunk: (text: string) => void,
-    signal?: AbortSignal,
-  ): Promise<{ sources: ChatSource[] }>
+  streamReply(prompt: string, onChunk: (text: string) => void, signal?: AbortSignal): Promise<{ sources: ChatSource[] }>
 }
 
 const mockAiService: AiService = {

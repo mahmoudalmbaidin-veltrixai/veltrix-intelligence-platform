@@ -50,7 +50,11 @@ function openRun(run: AgentRun): void {
 
 function cancelRun(): void {
   if (!selected.value) return
-  ui.pushToast({ kind: 'warning', title: 'Cancellation requested', message: `Run ${selected.value.id} will stop after the current step.` })
+  ui.pushToast({
+    kind: 'warning',
+    title: 'Cancellation requested',
+    message: `Run ${selected.value.id} will stop after the current step.`,
+  })
 }
 function retryRun(): void {
   if (!selected.value) return
@@ -109,9 +113,18 @@ function retryRun(): void {
         </div>
 
         <div class="runs__stats">
-          <div class="runs__stat"><span class="runs__stat-v">{{ formatDuration(selected.durationMs) }}</span><span class="runs__stat-l">Duration</span></div>
-          <div class="runs__stat"><span class="runs__stat-v">{{ selected.tokens != null ? formatNumber(selected.tokens) : '—' }}</span><span class="runs__stat-l">Tokens</span></div>
-          <div class="runs__stat"><span class="runs__stat-v">{{ selected.cost != null ? `$${selected.cost.toFixed(2)}` : '—' }}</span><span class="runs__stat-l">Cost</span></div>
+          <div class="runs__stat">
+            <span class="runs__stat-v">{{ formatDuration(selected.durationMs) }}</span
+            ><span class="runs__stat-l">Duration</span>
+          </div>
+          <div class="runs__stat">
+            <span class="runs__stat-v">{{ selected.tokens != null ? formatNumber(selected.tokens) : '—' }}</span
+            ><span class="runs__stat-l">Tokens</span>
+          </div>
+          <div class="runs__stat">
+            <span class="runs__stat-v">{{ selected.cost != null ? `$${selected.cost.toFixed(2)}` : '—' }}</span
+            ><span class="runs__stat-l">Cost</span>
+          </div>
         </div>
 
         <section class="runs__section">
@@ -130,11 +143,18 @@ function retryRun(): void {
 
         <section class="runs__section">
           <h4 class="runs__section-title">Logs</h4>
-          <pre class="runs__logs">[00:00] Run accepted for agent "{{ selected.agent }}"
+          <pre class="runs__logs">
+[00:00] Run accepted for agent "{{ selected.agent }}"
 [00:01] Planning steps ({{ selected.steps.length }})
 [00:02] Executing step 1 — {{ selected.steps[0]?.name }}
 [00:14] {{ selected.status === 'failed' ? 'ERROR: tool call returned non-zero status' : 'Progressing normally' }}
-[00:18] {{ selected.status === 'succeeded' ? 'Run completed' : selected.status === 'running' ? 'In progress…' : 'Awaiting scheduler' }}</pre>
+[00:18] {{
+              selected.status === 'succeeded'
+                ? 'Run completed'
+                : selected.status === 'running'
+                  ? 'In progress…'
+                  : 'Awaiting scheduler'
+            }}</pre>
           <p class="runs__logs-note">Logs are redacted of prompt content and credentials.</p>
         </section>
       </div>
@@ -147,7 +167,9 @@ function retryRun(): void {
         >
           Cancel
         </VipButton>
-        <VipButton v-if="selected?.status === 'failed'" variant="secondary" icon="refresh" @click="retryRun">Retry</VipButton>
+        <VipButton v-if="selected?.status === 'failed'" variant="secondary" icon="refresh" @click="retryRun"
+          >Retry</VipButton
+        >
         <VipButton variant="secondary" @click="selected = null">Close</VipButton>
       </template>
     </VipDrawer>
@@ -155,34 +177,171 @@ function retryRun(): void {
 </template>
 
 <style scoped>
-.runs { max-width: 1280px; margin: 0 auto; }
-.runs__agent { display: flex; align-items: center; gap: var(--vip-sp-4); }
-.runs__agent-icon { color: var(--vip-text-muted); }
-.runs__agent-name { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.runs__muted { color: var(--vip-text-muted); }
-.runs__mono { font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
-.runs__pulse { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: runs-pulse 1s ease-in-out infinite; }
-@keyframes runs-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.runs {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.runs__agent {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+}
+.runs__agent-icon {
+  color: var(--vip-text-muted);
+}
+.runs__agent-name {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.runs__muted {
+  color: var(--vip-text-muted);
+}
+.runs__mono {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
+.runs__pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: runs-pulse 1s ease-in-out infinite;
+}
+@keyframes runs-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
 
-.runs__detail { display: flex; flex-direction: column; gap: var(--vip-sp-7); }
-.runs__head { display: flex; align-items: center; gap: var(--vip-sp-5); }
-.runs__id { font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
-.runs__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--vip-sp-5); }
-.runs__stat { display: flex; flex-direction: column; gap: 2px; padding: var(--vip-sp-5); background: var(--vip-surface-2); border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md); }
-.runs__stat-v { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); font-family: var(--vip-font-mono); }
-.runs__stat-l { font-size: var(--vip-fs-2xs); color: var(--vip-text-muted); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); }
+.runs__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-7);
+}
+.runs__head {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+}
+.runs__id {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
+.runs__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--vip-sp-5);
+}
+.runs__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--vip-sp-5);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+}
+.runs__stat-v {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+  font-family: var(--vip-font-mono);
+}
+.runs__stat-l {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+}
 
-.runs__section { display: flex; flex-direction: column; gap: var(--vip-sp-5); }
-.runs__section-title { font-size: var(--vip-fs-sm); font-weight: var(--vip-fw-semibold); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-muted); }
-.runs__steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.runs__step { display: flex; align-items: center; gap: var(--vip-sp-5); padding: var(--vip-sp-4) var(--vip-sp-5); background: var(--vip-surface-2); border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md); }
-.runs__step-dot { width: 24px; height: 24px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--vip-surface-3); color: var(--vip-text-muted); }
-.runs__step.is-succeeded .runs__step-dot { background: var(--vip-success-soft); color: var(--vip-success-text); }
-.runs__step.is-running .runs__step-dot { background: var(--vip-info-soft); color: var(--vip-info-text); }
-.runs__step.is-failed .runs__step-dot { background: var(--vip-danger-soft); color: var(--vip-danger-text); }
-.runs__step-body { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.runs__step-name { font-size: var(--vip-fs-sm); color: var(--vip-text-primary); }
-.runs__step-tool { font-size: var(--vip-fs-2xs); font-family: var(--vip-font-mono); color: var(--vip-text-muted); }
-.runs__logs { font-family: var(--vip-font-mono); font-size: var(--vip-fs-xs); color: var(--vip-text-secondary); background: var(--vip-surface-inset); border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md); padding: var(--vip-sp-5); overflow-x: auto; white-space: pre-wrap; line-height: var(--vip-lh-snug); }
-.runs__logs-note { font-size: var(--vip-fs-2xs); color: var(--vip-text-muted); }
+.runs__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
+.runs__section-title {
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-muted);
+}
+.runs__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.runs__step {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+  padding: var(--vip-sp-4) var(--vip-sp-5);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+}
+.runs__step-dot {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--vip-surface-3);
+  color: var(--vip-text-muted);
+}
+.runs__step.is-succeeded .runs__step-dot {
+  background: var(--vip-success-soft);
+  color: var(--vip-success-text);
+}
+.runs__step.is-running .runs__step-dot {
+  background: var(--vip-info-soft);
+  color: var(--vip-info-text);
+}
+.runs__step.is-failed .runs__step-dot {
+  background: var(--vip-danger-soft);
+  color: var(--vip-danger-text);
+}
+.runs__step-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.runs__step-name {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-primary);
+}
+.runs__step-tool {
+  font-size: var(--vip-fs-2xs);
+  font-family: var(--vip-font-mono);
+  color: var(--vip-text-muted);
+}
+.runs__logs {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-secondary);
+  background: var(--vip-surface-inset);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+  padding: var(--vip-sp-5);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  line-height: var(--vip-lh-snug);
+}
+.runs__logs-note {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-muted);
+}
 </style>

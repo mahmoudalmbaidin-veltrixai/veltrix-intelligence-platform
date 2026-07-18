@@ -64,8 +64,8 @@ const warnCount = computed(() => metrics.value.filter((m) => state(m) === 'warn'
     </VipPageHeader>
 
     <VipAlert v-if="overCount" tone="danger" title="Hard limit reached">
-      {{ overCount }} {{ overCount === 1 ? 'metric has' : 'metrics have' }} exceeded the plan limit.
-      Additional usage may be throttled until you upgrade.
+      {{ overCount }} {{ overCount === 1 ? 'metric has' : 'metrics have' }} exceeded the plan limit. Additional usage
+      may be throttled until you upgrade.
     </VipAlert>
     <VipAlert v-else-if="warnCount" tone="warning" title="Approaching limits">
       {{ warnCount }} {{ warnCount === 1 ? 'metric is' : 'metrics are' }} above 80% of the plan limit.
@@ -99,27 +99,70 @@ const warnCount = computed(() => metrics.value.filter((m) => state(m) === 'warn'
 </template>
 
 <style scoped>
-.usg { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--vip-sp-5); }
+.usg {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
 .usg__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--vip-sp-5);
 }
-.usg__card { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.usg__head { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-4); }
-.usg__label { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.usg__values { display: flex; align-items: baseline; gap: var(--vip-sp-3); }
-.usg__used { font-size: var(--vip-fs-2xl); font-weight: var(--vip-fw-semibold); color: var(--vip-text-primary); }
-.usg__limit { font-size: var(--vip-fs-md); color: var(--vip-text-muted); }
+.usg__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.usg__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-4);
+}
+.usg__label {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.usg__values {
+  display: flex;
+  align-items: baseline;
+  gap: var(--vip-sp-3);
+}
+.usg__used {
+  font-size: var(--vip-fs-2xl);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+}
+.usg__limit {
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-muted);
+}
 .usg__bar {
   height: 8px;
   background: var(--vip-surface-3);
   border-radius: var(--vip-radius-full);
   overflow: hidden;
 }
-.usg__fill { height: 100%; border-radius: var(--vip-radius-full); transition: width var(--vip-motion-base) var(--vip-ease-standard); }
-.usg__fill.is-ok { background: var(--vip-success); }
-.usg__fill.is-warn { background: var(--vip-warning); }
-.usg__fill.is-over { background: var(--vip-danger); }
-.usg__unit { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
+.usg__fill {
+  height: 100%;
+  border-radius: var(--vip-radius-full);
+  transition: width var(--vip-motion-base) var(--vip-ease-standard);
+}
+.usg__fill.is-ok {
+  background: var(--vip-success);
+}
+.usg__fill.is-warn {
+  background: var(--vip-warning);
+}
+.usg__fill.is-over {
+  background: var(--vip-danger);
+}
+.usg__unit {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
 </style>

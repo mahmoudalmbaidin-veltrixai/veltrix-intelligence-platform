@@ -17,6 +17,9 @@ export default ts.config(
     rules: {
       'vue/multi-word-component-names': 'off',
       'vue/no-v-html': 'off',
+      // Vue-2-only rule; false-positives on TypeScript union types (`a | b`)
+      // inside template bindings (e.g. `x as 'a' | 'b'`).
+      'vue/no-deprecated-filter': 'off',
       'vue/require-default-prop': 'off',
       'vue/attribute-hyphenation': 'off',
       // Editor engines are composables passed to studio components as a prop and

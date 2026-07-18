@@ -18,7 +18,10 @@ const { data, isLoading } = useQuery('operations:activity', (signal) =>
   }),
 )
 
-const DOMAIN_META: Record<ActivityDomain, { label: string; icon: string; tone: 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
+const DOMAIN_META: Record<
+  ActivityDomain,
+  { label: string; icon: string; tone: 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' }
+> = {
   pipeline: { label: 'Pipelines', icon: 'workflow', tone: 'brand' },
   dataset: { label: 'Datasets', icon: 'database', tone: 'info' },
   dashboard: { label: 'Dashboards', icon: 'chart', tone: 'success' },
@@ -122,9 +125,20 @@ const grouped = computed<DayGroup[]>(() => {
 </template>
 
 <style scoped>
-.act { max-width: 900px; margin: 0 auto; }
-.act__loading { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.act__groups { display: flex; flex-direction: column; gap: var(--vip-sp-7); }
+.act {
+  max-width: 900px;
+  margin: 0 auto;
+}
+.act__loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.act__groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-7);
+}
 .act__day {
   font-size: var(--vip-fs-sm);
   font-weight: var(--vip-fw-semibold);
@@ -133,32 +147,92 @@ const grouped = computed<DayGroup[]>(() => {
   letter-spacing: var(--vip-ls-wide);
   margin-bottom: var(--vip-sp-5);
 }
-.act__timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+.act__timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
 .act__timeline::before {
   content: '';
   position: absolute;
-  left: 15px; top: 4px; bottom: 4px;
+  left: 15px;
+  top: 4px;
+  bottom: 4px;
   width: 1px;
   background: var(--vip-border-subtle);
 }
-.act__event { display: flex; gap: var(--vip-sp-5); padding-bottom: var(--vip-sp-6); position: relative; }
-.act__event:last-child { padding-bottom: 0; }
+.act__event {
+  display: flex;
+  gap: var(--vip-sp-5);
+  padding-bottom: var(--vip-sp-6);
+  position: relative;
+}
+.act__event:last-child {
+  padding-bottom: 0;
+}
 .act__marker {
-  width: 32px; height: 32px; flex: none; z-index: 1;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--vip-radius-full);
   background: var(--vip-surface-2);
   border: 1px solid var(--vip-border);
 }
-.act__marker.is-brand { color: var(--vip-brand-text); background: var(--vip-brand-soft); border-color: transparent; }
-.act__marker.is-success { color: var(--vip-success-text); background: var(--vip-success-soft); border-color: transparent; }
-.act__marker.is-warning { color: var(--vip-warning-text); background: var(--vip-warning-soft); border-color: transparent; }
-.act__marker.is-danger { color: var(--vip-danger-text); background: var(--vip-danger-soft); border-color: transparent; }
-.act__marker.is-info { color: var(--vip-info-text); background: var(--vip-info-soft); border-color: transparent; }
-.act__content { flex: 1; padding-top: var(--vip-sp-2); }
-.act__text { font-size: var(--vip-fs-md); color: var(--vip-text-secondary); margin: 0; }
-.act__text strong { color: var(--vip-text-primary); font-weight: var(--vip-fw-semibold); }
-.act__target { color: var(--vip-text-primary); font-weight: var(--vip-fw-medium); }
-.act__meta { display: flex; align-items: center; gap: var(--vip-sp-4); margin-top: var(--vip-sp-3); }
-.act__time { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
+.act__marker.is-brand {
+  color: var(--vip-brand-text);
+  background: var(--vip-brand-soft);
+  border-color: transparent;
+}
+.act__marker.is-success {
+  color: var(--vip-success-text);
+  background: var(--vip-success-soft);
+  border-color: transparent;
+}
+.act__marker.is-warning {
+  color: var(--vip-warning-text);
+  background: var(--vip-warning-soft);
+  border-color: transparent;
+}
+.act__marker.is-danger {
+  color: var(--vip-danger-text);
+  background: var(--vip-danger-soft);
+  border-color: transparent;
+}
+.act__marker.is-info {
+  color: var(--vip-info-text);
+  background: var(--vip-info-soft);
+  border-color: transparent;
+}
+.act__content {
+  flex: 1;
+  padding-top: var(--vip-sp-2);
+}
+.act__text {
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-secondary);
+  margin: 0;
+}
+.act__text strong {
+  color: var(--vip-text-primary);
+  font-weight: var(--vip-fw-semibold);
+}
+.act__target {
+  color: var(--vip-text-primary);
+  font-weight: var(--vip-fw-medium);
+}
+.act__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  margin-top: var(--vip-sp-3);
+}
+.act__time {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
 </style>

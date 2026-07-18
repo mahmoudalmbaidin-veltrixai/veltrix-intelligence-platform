@@ -69,8 +69,15 @@ interface Draft {
   critical: number | null
 }
 const draft = reactive<Draft>({
-  name: '', description: '', modelId: MODELS[0].id, measureId: '',
-  aggregation: 'sum', format: 'plain', target: null, warning: null, critical: null,
+  name: '',
+  description: '',
+  modelId: MODELS[0].id,
+  measureId: '',
+  aggregation: 'sum',
+  format: 'plain',
+  target: null,
+  warning: null,
+  critical: null,
 })
 
 const activeModel = computed(() => MODELS.find((m) => m.id === draft.modelId) ?? MODELS[0])
@@ -80,23 +87,31 @@ const measureOptions = computed(() =>
     .map((f) => ({ value: f.id, label: f.label })),
 )
 const aggOptions = [
-  { value: 'sum', label: 'Sum' }, { value: 'avg', label: 'Average' },
-  { value: 'min', label: 'Minimum' }, { value: 'max', label: 'Maximum' },
-  { value: 'count', label: 'Count' }, { value: 'median', label: 'Median' },
+  { value: 'sum', label: 'Sum' },
+  { value: 'avg', label: 'Average' },
+  { value: 'min', label: 'Minimum' },
+  { value: 'max', label: 'Maximum' },
+  { value: 'count', label: 'Count' },
+  { value: 'median', label: 'Median' },
 ]
 const formatOptions = [
-  { value: 'plain', label: 'Plain number' }, { value: 'currency', label: 'Currency' },
-  { value: 'percent', label: 'Percent' }, { value: 'compact', label: 'Compact' },
+  { value: 'plain', label: 'Plain number' },
+  { value: 'currency', label: 'Currency' },
+  { value: 'percent', label: 'Percent' },
+  { value: 'compact', label: 'Compact' },
 ]
 
-watch(() => draft.modelId, () => {
-  draft.measureId = measureOptions.value[0]?.value ?? ''
-  const f = activeModel.value.fields.find((x) => x.id === draft.measureId)
-  if (f) {
-    draft.aggregation = f.defaultAggregation ?? 'sum'
-    draft.format = f.format?.style ?? 'plain'
-  }
-})
+watch(
+  () => draft.modelId,
+  () => {
+    draft.measureId = measureOptions.value[0]?.value ?? ''
+    const f = activeModel.value.fields.find((x) => x.id === draft.measureId)
+    if (f) {
+      draft.aggregation = f.defaultAggregation ?? 'sum'
+      draft.format = f.format?.style ?? 'plain'
+    }
+  },
+)
 
 function openDialog() {
   draft.name = ''
@@ -151,17 +166,14 @@ const previewFormatted = computed(() =>
 const nameError = computed(() => (draft.name.trim().length === 0 ? 'Name is required' : ''))
 const canSubmit = computed(() => !nameError.value && !!draft.measureId)
 
-const { mutate, isPending } = useMutation(
-  (input: Omit<Metric, 'id'>) => semanticStudioService.createMetric(input),
-  {
-    invalidate: ['semantic:metrics'],
-    onSuccess: (m) => {
-      ui.pushToast({ kind: 'success', title: 'Metric created', message: `${m.name} added as ${m.status}.` })
-      dialogOpen.value = false
-      refetch()
-    },
+const { mutate, isPending } = useMutation((input: Omit<Metric, 'id'>) => semanticStudioService.createMetric(input), {
+  invalidate: ['semantic:metrics'],
+  onSuccess: (m) => {
+    ui.pushToast({ kind: 'success', title: 'Metric created', message: `${m.name} added as ${m.status}.` })
+    dialogOpen.value = false
+    refetch()
   },
-)
+})
 
 async function submit() {
   if (!canSubmit.value) return
@@ -184,7 +196,10 @@ async function submit() {
 
 <template>
   <div class="wrap">
-    <VipPageHeader title="Metrics &amp; KPIs" description="Curated, certified measures with targets and alert thresholds — the single source of truth for the business.">
+    <VipPageHeader
+      title="Metrics &amp; KPIs"
+      description="Curated, certified measures with targets and alert thresholds — the single source of truth for the business."
+    >
       <template #actions>
         <VipButton variant="primary" icon="plus" :disabled="!canWrite" @click="openDialog">New metric</VipButton>
       </template>
@@ -218,14 +233,36 @@ async function submit() {
       </VipTable>
     </VipCard>
 
-    <VipDialog :open="dialogOpen" title="New metric" description="Define a governed KPI backed by a semantic measure." size="lg" @close="dialogOpen = false">
+    <VipDialog
+      :open="dialogOpen"
+      title="New metric"
+      description="Define a governed KPI backed by a semantic measure."
+      size="lg"
+      @close="dialogOpen = false"
+    >
       <div class="builder">
         <div class="builder__form">
-          <VipInput v-model="draft.name" label="Name" placeholder="e.g. Net Revenue" required :error="draft.name ? nameError : ''" />
-          <VipTextarea v-model="draft.description" label="Description" :rows="2" placeholder="What does this metric represent?" />
+          <VipInput
+            v-model="draft.name"
+            label="Name"
+            placeholder="e.g. Net Revenue"
+            required
+            :error="draft.name ? nameError : ''"
+          />
+          <VipTextarea
+            v-model="draft.description"
+            label="Description"
+            :rows="2"
+            placeholder="What does this metric represent?"
+          />
           <div class="row2">
             <VipSelect v-model="draft.modelId" :options="measureModels" label="Model" />
-            <VipSelect v-model="draft.measureId" :options="measureOptions" label="Measure" placeholder="Select a measure" />
+            <VipSelect
+              v-model="draft.measureId"
+              :options="measureOptions"
+              label="Measure"
+              placeholder="Select a measure"
+            />
           </div>
           <div class="row2">
             <VipSelect v-model="draft.aggregation" :options="aggOptions" label="Aggregation" />
@@ -252,33 +289,92 @@ async function submit() {
       </div>
       <template #footer>
         <VipButton variant="tertiary" @click="dialogOpen = false">Cancel</VipButton>
-        <VipButton variant="primary" :loading="isPending" :disabled="!canSubmit" @click="submit">Create metric</VipButton>
+        <VipButton variant="primary" :loading="isPending" :disabled="!canSubmit" @click="submit"
+          >Create metric</VipButton
+        >
       </template>
     </VipDialog>
   </div>
 </template>
 
 <style scoped>
-.wrap { max-width: 1120px; }
-.c-name { display: flex; flex-direction: column; gap: 2px; }
-.c-name__label { font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.c-name__desc { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mono { font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); }
+.wrap {
+  max-width: 1120px;
+}
+.c-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.c-name__label {
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.c-name__desc {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mono {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+}
 
-.builder { display: grid; grid-template-columns: 1fr 220px; gap: var(--vip-sp-7); }
-.builder__form { display: flex; flex-direction: column; gap: var(--vip-sp-5); }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--vip-sp-5); }
+.builder {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: var(--vip-sp-7);
+}
+.builder__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--vip-sp-5);
+}
 .builder__preview {
   background: var(--vip-surface-2);
   border: 1px solid var(--vip-border-subtle);
   border-radius: var(--vip-radius-lg);
   padding: var(--vip-sp-6);
-  display: flex; flex-direction: column; gap: var(--vip-sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
   height: fit-content;
 }
-.preview__label { font-size: var(--vip-fs-2xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-muted); }
-.preview__value { font-size: var(--vip-fs-3xl); font-weight: var(--vip-fw-bold); color: var(--vip-text-primary); min-height: 34px; display: flex; align-items: center; }
-.preview__meta { font-size: var(--vip-fs-xs); color: var(--vip-text-secondary); }
-.preview__target { font-size: var(--vip-fs-xs); color: var(--vip-brand-text); }
-.preview__note { font-size: var(--vip-fs-2xs); color: var(--vip-text-disabled); margin-top: var(--vip-sp-3); padding-top: var(--vip-sp-4); border-top: 1px solid var(--vip-border-subtle); }
+.preview__label {
+  font-size: var(--vip-fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-muted);
+}
+.preview__value {
+  font-size: var(--vip-fs-3xl);
+  font-weight: var(--vip-fw-bold);
+  color: var(--vip-text-primary);
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+}
+.preview__meta {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-secondary);
+}
+.preview__target {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-brand-text);
+}
+.preview__note {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-disabled);
+  margin-top: var(--vip-sp-3);
+  padding-top: var(--vip-sp-4);
+  border-top: 1px solid var(--vip-border-subtle);
+}
 </style>

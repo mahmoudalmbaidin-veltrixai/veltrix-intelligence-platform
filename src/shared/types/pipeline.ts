@@ -51,8 +51,17 @@ export interface NodeTypeSpec {
 }
 
 export type NodeConfigFieldType =
-  | 'text' | 'textarea' | 'number' | 'select' | 'multiselect'
-  | 'boolean' | 'columns' | 'code' | 'keyvalue' | 'secret' | 'formula'
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'select'
+  | 'multiselect'
+  | 'boolean'
+  | 'columns'
+  | 'code'
+  | 'keyvalue'
+  | 'secret'
+  | 'formula'
 
 export interface NodeConfigField {
   key: string
@@ -75,8 +84,7 @@ export interface NodeValidationMsg {
 }
 
 export type NodeExecStatus =
-  | 'idle' | 'queued' | 'running' | 'waiting'
-  | 'succeeded' | 'failed' | 'cancelled' | 'timed-out' | 'skipped'
+  'idle' | 'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'cancelled' | 'timed-out' | 'skipped'
 
 export interface SchemaColumn {
   name: string
@@ -155,9 +163,7 @@ export interface ValidationReport {
 
 /* ---------------- Execution ---------------- */
 
-export type RunStatus =
-  | 'queued' | 'running' | 'waiting'
-  | 'succeeded' | 'failed' | 'cancelled' | 'timed-out'
+export type RunStatus = 'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'cancelled' | 'timed-out'
 
 export interface RunNodeState {
   nodeId: string

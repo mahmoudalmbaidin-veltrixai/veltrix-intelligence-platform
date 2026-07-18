@@ -1,10 +1,7 @@
 /** Locale-aware value formatting used across analytics + tables. */
 import type { NumberFormat } from '@/shared/types/semantic'
 
-export function formatNumber(
-  value: number | null | undefined,
-  fmt: Partial<NumberFormat> = {},
-): string {
+export function formatNumber(value: number | null | undefined, fmt: Partial<NumberFormat> = {}): string {
   if (value == null || Number.isNaN(value)) return '—'
   const decimals = fmt.decimals ?? (Number.isInteger(value) ? 0 : 1)
   switch (fmt.style) {

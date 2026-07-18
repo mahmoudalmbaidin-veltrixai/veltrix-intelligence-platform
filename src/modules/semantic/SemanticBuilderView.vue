@@ -40,7 +40,11 @@ const tabs = computed(() => {
   return [
     { value: 'entities', label: 'Entities', count: model.value?.entities.length },
     { value: 'relationships', label: 'Relationships', count: hierarchies.value.length },
-    { value: 'dimensions', label: 'Dimensions', count: f.filter((x) => x.role === 'dimension' || x.role === 'time').length },
+    {
+      value: 'dimensions',
+      label: 'Dimensions',
+      count: f.filter((x) => x.role === 'dimension' || x.role === 'time').length,
+    },
     { value: 'measures', label: 'Measures', count: f.filter((x) => x.role === 'measure').length },
     { value: 'metrics', label: 'Metrics', count: f.filter((x) => x.role === 'metric').length },
     { value: 'history', label: 'Version history' },
@@ -51,7 +55,13 @@ const tabs = computed(() => {
 const selectedId = ref<string | null>(null)
 const selected = computed(() => model.value?.fields.find((f) => f.id === selectedId.value) ?? null)
 
-interface FieldConfig { label: string; role: SemanticField['role']; aggregation: Aggregation; format: string; visible: boolean }
+interface FieldConfig {
+  label: string
+  role: SemanticField['role']
+  aggregation: Aggregation
+  format: string
+  visible: boolean
+}
 const overrides = reactive<Record<string, FieldConfig>>({})
 
 function configFor(f: SemanticField): FieldConfig {
@@ -77,11 +87,17 @@ function selectField(f: SemanticField) {
 }
 
 /* ---- derived groupings ---- */
-const dimensions = computed(() => (model.value?.fields ?? []).filter((f) => f.role === 'dimension' || f.role === 'time'))
+const dimensions = computed(() =>
+  (model.value?.fields ?? []).filter((f) => f.role === 'dimension' || f.role === 'time'),
+)
 const measures = computed(() => (model.value?.fields ?? []).filter((f) => f.role === 'measure'))
 const metrics = computed(() => (model.value?.fields ?? []).filter((f) => f.role === 'metric'))
 
-interface Hierarchy { id: string; label: string; levels: SemanticField[] }
+interface Hierarchy {
+  id: string
+  label: string
+  levels: SemanticField[]
+}
 const hierarchies = computed<Hierarchy[]>(() => {
   const map = new Map<string, SemanticField[]>()
   for (const f of model.value?.fields ?? []) {
@@ -98,33 +114,53 @@ const hierarchies = computed<Hierarchy[]>(() => {
 })
 
 const aggOptions = [
-  { value: 'sum', label: 'Sum' }, { value: 'avg', label: 'Average' },
-  { value: 'min', label: 'Minimum' }, { value: 'max', label: 'Maximum' },
-  { value: 'count', label: 'Count' }, { value: 'count_distinct', label: 'Count distinct' },
-  { value: 'median', label: 'Median' }, { value: 'none', label: 'None' },
+  { value: 'sum', label: 'Sum' },
+  { value: 'avg', label: 'Average' },
+  { value: 'min', label: 'Minimum' },
+  { value: 'max', label: 'Maximum' },
+  { value: 'count', label: 'Count' },
+  { value: 'count_distinct', label: 'Count distinct' },
+  { value: 'median', label: 'Median' },
+  { value: 'none', label: 'None' },
 ]
 const formatOptions = [
-  { value: 'plain', label: 'Plain number' }, { value: 'currency', label: 'Currency' },
-  { value: 'percent', label: 'Percent' }, { value: 'compact', label: 'Compact' },
+  { value: 'plain', label: 'Plain number' },
+  { value: 'currency', label: 'Currency' },
+  { value: 'percent', label: 'Percent' },
+  { value: 'compact', label: 'Compact' },
 ]
 const roleOptions = [
-  { value: 'dimension', label: 'Dimension' }, { value: 'measure', label: 'Measure' },
-  { value: 'metric', label: 'Metric' }, { value: 'time', label: 'Time' },
+  { value: 'dimension', label: 'Dimension' },
+  { value: 'measure', label: 'Measure' },
+  { value: 'metric', label: 'Metric' },
+  { value: 'time', label: 'Time' },
 ]
 
 const TYPE_ICON: Record<DataType, string> = {
-  string: 'text', number: 'hash', integer: 'hash', currency: 'card',
-  percent: 'pieChart', boolean: 'check', date: 'calendar', datetime: 'calendarClock', geo: 'target',
+  string: 'text',
+  number: 'hash',
+  integer: 'hash',
+  currency: 'card',
+  percent: 'pieChart',
+  boolean: 'check',
+  date: 'calendar',
+  datetime: 'calendarClock',
+  geo: 'target',
 }
 const ROLE_TONE: Record<SemanticField['role'], 'brand' | 'info' | 'success' | 'warning'> = {
-  dimension: 'info', measure: 'brand', metric: 'success', time: 'warning',
+  dimension: 'info',
+  measure: 'brand',
+  metric: 'success',
+  time: 'warning',
 }
 
 /* ---- publish / validation ---- */
 const status = ref<'draft' | 'published'>('published')
 const validationIssues = computed(() => {
   const issues: string[] = []
-  const noAgg = measures.value.filter((f) => !(f.defaultAggregation || overrides[f.id]?.aggregation) || overrides[f.id]?.aggregation === 'none')
+  const noAgg = measures.value.filter(
+    (f) => !(f.defaultAggregation || overrides[f.id]?.aggregation) || overrides[f.id]?.aggregation === 'none',
+  )
   if (noAgg.length) issues.push(`${noAgg.length} measure(s) have no default aggregation`)
   const noDesc = (model.value?.fields ?? []).filter((f) => !f.description).length
   if (noDesc > 0) issues.push(`${noDesc} field(s) missing a description`)
@@ -141,12 +177,30 @@ function publish() {
     return
   }
   status.value = 'published'
-  ui.pushToast({ kind: 'success', title: 'Model published', message: `${model.value?.label} is now certified and query-ready.` })
+  ui.pushToast({
+    kind: 'success',
+    title: 'Model published',
+    message: `${model.value?.label} is now certified and query-ready.`,
+  })
 }
 
-interface Version { id: string; label: string; author: string; when: string; note: string; current?: boolean }
+interface Version {
+  id: string
+  label: string
+  author: string
+  when: string
+  note: string
+  current?: boolean
+}
 const versions = computed<Version[]>(() => [
-  { id: 'v14', label: 'v1.4', author: platform.user.name, when: isoAgo(90), note: 'Added margin metric and KPI folder.', current: true },
+  {
+    id: 'v14',
+    label: 'v1.4',
+    author: platform.user.name,
+    when: isoAgo(90),
+    note: 'Added margin metric and KPI folder.',
+    current: true,
+  },
   { id: 'v13', label: 'v1.3', author: 'A. Rahman', when: isoAgo(60 * 26), note: 'Renamed Sales Channel dimension.' },
   { id: 'v12', label: 'v1.2', author: 'L. Haddad', when: isoAgo(60 * 24 * 6), note: 'Introduced geography hierarchy.' },
   { id: 'v11', label: 'v1.1', author: 'A. Rahman', when: isoAgo(60 * 24 * 18), note: 'Certified for production use.' },
@@ -187,12 +241,7 @@ const versions = computed<Version[]>(() => [
       <aside class="panel panel--left">
         <div class="panel__head">Datasets &amp; entities</div>
         <div class="panel__body">
-          <button
-            v-for="e in model?.entities"
-            :key="e.id"
-            type="button"
-            class="entity-row"
-          >
+          <button v-for="e in model?.entities" :key="e.id" type="button" class="entity-row">
             <VipIcon name="database" :size="14" />
             <span class="entity-row__label">{{ e.label }}</span>
             <span class="entity-row__count">{{ e.fields.length }}</span>
@@ -260,7 +309,7 @@ const versions = computed<Version[]>(() => [
         <!-- Dimensions / Measures / Metrics tables -->
         <div v-else-if="tab === 'dimensions' || tab === 'measures' || tab === 'metrics'" class="list">
           <div
-            v-for="f in (tab === 'dimensions' ? dimensions : tab === 'measures' ? measures : metrics)"
+            v-for="f in tab === 'dimensions' ? dimensions : tab === 'measures' ? measures : metrics"
             :key="f.id"
             class="list-row"
             :class="{ 'is-selected': f.id === selectedId }"
@@ -297,8 +346,17 @@ const versions = computed<Version[]>(() => [
       <aside class="panel panel--right">
         <div class="panel__head">Field inspector</div>
         <div v-if="selected" class="panel__body inspector">
-          <VipInput :model-value="configFor(selected).label" label="Display label" @update:model-value="(v) => (configFor(selected!).label = String(v))" />
-          <VipSelect :model-value="configFor(selected).role" :options="roleOptions" label="Role" @update:model-value="(v) => (configFor(selected!).role = v as SemanticField['role'])" />
+          <VipInput
+            :model-value="configFor(selected).label"
+            label="Display label"
+            @update:model-value="(v) => (configFor(selected!).label = String(v))"
+          />
+          <VipSelect
+            :model-value="configFor(selected).role"
+            :options="roleOptions"
+            label="Role"
+            @update:model-value="(v) => (configFor(selected!).role = v as SemanticField['role'])"
+          />
           <VipSelect
             v-if="configFor(selected).role === 'measure' || configFor(selected).role === 'metric'"
             :model-value="configFor(selected).aggregation"
@@ -306,7 +364,12 @@ const versions = computed<Version[]>(() => [
             label="Default aggregation"
             @update:model-value="(v) => (configFor(selected!).aggregation = v as Aggregation)"
           />
-          <VipSelect :model-value="configFor(selected).format" :options="formatOptions" label="Number format" @update:model-value="(v) => (configFor(selected!).format = v)" />
+          <VipSelect
+            :model-value="configFor(selected).format"
+            :options="formatOptions"
+            label="Number format"
+            @update:model-value="(v) => (configFor(selected!).format = v)"
+          />
           <div class="inspector__meta">
             <span class="inspector__key">Field id</span>
             <code>{{ selected.id }}</code>
@@ -320,11 +383,18 @@ const versions = computed<Version[]>(() => [
               <div class="inspector__switch-label">Visible in explore</div>
               <div class="inspector__switch-help">Hide internal or deprecated fields from consumers.</div>
             </div>
-            <VipSwitch :model-value="configFor(selected).visible" @update:model-value="(v) => (configFor(selected!).visible = v)" />
+            <VipSwitch
+              :model-value="configFor(selected).visible"
+              @update:model-value="(v) => (configFor(selected!).visible = v)"
+            />
           </div>
         </div>
         <div v-else class="panel__body">
-          <VipEmptyState icon="target" title="No field selected" description="Select a field from the canvas to configure it." />
+          <VipEmptyState
+            icon="target"
+            title="No field selected"
+            description="Select a field from the canvas to configure it."
+          />
         </div>
       </aside>
     </div>
@@ -332,9 +402,23 @@ const versions = computed<Version[]>(() => [
 </template>
 
 <style scoped>
-.wrap { max-width: 1360px; }
-.issues { margin: 0; padding-left: var(--vip-sp-6); display: flex; flex-direction: column; gap: 2px; }
-.loading { display: flex; align-items: center; gap: var(--vip-sp-4); color: var(--vip-text-muted); padding: var(--vip-sp-9); }
+.wrap {
+  max-width: 1360px;
+}
+.issues {
+  margin: 0;
+  padding-left: var(--vip-sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.loading {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  color: var(--vip-text-muted);
+  padding: var(--vip-sp-9);
+}
 
 .builder {
   display: grid;
@@ -358,64 +442,274 @@ const versions = computed<Version[]>(() => [
   color: var(--vip-text-muted);
   border-bottom: 1px solid var(--vip-border-subtle);
 }
-.panel__body { padding: var(--vip-sp-5); }
-.panel__sub { font-size: var(--vip-fs-2xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-disabled); margin: var(--vip-sp-6) 0 var(--vip-sp-3); }
+.panel__body {
+  padding: var(--vip-sp-5);
+}
+.panel__sub {
+  font-size: var(--vip-fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-disabled);
+  margin: var(--vip-sp-6) 0 var(--vip-sp-3);
+}
 
 .entity-row {
-  display: flex; align-items: center; gap: var(--vip-sp-4); width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  width: 100%;
   padding: var(--vip-sp-4) var(--vip-sp-4);
-  background: none; border: none; border-radius: var(--vip-radius-sm);
-  color: var(--vip-text-secondary); font-size: var(--vip-fs-sm); text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--vip-radius-sm);
+  color: var(--vip-text-secondary);
+  font-size: var(--vip-fs-sm);
+  text-align: left;
 }
-.entity-row:hover { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
-.entity-row--sub { color: var(--vip-text-muted); }
-.entity-row__label { flex: 1; }
-.entity-row__count { font-size: var(--vip-fs-2xs); color: var(--vip-text-muted); background: var(--vip-surface-3); padding: 1px 6px; border-radius: var(--vip-radius-full); }
+.entity-row:hover {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
+.entity-row--sub {
+  color: var(--vip-text-muted);
+}
+.entity-row__label {
+  flex: 1;
+}
+.entity-row__count {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-muted);
+  background: var(--vip-surface-3);
+  padding: 1px 6px;
+  border-radius: var(--vip-radius-full);
+}
 
-.canvas { display: flex; flex-wrap: wrap; gap: var(--vip-sp-6); padding: var(--vip-sp-6); }
-.entity-card { width: 300px; }
-.entity-card__head { display: flex; align-items: center; gap: var(--vip-sp-4); padding: var(--vip-sp-5) var(--vip-sp-6); border-bottom: 1px solid var(--vip-border-subtle); background: var(--vip-surface-2); }
-.entity-card__icon { width: 30px; height: 30px; flex: none; display: inline-flex; align-items: center; justify-content: center; background: var(--vip-brand-soft); color: var(--vip-brand-text); border-radius: var(--vip-radius-sm); }
-.entity-card__title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); color: var(--vip-text-primary); }
-.entity-card__sub { font-size: var(--vip-fs-2xs); color: var(--vip-text-muted); }
-.field-list { list-style: none; margin: 0; padding: var(--vip-sp-2); }
-.field { display: flex; align-items: center; gap: var(--vip-sp-4); padding: var(--vip-sp-3) var(--vip-sp-4); border-radius: var(--vip-radius-sm); cursor: pointer; }
-.field:hover { background: var(--vip-surface-hover); }
-.field.is-selected { background: var(--vip-brand-soft); }
-.field__type { color: var(--vip-text-muted); flex: none; }
-.field__label { flex: 1; font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
+.canvas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vip-sp-6);
+  padding: var(--vip-sp-6);
+}
+.entity-card {
+  width: 300px;
+}
+.entity-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  padding: var(--vip-sp-5) var(--vip-sp-6);
+  border-bottom: 1px solid var(--vip-border-subtle);
+  background: var(--vip-surface-2);
+}
+.entity-card__icon {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+  border-radius: var(--vip-radius-sm);
+}
+.entity-card__title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+}
+.entity-card__sub {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-muted);
+}
+.field-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--vip-sp-2);
+}
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  padding: var(--vip-sp-3) var(--vip-sp-4);
+  border-radius: var(--vip-radius-sm);
+  cursor: pointer;
+}
+.field:hover {
+  background: var(--vip-surface-hover);
+}
+.field.is-selected {
+  background: var(--vip-brand-soft);
+}
+.field__type {
+  color: var(--vip-text-muted);
+  flex: none;
+}
+.field__label {
+  flex: 1;
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
 
-.rel { display: flex; flex-direction: column; gap: var(--vip-sp-5); padding: var(--vip-sp-6); }
-.rel-card__title { display: flex; align-items: center; gap: var(--vip-sp-3); font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); margin-bottom: var(--vip-sp-5); }
-.rel-chain { display: flex; align-items: center; gap: var(--vip-sp-4); flex-wrap: wrap; }
-.rel-node { padding: var(--vip-sp-3) var(--vip-sp-5); background: var(--vip-surface-2); border: 1px solid var(--vip-border); border-radius: var(--vip-radius-md); font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
-.rel-arrow { color: var(--vip-text-disabled); }
+.rel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+  padding: var(--vip-sp-6);
+}
+.rel-card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+  margin-bottom: var(--vip-sp-5);
+}
+.rel-chain {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  flex-wrap: wrap;
+}
+.rel-node {
+  padding: var(--vip-sp-3) var(--vip-sp-5);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-md);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
+.rel-arrow {
+  color: var(--vip-text-disabled);
+}
 
-.list { padding: var(--vip-sp-3); }
-.list-row { display: flex; align-items: center; gap: var(--vip-sp-5); padding: var(--vip-sp-4) var(--vip-sp-5); border-radius: var(--vip-radius-md); cursor: pointer; }
-.list-row:hover { background: var(--vip-surface-hover); }
-.list-row.is-selected { background: var(--vip-brand-soft); }
-.list-row__type { color: var(--vip-text-muted); flex: none; }
-.list-row__main { flex: 1; min-width: 0; }
-.list-row__label { font-size: var(--vip-fs-md); color: var(--vip-text-primary); }
-.list-row__id { font-size: var(--vip-fs-2xs); color: var(--vip-text-muted); font-family: var(--vip-font-mono); }
+.list {
+  padding: var(--vip-sp-3);
+}
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+  padding: var(--vip-sp-4) var(--vip-sp-5);
+  border-radius: var(--vip-radius-md);
+  cursor: pointer;
+}
+.list-row:hover {
+  background: var(--vip-surface-hover);
+}
+.list-row.is-selected {
+  background: var(--vip-brand-soft);
+}
+.list-row__type {
+  color: var(--vip-text-muted);
+  flex: none;
+}
+.list-row__main {
+  flex: 1;
+  min-width: 0;
+}
+.list-row__label {
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-primary);
+}
+.list-row__id {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-muted);
+  font-family: var(--vip-font-mono);
+}
 
-.history { padding: var(--vip-sp-7); }
-.ver { display: flex; gap: var(--vip-sp-5); padding-bottom: var(--vip-sp-6); position: relative; }
-.ver:not(:last-child)::before { content: ''; position: absolute; left: 4px; top: 14px; bottom: 0; width: 1px; background: var(--vip-border); }
-.ver__dot { width: 9px; height: 9px; flex: none; margin-top: 4px; border-radius: 50%; background: var(--vip-border-strong); z-index: 1; }
-.ver__dot.is-current { background: var(--vip-brand-500); }
-.ver__row { display: flex; align-items: center; gap: var(--vip-sp-4); }
-.ver__label { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); color: var(--vip-text-primary); }
-.ver__time { font-size: var(--vip-fs-xs); color: var(--vip-text-disabled); margin-left: auto; }
-.ver__note { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); margin-top: 2px; }
-.ver__author { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); margin-top: 2px; }
+.history {
+  padding: var(--vip-sp-7);
+}
+.ver {
+  display: flex;
+  gap: var(--vip-sp-5);
+  padding-bottom: var(--vip-sp-6);
+  position: relative;
+}
+.ver:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 14px;
+  bottom: 0;
+  width: 1px;
+  background: var(--vip-border);
+}
+.ver__dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--vip-border-strong);
+  z-index: 1;
+}
+.ver__dot.is-current {
+  background: var(--vip-brand-500);
+}
+.ver__row {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+}
+.ver__label {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+}
+.ver__time {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-disabled);
+  margin-left: auto;
+}
+.ver__note {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  margin-top: 2px;
+}
+.ver__author {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  margin-top: 2px;
+}
 
-.inspector { display: flex; flex-direction: column; gap: var(--vip-sp-5); }
-.inspector__meta { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-4); font-size: var(--vip-fs-sm); }
-.inspector__key { color: var(--vip-text-muted); }
-.inspector__meta code { font-family: var(--vip-font-mono); font-size: var(--vip-fs-xs); color: var(--vip-text-secondary); }
-.inspector__switch { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--vip-sp-5); padding-top: var(--vip-sp-5); border-top: 1px solid var(--vip-border-subtle); }
-.inspector__switch-label { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); font-weight: var(--vip-fw-medium); }
-.inspector__switch-help { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); margin-top: 2px; }
+.inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
+.inspector__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-4);
+  font-size: var(--vip-fs-sm);
+}
+.inspector__key {
+  color: var(--vip-text-muted);
+}
+.inspector__meta code {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-secondary);
+}
+.inspector__switch {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--vip-sp-5);
+  padding-top: var(--vip-sp-5);
+  border-top: 1px solid var(--vip-border-subtle);
+}
+.inspector__switch-label {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  font-weight: var(--vip-fw-medium);
+}
+.inspector__switch-help {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  margin-top: 2px;
+}
 </style>

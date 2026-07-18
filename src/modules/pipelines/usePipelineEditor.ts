@@ -8,7 +8,11 @@
  */
 import { computed, reactive, ref } from 'vue'
 import type {
-  Pipeline, PipelineNode, PipelineNodeKind, ValidationIssue, ValidationReport,
+  Pipeline,
+  PipelineNode,
+  PipelineNodeKind,
+  ValidationIssue,
+  ValidationReport,
 } from '@/shared/types/pipeline'
 import { NODE_TYPES, mockOutputSchema } from './nodeTypes'
 import { clone } from '@/shared/lib/mock'
@@ -32,7 +36,12 @@ export function usePipelineEditor(initial: Pipeline) {
   const lastSavedSnapshot = ref(snapshot())
 
   function snapshot(): string {
-    return JSON.stringify({ nodes: pipeline.nodes, edges: pipeline.edges, name: pipeline.name, description: pipeline.description })
+    return JSON.stringify({
+      nodes: pipeline.nodes,
+      edges: pipeline.edges,
+      name: pipeline.name,
+      description: pipeline.description,
+    })
   }
 
   function commit() {
@@ -215,11 +224,23 @@ export function usePipelineEditor(initial: Pipeline) {
   function validate(): ValidationReport {
     const issues: ValidationIssue[] = []
     if (pipeline.nodes.length === 0) {
-      issues.push({ id: genId('iss'), level: 'error', scope: 'pipeline', code: 'EMPTY', message: 'Pipeline has no nodes.' })
+      issues.push({
+        id: genId('iss'),
+        level: 'error',
+        scope: 'pipeline',
+        code: 'EMPTY',
+        message: 'Pipeline has no nodes.',
+      })
     }
     const hasOutput = pipeline.nodes.some((n) => NODE_TYPES[n.kind].category === 'output')
     if (pipeline.nodes.length > 0 && !hasOutput) {
-      issues.push({ id: genId('iss'), level: 'warning', scope: 'pipeline', code: 'NO_OUTPUT', message: 'No output node — results will not be materialised.' })
+      issues.push({
+        id: genId('iss'),
+        level: 'warning',
+        scope: 'pipeline',
+        code: 'NO_OUTPUT',
+        message: 'No output node — results will not be materialised.',
+      })
     }
 
     pipeline.nodes.forEach((n) => {
@@ -230,28 +251,60 @@ export function usePipelineEditor(initial: Pipeline) {
         // skip conditionally hidden fields
         if (c.visibleWhen && n.config[c.visibleWhen.key] !== c.visibleWhen.equals) return
         const v = n.config[c.key]
-        const empty = v == null || v === '' || (Array.isArray(v) && v.length === 0) || (typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0)
+        const empty =
+          v == null ||
+          v === '' ||
+          (Array.isArray(v) && v.length === 0) ||
+          (typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0)
         if (empty) {
-          issues.push({ id: genId('iss'), level: 'error', scope: 'node', nodeId: n.id, code: 'REQ', message: `${n.title}: “${c.label}” is required.` })
+          issues.push({
+            id: genId('iss'),
+            level: 'error',
+            scope: 'node',
+            nodeId: n.id,
+            code: 'REQ',
+            message: `${n.title}: “${c.label}” is required.`,
+          })
         }
       })
       // disconnected (non-source with no input edge)
       if (spec.inputs.length > 0) {
         const incoming = pipeline.edges.filter((e) => e.targetNode === n.id)
         if (incoming.length === 0) {
-          issues.push({ id: genId('iss'), level: 'error', scope: 'node', nodeId: n.id, code: 'DISCONNECTED', message: `${n.title}: input is not connected.` })
+          issues.push({
+            id: genId('iss'),
+            level: 'error',
+            scope: 'node',
+            nodeId: n.id,
+            code: 'DISCONNECTED',
+            message: `${n.title}: input is not connected.`,
+          })
         } else {
           // required multi-input ports
           spec.inputs.forEach((port) => {
             if (!incoming.some((e) => e.targetPort === port.id)) {
-              issues.push({ id: genId('iss'), level: 'warning', scope: 'node', nodeId: n.id, code: 'PORT', message: `${n.title}: “${port.label}” input is empty.` })
+              issues.push({
+                id: genId('iss'),
+                level: 'warning',
+                scope: 'node',
+                nodeId: n.id,
+                code: 'PORT',
+                message: `${n.title}: “${port.label}” input is empty.`,
+              })
             }
           })
         }
       }
       // source with no downstream
       if (spec.category === 'source' && !pipeline.edges.some((e) => e.sourceNode === n.id)) {
-        issues.push({ id: genId('iss'), level: 'warning', scope: 'node', nodeId: n.id, code: 'UNUSED', message: `${n.title}: output is not used.` })
+        issues.push({
+          id: genId('iss'),
+          level: 'warning',
+          scope: 'node',
+          nodeId: n.id,
+          code: 'UNUSED',
+          message: `${n.title}: output is not used.`,
+        })
       }
     })
 
@@ -271,14 +324,33 @@ export function usePipelineEditor(initial: Pipeline) {
 
   return {
     pipeline,
-    selection, selectedNode, selectedEdge,
-    dirty, canUndo, canRedo, clipboard,
-    addNode, moveNodes, updateNodeConfig, renameNode, deleteNodes, duplicateNodes,
-    copySelection, paste,
-    connect, deleteEdge,
-    selectNode, selectMany, selectEdge, clearSelection,
-    undo, redo, commit, markSaved,
-    validate, nodeIssues,
+    selection,
+    selectedNode,
+    selectedEdge,
+    dirty,
+    canUndo,
+    canRedo,
+    clipboard,
+    addNode,
+    moveNodes,
+    updateNodeConfig,
+    renameNode,
+    deleteNodes,
+    duplicateNodes,
+    copySelection,
+    paste,
+    connect,
+    deleteEdge,
+    selectNode,
+    selectMany,
+    selectEdge,
+    clearSelection,
+    undo,
+    redo,
+    commit,
+    markSaved,
+    validate,
+    nodeIssues,
   }
 }
 

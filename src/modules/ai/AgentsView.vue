@@ -3,13 +3,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { useUiStore } from '@/shared/stores/ui'
-import {
-  aiService,
-  AI_MODELS,
-  AI_TOOLS,
-  type Agent,
-  type PublishStatus,
-} from './ai.service'
+import { aiService, AI_MODELS, AI_TOOLS, type Agent, type PublishStatus } from './ai.service'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
@@ -100,7 +94,10 @@ function save(status: PublishStatus): void {
 
 <template>
   <div class="agents">
-    <VipPageHeader title="Agents" description="Autonomous, tool-using agents that pursue a goal across your data platform.">
+    <VipPageHeader
+      title="Agents"
+      description="Autonomous, tool-using agents that pursue a goal across your data platform."
+    >
       <template #actions>
         <VipButton variant="tertiary" icon="run" @click="router.push('/ai/agent-runs')">View runs</VipButton>
         <VipButton variant="primary" icon="plus" @click="openBuilder">New agent</VipButton>
@@ -143,7 +140,13 @@ function save(status: PublishStatus): void {
     <VipDrawer :open="builderOpen" title="New agent" :width="540" @close="builderOpen = false">
       <div class="agents__form">
         <VipInput v-model="form.name" label="Name" placeholder="e.g. Incident Triage" required />
-        <VipTextarea v-model="form.goal" label="Goal" :rows="2" placeholder="What outcome should this agent achieve?" required />
+        <VipTextarea
+          v-model="form.goal"
+          label="Goal"
+          :rows="2"
+          placeholder="What outcome should this agent achieve?"
+          required
+        />
         <VipTextarea
           v-model="form.instructions"
           label="Instructions"
@@ -202,17 +205,69 @@ function save(status: PublishStatus): void {
 </template>
 
 <style scoped>
-.agents { max-width: 1280px; margin: 0 auto; }
-.agents__name { display: flex; align-items: center; gap: var(--vip-sp-5); }
-.agents__name-icon { width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--vip-radius-md); background: var(--vip-brand-soft); color: var(--vip-brand-text); }
-.agents__name-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.agents__name-title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.agents__name-desc { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.agents__muted { color: var(--vip-text-muted); font-size: var(--vip-fs-sm); }
+.agents {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.agents__name {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+}
+.agents__name-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--vip-radius-md);
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+}
+.agents__name-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.agents__name-title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.agents__name-desc {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.agents__muted {
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-sm);
+}
 
-.agents__form { display: flex; flex-direction: column; gap: var(--vip-sp-6); }
-.agents__group { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.agents__group-label { font-size: var(--vip-fs-sm); font-weight: var(--vip-fw-medium); color: var(--vip-text-secondary); }
-.agents__checks { display: grid; grid-template-columns: 1fr 1fr; gap: var(--vip-sp-4); }
-.agents__limits { display: grid; grid-template-columns: 1fr 1fr; gap: var(--vip-sp-5); }
+.agents__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-6);
+}
+.agents__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.agents__group-label {
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-secondary);
+}
+.agents__checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--vip-sp-4);
+}
+.agents__limits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--vip-sp-5);
+}
 </style>

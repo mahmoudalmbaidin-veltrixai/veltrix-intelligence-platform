@@ -6,7 +6,13 @@ import { formatNumber } from '@/shared/lib/format'
 import type { NumberFormat } from '@/shared/types/semantic'
 
 const props = withDefaults(
-  defineProps<{ slices: Slice[]; donut?: boolean; scheme?: string; showLegend?: boolean; format?: Partial<NumberFormat> }>(),
+  defineProps<{
+    slices: Slice[]
+    donut?: boolean
+    scheme?: string
+    showLegend?: boolean
+    format?: Partial<NumberFormat>
+  }>(),
   { showLegend: true },
 )
 
@@ -64,15 +70,62 @@ function fmt(v: number): string {
 </template>
 
 <style scoped>
-.pie { display: flex; align-items: center; gap: var(--vip-sp-6); width: 100%; height: 100%; }
-.pie__svg { height: 100%; max-height: 220px; aspect-ratio: 1; }
-.pie__arc { stroke: var(--vip-surface-1); stroke-width: 1.5; transition: opacity var(--vip-motion-fast); }
-.pie__arc:hover { opacity: 0.85; }
-.pie__center-val { fill: var(--vip-text-primary); font-size: 18px; font-weight: 600; }
-.pie__center-label { fill: var(--vip-text-muted); font-size: 10px; }
-.pie__legend { display: flex; flex-direction: column; gap: var(--vip-sp-3); min-width: 0; }
-.pie__legend-item { display: flex; align-items: center; gap: var(--vip-sp-3); font-size: var(--vip-fs-xs); }
-.pie__dot { width: 9px; height: 9px; border-radius: 2px; flex: none; }
-.pie__name { color: var(--vip-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pie__val { margin-left: auto; color: var(--vip-text-muted); font-variant-numeric: tabular-nums; }
+.pie {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-6);
+  width: 100%;
+  height: 100%;
+}
+.pie__svg {
+  height: 100%;
+  max-height: 220px;
+  aspect-ratio: 1;
+}
+.pie__arc {
+  stroke: var(--vip-surface-1);
+  stroke-width: 1.5;
+  transition: opacity var(--vip-motion-fast);
+}
+.pie__arc:hover {
+  opacity: 0.85;
+}
+.pie__center-val {
+  fill: var(--vip-text-primary);
+  font-size: 18px;
+  font-weight: 600;
+}
+.pie__center-label {
+  fill: var(--vip-text-muted);
+  font-size: 10px;
+}
+.pie__legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+  min-width: 0;
+}
+.pie__legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-xs);
+}
+.pie__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+.pie__name {
+  color: var(--vip-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pie__val {
+  margin-left: auto;
+  color: var(--vip-text-muted);
+  font-variant-numeric: tabular-nums;
+}
 </style>

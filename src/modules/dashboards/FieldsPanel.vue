@@ -54,7 +54,10 @@ function onWidgetDrag(e: DragEvent, t: WidgetType) {
     <div class="fpanel__mode">
       <VipSegmented
         v-model="mode"
-        :options="[{ value: 'visuals', label: 'Visuals', icon: 'chart' }, { value: 'fields', label: 'Data', icon: 'database' }]"
+        :options="[
+          { value: 'visuals', label: 'Visuals', icon: 'chart' },
+          { value: 'fields', label: 'Data', icon: 'database' },
+        ]"
         size="sm"
       />
     </div>
@@ -114,30 +117,97 @@ function onWidgetDrag(e: DragEvent, t: WidgetType) {
 </template>
 
 <style scoped>
-.fpanel { display: flex; flex-direction: column; height: 100%; background: var(--vip-surface-1); }
-.fpanel__mode { padding: var(--vip-sp-5); border-bottom: 1px solid var(--vip-border-subtle); }
-.fpanel__mode :deep(.vip-seg) { width: 100%; }
-.fpanel__mode :deep(.vip-seg__btn) { flex: 1; justify-content: center; }
-.fpanel__scroll { flex: 1; overflow-y: auto; padding: var(--vip-sp-5); }
-.fpanel__model, .fpanel__search { margin-bottom: var(--vip-sp-5); }
-.fpanel__group { margin-bottom: var(--vip-sp-6); }
-.fpanel__group-label { display: flex; align-items: center; gap: var(--vip-sp-2); font-size: var(--vip-fs-2xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-disabled); margin-bottom: var(--vip-sp-3); }
-.fpanel__viz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--vip-sp-3); }
+.fpanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--vip-surface-1);
+}
+.fpanel__mode {
+  padding: var(--vip-sp-5);
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.fpanel__mode :deep(.vip-seg) {
+  width: 100%;
+}
+.fpanel__mode :deep(.vip-seg__btn) {
+  flex: 1;
+  justify-content: center;
+}
+.fpanel__scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--vip-sp-5);
+}
+.fpanel__model,
+.fpanel__search {
+  margin-bottom: var(--vip-sp-5);
+}
+.fpanel__group {
+  margin-bottom: var(--vip-sp-6);
+}
+.fpanel__group-label {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  font-size: var(--vip-fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-disabled);
+  margin-bottom: var(--vip-sp-3);
+}
+.fpanel__viz-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--vip-sp-3);
+}
 .fpanel__viz {
-  display: flex; flex-direction: column; align-items: center; gap: var(--vip-sp-2);
-  padding: var(--vip-sp-4) var(--vip-sp-2); background: var(--vip-surface-2);
-  border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md);
-  color: var(--vip-text-secondary); font-size: var(--vip-fs-2xs); text-align: center; cursor: grab;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  padding: var(--vip-sp-4) var(--vip-sp-2);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+  color: var(--vip-text-secondary);
+  font-size: var(--vip-fs-2xs);
+  text-align: center;
+  cursor: grab;
 }
-.fpanel__viz:hover { border-color: var(--vip-brand-500); color: var(--vip-brand-text); background: var(--vip-brand-soft); }
+.fpanel__viz:hover {
+  border-color: var(--vip-brand-500);
+  color: var(--vip-brand-text);
+  background: var(--vip-brand-soft);
+}
 .fpanel__field {
-  display: flex; align-items: center; gap: var(--vip-sp-3);
-  padding: var(--vip-sp-3) var(--vip-sp-4); border-radius: var(--vip-radius-sm);
-  color: var(--vip-text-secondary); font-size: var(--vip-fs-sm); cursor: grab;
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  padding: var(--vip-sp-3) var(--vip-sp-4);
+  border-radius: var(--vip-radius-sm);
+  color: var(--vip-text-secondary);
+  font-size: var(--vip-fs-sm);
+  cursor: grab;
 }
-.fpanel__field:hover { background: var(--vip-surface-hover); }
-.fpanel__field.is-measure, .fpanel__field.is-metric { color: var(--vip-brand-text); }
-.fpanel__field-name { flex: 1; }
-.fpanel__sensitive { color: var(--vip-warning-text); }
-.fpanel__hint { padding: var(--vip-sp-4); border-top: 1px solid var(--vip-border-subtle); font-size: var(--vip-fs-2xs); color: var(--vip-text-disabled); text-align: center; }
+.fpanel__field:hover {
+  background: var(--vip-surface-hover);
+}
+.fpanel__field.is-measure,
+.fpanel__field.is-metric {
+  color: var(--vip-brand-text);
+}
+.fpanel__field-name {
+  flex: 1;
+}
+.fpanel__sensitive {
+  color: var(--vip-warning-text);
+}
+.fpanel__hint {
+  padding: var(--vip-sp-4);
+  border-top: 1px solid var(--vip-border-subtle);
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-disabled);
+  text-align: center;
+}
 </style>

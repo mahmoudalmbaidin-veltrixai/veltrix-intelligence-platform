@@ -3,7 +3,13 @@ import { watch, ref, nextTick, onBeforeUnmount } from 'vue'
 import VipIcon from './VipIcon.vue'
 
 const props = withDefaults(
-  defineProps<{ open: boolean; title?: string; description?: string; size?: 'sm' | 'md' | 'lg' | 'xl'; closable?: boolean }>(),
+  defineProps<{
+    open: boolean
+    title?: string
+    description?: string
+    size?: 'sm' | 'md' | 'lg' | 'xl'
+    closable?: boolean
+  }>(),
   { size: 'md', closable: true },
 )
 const emit = defineEmits<{ close: [] }>()
@@ -106,10 +112,18 @@ onBeforeUnmount(() => {
   flex-direction: column;
   max-height: 80vh;
 }
-.vip-dialog--sm { max-width: 420px; }
-.vip-dialog--md { max-width: 560px; }
-.vip-dialog--lg { max-width: 760px; }
-.vip-dialog--xl { max-width: 1040px; }
+.vip-dialog--sm {
+  max-width: 420px;
+}
+.vip-dialog--md {
+  max-width: 560px;
+}
+.vip-dialog--lg {
+  max-width: 760px;
+}
+.vip-dialog--xl {
+  max-width: 1040px;
+}
 .vip-dialog__header {
   display: flex;
   align-items: flex-start;
@@ -117,16 +131,35 @@ onBeforeUnmount(() => {
   gap: var(--vip-sp-6);
   padding: var(--vip-sp-7) var(--vip-sp-7) var(--vip-sp-5);
 }
-.vip-dialog__title { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); }
-.vip-dialog__desc { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); margin-top: var(--vip-sp-2); }
+.vip-dialog__title {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+}
+.vip-dialog__desc {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+  margin-top: var(--vip-sp-2);
+}
 .vip-dialog__close {
-  flex: none; width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: none; border: none; border-radius: var(--vip-radius-sm);
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--vip-radius-sm);
   color: var(--vip-text-muted);
 }
-.vip-dialog__close:hover { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
-.vip-dialog__body { padding: 0 var(--vip-sp-7) var(--vip-sp-7); overflow-y: auto; }
+.vip-dialog__close:hover {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
+.vip-dialog__body {
+  padding: 0 var(--vip-sp-7) var(--vip-sp-7);
+  overflow-y: auto;
+}
 .vip-dialog__footer {
   display: flex;
   justify-content: flex-end;
@@ -135,8 +168,20 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--vip-border-subtle);
 }
 
-.vip-dialog-enter-active, .vip-dialog-leave-active { transition: opacity var(--vip-motion-base); }
-.vip-dialog-enter-active .vip-dialog, .vip-dialog-leave-active .vip-dialog { transition: transform var(--vip-motion-base) var(--vip-ease-emphasized); }
-.vip-dialog-enter-from, .vip-dialog-leave-to { opacity: 0; }
-.vip-dialog-enter-from .vip-dialog, .vip-dialog-leave-to .vip-dialog { transform: translateY(-12px) scale(0.98); }
+.vip-dialog-enter-active,
+.vip-dialog-leave-active {
+  transition: opacity var(--vip-motion-base);
+}
+.vip-dialog-enter-active .vip-dialog,
+.vip-dialog-leave-active .vip-dialog {
+  transition: transform var(--vip-motion-base) var(--vip-ease-emphasized);
+}
+.vip-dialog-enter-from,
+.vip-dialog-leave-to {
+  opacity: 0;
+}
+.vip-dialog-enter-from .vip-dialog,
+.vip-dialog-leave-to .vip-dialog {
+  transform: translateY(-12px) scale(0.98);
+}
 </style>

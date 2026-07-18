@@ -3,12 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { relativeTime, formatDateTime, formatNumber } from '@/shared/lib/format'
-import {
-  datasetService,
-  type Dataset,
-  type QualityRule,
-  type QualityRuleStatus,
-} from './datasets.service'
+import { datasetService, type Dataset, type QualityRule, type QualityRuleStatus } from './datasets.service'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
@@ -29,9 +24,7 @@ const { data: dataset, isLoading } = useQuery(
 )
 const { data: rules } = useQuery('datasets:rules', () => datasetService.listQualityRules())
 
-const datasetRules = computed<QualityRule[]>(() =>
-  (rules.value ?? []).filter((r) => r.dataset === dataset.value?.name),
-)
+const datasetRules = computed<QualityRule[]>(() => (rules.value ?? []).filter((r) => r.dataset === dataset.value?.name))
 
 const tabs = [
   { value: 'overview', label: 'Overview' },
@@ -70,7 +63,12 @@ function overviewCards(d: Dataset): { label: string; value: string; icon: string
 }
 
 /* ---- schema (mock) ---- */
-interface ColumnInfo { name: string; type: string; nullable: boolean; description: string }
+interface ColumnInfo {
+  name: string
+  type: string
+  nullable: boolean
+  description: string
+}
 const schema: ColumnInfo[] = [
   { name: 'order_id', type: 'bigint', nullable: false, description: 'Primary key' },
   { name: 'customer_id', type: 'bigint', nullable: false, description: 'FK to dim_customers' },
@@ -89,7 +87,14 @@ const schemaColumns: Column<ColumnInfo>[] = [
 ]
 
 /* ---- data preview (mock) ---- */
-interface PreviewRow { order_id: number; customer_id: number; amount: number; currency: string; status: string; order_date: string }
+interface PreviewRow {
+  order_id: number
+  customer_id: number
+  amount: number
+  currency: string
+  status: string
+  order_date: string
+}
 const preview: PreviewRow[] = [
   { order_id: 90211, customer_id: 4021, amount: 12480, currency: 'USD', status: 'paid', order_date: '2026-07-14' },
   { order_id: 90210, customer_id: 5530, amount: 3120, currency: 'USD', status: 'pending', order_date: '2026-07-14' },
@@ -107,7 +112,13 @@ const previewColumns: Column<PreviewRow>[] = [
 ]
 
 /* ---- profile (mock per-column stats) ---- */
-interface ProfileStat { column: string; nulls: number; distinct: number; min: string; max: string }
+interface ProfileStat {
+  column: string
+  nulls: number
+  distinct: number
+  min: string
+  max: string
+}
 const profile: ProfileStat[] = [
   { column: 'order_id', nulls: 0, distinct: 100, min: '1', max: '1,284,502' },
   { column: 'customer_id', nulls: 0, distinct: 66, min: '1', max: '84,213' },
@@ -118,7 +129,11 @@ const profile: ProfileStat[] = [
 ]
 
 /* ---- access (mock) ---- */
-interface AccessGrant { principal: string; role: string; type: string }
+interface AccessGrant {
+  principal: string
+  role: string
+  type: string
+}
 const access: AccessGrant[] = [
   { principal: 'Revenue Ops', role: 'Owner', type: 'team' },
   { principal: 'Analytics', role: 'Editor', type: 'workspace' },
@@ -127,15 +142,33 @@ const access: AccessGrant[] = [
 ]
 
 /* ---- versions (mock) ---- */
-interface Version { id: string; label: string; when: string; author: string; note: string }
+interface Version {
+  id: string
+  label: string
+  when: string
+  author: string
+  note: string
+}
 const versions: Version[] = [
-  { id: 'v12', label: 'v12', when: relativeTime(new Date(Date.now() - 35 * 60000).toISOString()), author: 'Nightly Scheduler', note: 'Incremental refresh' },
+  {
+    id: 'v12',
+    label: 'v12',
+    when: relativeTime(new Date(Date.now() - 35 * 60000).toISOString()),
+    author: 'Nightly Scheduler',
+    note: 'Incremental refresh',
+  },
   { id: 'v11', label: 'v11', when: '1d ago', author: 'A. Rahman', note: 'Added channel column' },
   { id: 'v10', label: 'v10', when: '9d ago', author: 'M. Almbaidin', note: 'Backfill 2024 orders' },
 ]
 
 /* ---- activity (mock) ---- */
-interface ActivityItem { id: string; actor: string; action: string; when: string; icon: string }
+interface ActivityItem {
+  id: string
+  actor: string
+  action: string
+  when: string
+  icon: string
+}
 const activity: ActivityItem[] = [
   { id: 'a1', actor: 'Nightly Scheduler', action: 'refreshed the dataset', when: '35m', icon: 'run' },
   { id: 'a2', actor: 'Data Quality', action: 'ran 4 quality checks', when: '35m', icon: 'gauge' },
@@ -161,7 +194,10 @@ const activity: ActivityItem[] = [
     <template v-else>
       <VipPageHeader :title="dataset.name" :description="dataset.description">
         <template #status>
-          <VipBadge :tone="dataset.status === 'active' ? 'success' : dataset.status === 'building' ? 'info' : 'neutral'" variant="soft">
+          <VipBadge
+            :tone="dataset.status === 'active' ? 'success' : dataset.status === 'building' ? 'info' : 'neutral'"
+            variant="soft"
+          >
             {{ dataset.status }}
           </VipBadge>
           <VipBadge v-if="dataset.certified" tone="brand" variant="soft">Certified</VipBadge>
@@ -169,7 +205,9 @@ const activity: ActivityItem[] = [
         </template>
         <template #actions>
           <VipButton variant="tertiary" icon="chevronLeft" @click="router.push('/datasets')">Back</VipButton>
-          <VipButton variant="secondary" icon="lineage" @click="router.push('/datasets/lineage')">View lineage</VipButton>
+          <VipButton variant="secondary" icon="lineage" @click="router.push('/datasets/lineage')"
+            >View lineage</VipButton
+          >
         </template>
         <template #tabs>
           <VipTabs v-model="activeTab" :tabs="tabs" />
@@ -201,7 +239,12 @@ const activity: ActivityItem[] = [
         </div>
         <VipTable :columns="previewColumns" :rows="preview" :row-key="(r) => String(r.order_id)" density="compact">
           <template #cell-status="{ row }">
-            <VipBadge :tone="row.status === 'paid' ? 'success' : row.status === 'refunded' ? 'danger' : 'warning'" variant="soft" size="sm">{{ row.status }}</VipBadge>
+            <VipBadge
+              :tone="row.status === 'paid' ? 'success' : row.status === 'refunded' ? 'danger' : 'warning'"
+              variant="soft"
+              size="sm"
+              >{{ row.status }}</VipBadge
+            >
           </template>
         </VipTable>
       </VipCard>
@@ -209,10 +252,16 @@ const activity: ActivityItem[] = [
       <!-- SCHEMA -->
       <VipCard v-else-if="activeTab === 'schema'" :padded="false">
         <VipTable :columns="schemaColumns" :rows="schema" :row-key="(r) => r.name" density="compact">
-          <template #cell-name="{ row }"><span class="dd__mono">{{ row.name }}</span></template>
-          <template #cell-type="{ row }"><span class="dd__mono">{{ row.type }}</span></template>
+          <template #cell-name="{ row }"
+            ><span class="dd__mono">{{ row.name }}</span></template
+          >
+          <template #cell-type="{ row }"
+            ><span class="dd__mono">{{ row.type }}</span></template
+          >
           <template #cell-nullable="{ row }">
-            <VipBadge :tone="row.nullable ? 'neutral' : 'success'" variant="soft" size="sm">{{ row.nullable ? 'nullable' : 'not null' }}</VipBadge>
+            <VipBadge :tone="row.nullable ? 'neutral' : 'success'" variant="soft" size="sm">{{
+              row.nullable ? 'nullable' : 'not null'
+            }}</VipBadge>
           </template>
         </VipTable>
       </VipCard>
@@ -231,7 +280,9 @@ const activity: ActivityItem[] = [
               </div>
               <div class="dd__bar-group">
                 <span class="dd__bar-label">distinct {{ p.distinct }}%</span>
-                <div class="dd__bar-track"><div class="dd__bar dd__bar--distinct" :style="{ width: `${p.distinct}%` }" /></div>
+                <div class="dd__bar-track">
+                  <div class="dd__bar dd__bar--distinct" :style="{ width: `${p.distinct}%` }" />
+                </div>
               </div>
             </div>
             <span class="dd__profile-range">{{ p.min }} … {{ p.max }}</span>
@@ -258,14 +309,28 @@ const activity: ActivityItem[] = [
           :row-key="(r) => r.id"
           density="compact"
         >
-          <template #cell-dimension="{ row }"><VipBadge tone="neutral" variant="soft" size="sm">{{ row.dimension }}</VipBadge></template>
+          <template #cell-dimension="{ row }"
+            ><VipBadge tone="neutral" variant="soft" size="sm">{{ row.dimension }}</VipBadge></template
+          >
           <template #cell-severity="{ row }">
-            <VipBadge :tone="row.severity === 'high' ? 'danger' : row.severity === 'medium' ? 'warning' : 'neutral'" variant="soft" size="sm">{{ row.severity }}</VipBadge>
+            <VipBadge
+              :tone="row.severity === 'high' ? 'danger' : row.severity === 'medium' ? 'warning' : 'neutral'"
+              variant="soft"
+              size="sm"
+              >{{ row.severity }}</VipBadge
+            >
           </template>
-          <template #cell-status="{ row }"><VipBadge :tone="RULE_TONE[row.status]" variant="soft" size="sm">{{ row.status }}</VipBadge></template>
+          <template #cell-status="{ row }"
+            ><VipBadge :tone="RULE_TONE[row.status]" variant="soft" size="sm">{{ row.status }}</VipBadge></template
+          >
           <template #cell-passRate="{ row }">{{ row.passRate }}%</template>
         </VipTable>
-        <VipEmptyState v-else icon="gauge" title="No rules on this dataset" description="Attach quality rules from the Data Quality workspace." />
+        <VipEmptyState
+          v-else
+          icon="gauge"
+          title="No rules on this dataset"
+          description="Attach quality rules from the Data Quality workspace."
+        />
       </VipCard>
 
       <!-- LINEAGE -->
@@ -289,7 +354,9 @@ const activity: ActivityItem[] = [
             <div class="dd__lineage-node"><VipIcon name="chart" :size="14" />Executive Overview</div>
           </div>
         </div>
-        <VipButton variant="tertiary" icon="lineage" @click="router.push('/datasets/lineage')">Open full lineage graph</VipButton>
+        <VipButton variant="tertiary" icon="lineage" @click="router.push('/datasets/lineage')"
+          >Open full lineage graph</VipButton
+        >
       </VipCard>
 
       <!-- ACCESS -->
@@ -304,7 +371,9 @@ const activity: ActivityItem[] = [
           :row-key="(r) => r.principal"
           density="compact"
         >
-          <template #cell-role="{ row }"><VipBadge tone="brand" variant="soft" size="sm">{{ row.role }}</VipBadge></template>
+          <template #cell-role="{ row }"
+            ><VipBadge tone="brand" variant="soft" size="sm">{{ row.role }}</VipBadge></template
+          >
         </VipTable>
       </VipCard>
 
@@ -329,67 +398,275 @@ const activity: ActivityItem[] = [
           <li v-for="a in activity" :key="a.id" class="dd__feed-item">
             <span class="dd__feed-dot"><VipIcon :name="a.icon" :size="13" /></span>
             <div class="dd__feed-body">
-              <span class="dd__feed-text"><strong>{{ a.actor }}</strong> {{ a.action }}</span>
+              <span class="dd__feed-text"
+                ><strong>{{ a.actor }}</strong> {{ a.action }}</span
+              >
               <span class="dd__feed-time">{{ a.when }} ago</span>
             </div>
           </li>
         </ul>
-        <p class="dd__muted">Dataset created {{ formatDateTime(dataset.freshness) }} · last refreshed {{ relativeTime(dataset.freshness) }}.</p>
+        <p class="dd__muted">
+          Dataset created {{ formatDateTime(dataset.freshness) }} · last refreshed
+          {{ relativeTime(dataset.freshness) }}.
+        </p>
       </VipCard>
     </template>
   </div>
 </template>
 
 <style scoped>
-.dd { max-width: 1200px; margin: 0 auto; }
-.dd__loading { display: flex; justify-content: center; padding: var(--vip-sp-12); }
-.dd__card-title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); margin-bottom: var(--vip-sp-5); }
-.dd__muted { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
-.dd__mono { font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
+.dd {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.dd__loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--vip-sp-12);
+}
+.dd__card-title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  margin-bottom: var(--vip-sp-5);
+}
+.dd__muted {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
+.dd__mono {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
 
-.dd__cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--vip-sp-6); }
-.dd__stat { display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.dd__stat-icon { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--vip-radius-md); background: var(--vip-surface-3); color: var(--vip-text-secondary); }
-.dd__stat-value { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); margin-top: var(--vip-sp-3); }
-.dd__stat-label { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.dd__tags-card { margin-top: var(--vip-sp-6); }
-.dd__tags { display: flex; flex-wrap: wrap; gap: var(--vip-sp-3); }
+.dd__cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--vip-sp-6);
+}
+.dd__stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.dd__stat-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--vip-radius-md);
+  background: var(--vip-surface-3);
+  color: var(--vip-text-secondary);
+}
+.dd__stat-value {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+  margin-top: var(--vip-sp-3);
+}
+.dd__stat-label {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.dd__tags-card {
+  margin-top: var(--vip-sp-6);
+}
+.dd__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vip-sp-3);
+}
 
-.dd__preview-head { display: flex; align-items: center; justify-content: space-between; padding: var(--vip-sp-5) var(--vip-sp-6); border-bottom: 1px solid var(--vip-border-subtle); }
+.dd__preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--vip-sp-5) var(--vip-sp-6);
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
 
-.dd__profile { list-style: none; margin: var(--vip-sp-5) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.dd__profile-row { display: grid; grid-template-columns: 160px 1fr 200px; align-items: center; gap: var(--vip-sp-6); padding: var(--vip-sp-4) 0; border-bottom: 1px solid var(--vip-border-subtle); }
-.dd__profile-name { font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); color: var(--vip-text-primary); }
-.dd__profile-bars { display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.dd__bar-group { display: flex; align-items: center; gap: var(--vip-sp-4); }
-.dd__bar-label { font-size: var(--vip-fs-2xs); color: var(--vip-text-muted); width: 88px; flex: none; }
-.dd__bar-track { flex: 1; height: 6px; background: var(--vip-surface-3); border-radius: var(--vip-radius-full); overflow: hidden; }
-.dd__bar { height: 100%; border-radius: var(--vip-radius-full); }
-.dd__bar--null { background: var(--vip-warning); }
-.dd__bar--distinct { background: var(--vip-brand-500); }
-.dd__profile-range { font-family: var(--vip-font-mono); font-size: var(--vip-fs-xs); color: var(--vip-text-muted); text-align: right; }
+.dd__profile {
+  list-style: none;
+  margin: var(--vip-sp-5) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.dd__profile-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 200px;
+  align-items: center;
+  gap: var(--vip-sp-6);
+  padding: var(--vip-sp-4) 0;
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.dd__profile-name {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-primary);
+}
+.dd__profile-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.dd__bar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+}
+.dd__bar-label {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-muted);
+  width: 88px;
+  flex: none;
+}
+.dd__bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--vip-surface-3);
+  border-radius: var(--vip-radius-full);
+  overflow: hidden;
+}
+.dd__bar {
+  height: 100%;
+  border-radius: var(--vip-radius-full);
+}
+.dd__bar--null {
+  background: var(--vip-warning);
+}
+.dd__bar--distinct {
+  background: var(--vip-brand-500);
+}
+.dd__profile-range {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  text-align: right;
+}
 
-.dd__quality-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--vip-sp-5); }
+.dd__quality-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--vip-sp-5);
+}
 
-.dd__lineage { display: flex; align-items: stretch; gap: var(--vip-sp-6); margin-bottom: var(--vip-sp-6); overflow-x: auto; }
-.dd__lineage-col { display: flex; flex-direction: column; gap: var(--vip-sp-4); min-width: 170px; }
-.dd__lineage-head { font-size: var(--vip-fs-xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-muted); }
-.dd__lineage-node { display: flex; align-items: center; gap: var(--vip-sp-3); padding: var(--vip-sp-4) var(--vip-sp-5); background: var(--vip-surface-2); border: 1px solid var(--vip-border); border-radius: var(--vip-radius-md); font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
-.dd__lineage-node.is-current { border-color: var(--vip-brand-500); background: var(--vip-brand-soft); color: var(--vip-brand-text); font-weight: var(--vip-fw-medium); }
-.dd__lineage-arrow { align-self: center; color: var(--vip-text-disabled); }
+.dd__lineage {
+  display: flex;
+  align-items: stretch;
+  gap: var(--vip-sp-6);
+  margin-bottom: var(--vip-sp-6);
+  overflow-x: auto;
+}
+.dd__lineage-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+  min-width: 170px;
+}
+.dd__lineage-head {
+  font-size: var(--vip-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-muted);
+}
+.dd__lineage-node {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  padding: var(--vip-sp-4) var(--vip-sp-5);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-md);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
+.dd__lineage-node.is-current {
+  border-color: var(--vip-brand-500);
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+  font-weight: var(--vip-fw-medium);
+}
+.dd__lineage-arrow {
+  align-self: center;
+  color: var(--vip-text-disabled);
+}
 
-.dd__versions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.dd__version { display: flex; align-items: center; gap: var(--vip-sp-5); padding: var(--vip-sp-4) 0; border-bottom: 1px solid var(--vip-border-subtle); }
-.dd__version-body { display: flex; flex-direction: column; gap: 1px; }
-.dd__version-note { font-size: var(--vip-fs-md); color: var(--vip-text-primary); }
-.dd__version-meta { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
+.dd__versions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.dd__version {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+  padding: var(--vip-sp-4) 0;
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.dd__version-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.dd__version-note {
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-primary);
+}
+.dd__version-meta {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
 
-.dd__feed { list-style: none; margin: 0 0 var(--vip-sp-5); padding: 0; }
-.dd__feed-item { display: flex; gap: var(--vip-sp-4); padding: var(--vip-sp-4) 0; }
-.dd__feed-dot { width: 26px; height: 26px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--vip-surface-3); color: var(--vip-text-muted); }
-.dd__feed-body { display: flex; flex-direction: column; gap: 2px; }
-.dd__feed-text { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
-.dd__feed-time { font-size: var(--vip-fs-2xs); color: var(--vip-text-disabled); }
+.dd__feed {
+  list-style: none;
+  margin: 0 0 var(--vip-sp-5);
+  padding: 0;
+}
+.dd__feed-item {
+  display: flex;
+  gap: var(--vip-sp-4);
+  padding: var(--vip-sp-4) 0;
+}
+.dd__feed-dot {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--vip-surface-3);
+  color: var(--vip-text-muted);
+}
+.dd__feed-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dd__feed-text {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
+.dd__feed-time {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-disabled);
+}
 
-@media (max-width: 860px) { .dd__cards { grid-template-columns: 1fr 1fr; } .dd__profile-row { grid-template-columns: 1fr; } .dd__profile-range { text-align: left; } }
+@media (max-width: 860px) {
+  .dd__cards {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dd__profile-row {
+    grid-template-columns: 1fr;
+  }
+  .dd__profile-range {
+    text-align: left;
+  }
+}
 </style>

@@ -12,10 +12,7 @@ export interface MenuItem {
   shortcut?: string
 }
 
-withDefaults(
-  defineProps<{ items: MenuItem[]; align?: 'start' | 'end'; label?: string }>(),
-  { align: 'end' },
-)
+withDefaults(defineProps<{ items: MenuItem[]; align?: 'start' | 'end'; label?: string }>(), { align: 'end' })
 const emit = defineEmits<{ select: [string] }>()
 
 const open = ref(false)
@@ -45,11 +42,21 @@ function focusItem(index: number) {
 function onMenuKeydown(e: KeyboardEvent) {
   const items = menuItems()
   const current = items.indexOf(document.activeElement as HTMLElement)
-  if (e.key === 'ArrowDown') { e.preventDefault(); focusItem(current + 1) }
-  else if (e.key === 'ArrowUp') { e.preventDefault(); focusItem(current - 1) }
-  else if (e.key === 'Home') { e.preventDefault(); focusItem(0) }
-  else if (e.key === 'End') { e.preventDefault(); focusItem(items.length - 1) }
-  else if (e.key === 'Escape' || e.key === 'Tab') { close() }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    focusItem(current + 1)
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    focusItem(current - 1)
+  } else if (e.key === 'Home') {
+    e.preventDefault()
+    focusItem(0)
+  } else if (e.key === 'End') {
+    e.preventDefault()
+    focusItem(items.length - 1)
+  } else if (e.key === 'Escape' || e.key === 'Tab') {
+    close()
+  }
 }
 function choose(item: MenuItem) {
   if (item.disabled || item.divider) return
@@ -96,13 +103,24 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 </template>
 
 <style scoped>
-.vip-menu { position: relative; display: inline-flex; }
-.vip-menu__trigger { display: inline-flex; }
+.vip-menu {
+  position: relative;
+  display: inline-flex;
+}
+.vip-menu__trigger {
+  display: inline-flex;
+}
 .vip-menu__default-trigger {
-  display: inline-flex; align-items: center; gap: var(--vip-sp-3);
-  height: 32px; padding: 0 var(--vip-sp-5);
-  background: var(--vip-surface-2); border: 1px solid var(--vip-border);
-  border-radius: var(--vip-radius-md); color: var(--vip-text-primary); font-size: var(--vip-fs-md);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  height: 32px;
+  padding: 0 var(--vip-sp-5);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-md);
+  color: var(--vip-text-primary);
+  font-size: var(--vip-fs-md);
 }
 .vip-menu__panel {
   position: absolute;
@@ -115,8 +133,12 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   padding: var(--vip-sp-2);
   z-index: var(--vip-z-dropdown);
 }
-.is-end { right: 0; }
-.is-start { left: 0; }
+.is-end {
+  right: 0;
+}
+.is-start {
+  left: 0;
+}
 .vip-menu__item {
   display: flex;
   align-items: center;
@@ -130,11 +152,23 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   font-size: var(--vip-fs-md);
   text-align: left;
 }
-.vip-menu__item:hover { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
-.vip-menu__item.is-danger { color: var(--vip-danger-text); }
-.vip-menu__item.is-danger:hover { background: var(--vip-danger-soft); }
-.vip-menu__item.is-disabled { opacity: 0.45; pointer-events: none; }
-.vip-menu__item-label { flex: 1; }
+.vip-menu__item:hover {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
+.vip-menu__item.is-danger {
+  color: var(--vip-danger-text);
+}
+.vip-menu__item.is-danger:hover {
+  background: var(--vip-danger-soft);
+}
+.vip-menu__item.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.vip-menu__item-label {
+  flex: 1;
+}
 .vip-menu__kbd {
   font-family: var(--vip-font-mono);
   font-size: var(--vip-fs-2xs);
@@ -143,8 +177,19 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   padding: 1px 5px;
   border-radius: var(--vip-radius-xs);
 }
-.vip-menu__divider { height: 1px; background: var(--vip-border-subtle); margin: var(--vip-sp-2) 0; }
+.vip-menu__divider {
+  height: 1px;
+  background: var(--vip-border-subtle);
+  margin: var(--vip-sp-2) 0;
+}
 
-.vip-menu-pop-enter-active { transition: opacity var(--vip-motion-fast), transform var(--vip-motion-fast); }
-.vip-menu-pop-enter-from { opacity: 0; transform: translateY(-4px); }
+.vip-menu-pop-enter-active {
+  transition:
+    opacity var(--vip-motion-fast),
+    transform var(--vip-motion-fast);
+}
+.vip-menu-pop-enter-from {
+  opacity: 0;
+  transform: translateY(-4px);
+}
 </style>

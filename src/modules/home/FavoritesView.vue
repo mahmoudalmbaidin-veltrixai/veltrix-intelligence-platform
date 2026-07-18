@@ -31,9 +31,33 @@ const favorites = [
 </template>
 
 <style scoped>
-.fav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--vip-sp-6); }
-.fav { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--vip-sp-5); }
-.fav__icon { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--vip-radius-md); background: var(--vip-brand-soft); color: var(--vip-brand-text); }
-.fav__star { color: var(--vip-warning); }
-.fav__name { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); margin-bottom: var(--vip-sp-4); }
+.fav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--vip-sp-6);
+}
+.fav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--vip-sp-5);
+}
+.fav__icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--vip-radius-md);
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+}
+.fav__star {
+  color: var(--vip-warning);
+}
+.fav__name {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  margin-bottom: var(--vip-sp-4);
+}
 </style>

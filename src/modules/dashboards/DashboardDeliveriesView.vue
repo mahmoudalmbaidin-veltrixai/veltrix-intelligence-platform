@@ -13,7 +13,13 @@ import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 const ui = useUiStore()
 const { data, refetch } = useQuery('dashboard:deliveries', () => deliveryService.list())
 const rows = ref<ScheduledDelivery[]>([])
-watch(data, (d) => { if (d) rows.value = d }, { immediate: true })
+watch(
+  data,
+  (d) => {
+    if (d) rows.value = d
+  },
+  { immediate: true },
+)
 
 const columns: Column<ScheduledDelivery>[] = [
   { key: 'dashboardName', label: 'Dashboard' },
@@ -40,7 +46,10 @@ async function remove(d: ScheduledDelivery) {
 
 <template>
   <div>
-    <VipPageHeader title="Scheduled Deliveries" description="Dashboards emailed to recipients on a schedule. Configure new deliveries from any dashboard's Share menu." />
+    <VipPageHeader
+      title="Scheduled Deliveries"
+      description="Dashboards emailed to recipients on a schedule. Configure new deliveries from any dashboard's Share menu."
+    />
     <VipTable
       :columns="columns"
       :rows="rows"
@@ -48,16 +57,28 @@ async function remove(d: ScheduledDelivery) {
       empty-title="No scheduled deliveries"
       empty-description="Open a dashboard and use Share → Email delivery to schedule one."
     >
-      <template #cell-recipients="{ row }"><span class="dd-muted">{{ row.recipients.length }} recipient(s)</span></template>
-      <template #cell-format="{ row }"><VipBadge tone="neutral" size="sm">{{ row.format.toUpperCase() }}</VipBadge></template>
+      <template #cell-recipients="{ row }"
+        ><span class="dd-muted">{{ row.recipients.length }} recipient(s)</span></template
+      >
+      <template #cell-format="{ row }"
+        ><VipBadge tone="neutral" size="sm">{{ row.format.toUpperCase() }}</VipBadge></template
+      >
       <template #cell-cadence="{ row }">{{ row.cadence }}</template>
-      <template #cell-nextRun="{ row }"><span :title="formatDateTime(row.nextRun)">{{ relativeTime(row.nextRun) }}</span></template>
-      <template #cell-active="{ row }"><VipSwitch :model-value="row.active" size="sm" @update:model-value="toggle(row)" /></template>
-      <template #cell-actions="{ row }"><VipButton variant="ghost" size="xs" icon="trash" @click="remove(row)" /></template>
+      <template #cell-nextRun="{ row }"
+        ><span :title="formatDateTime(row.nextRun)">{{ relativeTime(row.nextRun) }}</span></template
+      >
+      <template #cell-active="{ row }"
+        ><VipSwitch :model-value="row.active" size="sm" @update:model-value="toggle(row)"
+      /></template>
+      <template #cell-actions="{ row }"
+        ><VipButton variant="ghost" size="xs" icon="trash" @click="remove(row)"
+      /></template>
     </VipTable>
   </div>
 </template>
 
 <style scoped>
-.dd-muted { color: var(--vip-text-muted); }
+.dd-muted {
+  color: var(--vip-text-muted);
+}
 </style>

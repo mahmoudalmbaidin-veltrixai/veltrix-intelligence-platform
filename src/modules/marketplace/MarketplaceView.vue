@@ -129,23 +129,13 @@ function openExtension(e: Extension) {
     </VipPageHeader>
 
     <div class="mkt__search">
-      <VipInput
-        v-model="search"
-        icon="search"
-        placeholder="Search extensions by name, author or capability"
-      />
+      <VipInput v-model="search" icon="search" placeholder="Search extensions by name, author or capability" />
     </div>
 
     <section v-if="!search && category === 'all' && featured.length" class="mkt__featured">
       <h2 class="mkt__section-title">Featured</h2>
       <div class="mkt__featured-row">
-        <VipCard
-          v-for="e in featured"
-          :key="e.id"
-          hoverable
-          class="mkt__feature-card"
-          @click="openExtension(e)"
-        >
+        <VipCard v-for="e in featured" :key="e.id" hoverable class="mkt__feature-card" @click="openExtension(e)">
           <div class="mkt__feature-top">
             <span class="mkt__icon is-lg"><VipIcon :name="CATEGORY_ICON[e.category]" :size="20" /></span>
             <VipBadge :tone="STATUS_TONE[statusOf(e)]" variant="soft" size="sm">
@@ -186,13 +176,7 @@ function openExtension(e: Extension) {
       />
 
       <div v-else class="mkt__grid">
-        <VipCard
-          v-for="e in filtered"
-          :key="e.id"
-          hoverable
-          class="mkt__card"
-          @click="openExtension(e)"
-        >
+        <VipCard v-for="e in filtered" :key="e.id" hoverable class="mkt__card" @click="openExtension(e)">
           <div class="mkt__card-top">
             <span class="mkt__icon"><VipIcon :name="CATEGORY_ICON[e.category]" :size="18" /></span>
             <VipBadge :tone="STATUS_TONE[statusOf(e)]" variant="soft" size="sm">
@@ -203,7 +187,9 @@ function openExtension(e: Extension) {
           <span class="mkt__author">by {{ e.author }}</span>
           <p class="mkt__desc">{{ e.description }}</p>
           <div class="mkt__meta">
-            <span class="mkt__rating"><VipIcon name="star" :size="13" /> {{ e.rating ? e.rating.toFixed(1) : '—' }}</span>
+            <span class="mkt__rating"
+              ><VipIcon name="star" :size="13" /> {{ e.rating ? e.rating.toFixed(1) : '—' }}</span
+            >
             <span class="mkt__installs">{{ formatNumber(e.installs, { style: 'compact' }) }} installs</span>
           </div>
           <VipButton
@@ -223,46 +209,128 @@ function openExtension(e: Extension) {
 </template>
 
 <style scoped>
-.mkt { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--vip-sp-6); }
-.mkt__search { width: min(480px, 100%); }
-.mkt__section-title { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); }
+.mkt {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-6);
+}
+.mkt__search {
+  width: min(480px, 100%);
+}
+.mkt__section-title {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+}
 .mkt__featured-row {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--vip-sp-5);
   margin-top: var(--vip-sp-4);
 }
-.mkt__feature-card { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.mkt__feature-top { display: flex; align-items: center; justify-content: space-between; }
-.mkt__feature-name { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); }
-.mkt__feature-desc { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); line-height: var(--vip-lh-normal); }
-.mkt__feature-meta { display: flex; gap: var(--vip-sp-5); font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.mkt__feature-meta span { display: inline-flex; align-items: center; gap: 4px; }
-.mkt__catalog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--vip-sp-4); }
-.mkt__count { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
+.mkt__feature-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.mkt__feature-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mkt__feature-name {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+}
+.mkt__feature-desc {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+  line-height: var(--vip-lh-normal);
+}
+.mkt__feature-meta {
+  display: flex;
+  gap: var(--vip-sp-5);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.mkt__feature-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.mkt__catalog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--vip-sp-4);
+}
+.mkt__count {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
 .mkt__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--vip-sp-5);
 }
-.mkt__card { display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.mkt__card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--vip-sp-2); }
+.mkt__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.mkt__card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--vip-sp-2);
+}
 .mkt__icon {
-  width: 40px; height: 40px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--vip-radius-md);
   background: var(--vip-surface-3);
   color: var(--vip-brand-text);
 }
-.mkt__icon.is-lg { width: 44px; height: 44px; }
-.mkt__name { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); }
-.mkt__author { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
+.mkt__icon.is-lg {
+  width: 44px;
+  height: 44px;
+}
+.mkt__name {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+}
+.mkt__author {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
 .mkt__desc {
-  font-size: var(--vip-fs-sm); color: var(--vip-text-secondary);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
   line-height: var(--vip-lh-normal);
-  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   min-height: 40px;
 }
-.mkt__meta { display: flex; align-items: center; justify-content: space-between; font-size: var(--vip-fs-xs); color: var(--vip-text-muted); margin: var(--vip-sp-2) 0; }
-.mkt__rating { display: inline-flex; align-items: center; gap: 4px; color: var(--vip-warning-text); }
+.mkt__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  margin: var(--vip-sp-2) 0;
+}
+.mkt__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--vip-warning-text);
+}
 </style>

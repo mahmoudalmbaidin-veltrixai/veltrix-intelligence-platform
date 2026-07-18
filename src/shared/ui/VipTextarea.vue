@@ -37,9 +37,20 @@ const id = useId()
 </template>
 
 <style scoped>
-.vip-field { display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.vip-field__label { font-size: var(--vip-fs-sm); font-weight: var(--vip-fw-medium); color: var(--vip-text-secondary); }
-.vip-field__req { color: var(--vip-danger); margin-left: 3px; }
+.vip-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.vip-field__label {
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-secondary);
+}
+.vip-field__req {
+  color: var(--vip-danger);
+  margin-left: 3px;
+}
 .vip-textarea {
   background: var(--vip-surface-2);
   border: 1px solid var(--vip-border);
@@ -50,9 +61,22 @@ const id = useId()
   resize: vertical;
   outline: none;
 }
-.vip-textarea:focus { border-color: var(--vip-brand-500); box-shadow: 0 0 0 3px var(--vip-brand-soft); }
-.vip-textarea.is-mono { font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); }
-.vip-textarea.is-error { border-color: var(--vip-danger); }
-.vip-field__msg { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.vip-field__msg.is-error { color: var(--vip-danger-text); }
+.vip-textarea:focus {
+  border-color: var(--vip-brand-500);
+  box-shadow: 0 0 0 3px var(--vip-brand-soft);
+}
+.vip-textarea.is-mono {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+}
+.vip-textarea.is-error {
+  border-color: var(--vip-danger);
+}
+.vip-field__msg {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.vip-field__msg.is-error {
+  color: var(--vip-danger-text);
+}
 </style>

@@ -39,9 +39,24 @@ export function useDashboardEditor(initial: Dashboard) {
   }
   const canUndo = computed(() => undoStack.value.length > 0)
   const canRedo = computed(() => redoStack.value.length > 0)
-  function undo() { if (undoStack.value.length) { redoStack.value.push(snap()); apply(undoStack.value.pop()!); selectedId.value = null } }
-  function redo() { if (redoStack.value.length) { undoStack.value.push(snap()); apply(redoStack.value.pop()!); selectedId.value = null } }
-  function markSaved() { savedSnap = snap(); dirty.value = false }
+  function undo() {
+    if (undoStack.value.length) {
+      redoStack.value.push(snap())
+      apply(undoStack.value.pop()!)
+      selectedId.value = null
+    }
+  }
+  function redo() {
+    if (redoStack.value.length) {
+      undoStack.value.push(snap())
+      apply(redoStack.value.pop()!)
+      selectedId.value = null
+    }
+  }
+  function markSaved() {
+    savedSnap = snap()
+    dirty.value = false
+  }
 
   const activePage = computed(() => dashboard.pages.find((p) => p.id === activePageId.value) ?? dashboard.pages[0])
   const widgets = computed(() => activePage.value?.widgets ?? [])
@@ -64,9 +79,14 @@ export function useDashboardEditor(initial: Dashboard) {
 
   function updatePosition(id: string, pos: GridPosition) {
     const wi = widgets.value.find((w) => w.id === id)
-    if (wi) { wi.pos = pos; dirty.value = true }
+    if (wi) {
+      wi.pos = pos
+      dirty.value = true
+    }
   }
-  function beginChange() { commit() }
+  function beginChange() {
+    commit()
+  }
 
   function deleteWidget(id: string) {
     commit()
@@ -104,7 +124,9 @@ export function useDashboardEditor(initial: Dashboard) {
     commit()
     activePage.value.widgets[idx] = { ...activePage.value.widgets[idx], ...patch }
   }
-  function select(id: string | null) { selectedId.value = id }
+  function select(id: string | null) {
+    selectedId.value = id
+  }
 
   /* ---- pages ---- */
   function addPage() {
@@ -121,15 +143,39 @@ export function useDashboardEditor(initial: Dashboard) {
   }
   function renamePage(id: string, name: string) {
     const p = dashboard.pages.find((x) => x.id === id)
-    if (p) { commit(); p.name = name }
+    if (p) {
+      commit()
+      p.name = name
+    }
   }
 
   return {
-    dashboard, activePageId, activePage, widgets, selectedId, selectedWidget,
-    dirty, canUndo, canRedo, clipboard,
-    addWidget, updatePosition, beginChange, deleteWidget, duplicateWidget, copyWidget, paste, patchWidget, select,
-    addPage, removePage, renamePage,
-    undo, redo, commit, markSaved,
+    dashboard,
+    activePageId,
+    activePage,
+    widgets,
+    selectedId,
+    selectedWidget,
+    dirty,
+    canUndo,
+    canRedo,
+    clipboard,
+    addWidget,
+    updatePosition,
+    beginChange,
+    deleteWidget,
+    duplicateWidget,
+    copyWidget,
+    paste,
+    patchWidget,
+    select,
+    addPage,
+    removePage,
+    renamePage,
+    undo,
+    redo,
+    commit,
+    markSaved,
   }
 }
 

@@ -9,18 +9,24 @@ export const ICONS: Record<string, string> = {
   star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   plug: '<path d="M9 3v6M15 3v6M7 9h10v3a5 5 0 0 1-10 0z"/><path d="M12 17v4"/>',
-  workflow: '<rect x="3" y="4" width="6" height="5" rx="1.2"/><rect x="15" y="15" width="6" height="5" rx="1.2"/><path d="M9 6.5h4a3 3 0 0 1 3 3v6"/>',
-  database: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
+  workflow:
+    '<rect x="3" y="4" width="6" height="5" rx="1.2"/><rect x="15" y="15" width="6" height="5" rx="1.2"/><path d="M9 6.5h4a3 3 0 0 1 3 3v6"/>',
+  database:
+    '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
   layers: '<path d="M12 3 3 8l9 5 9-5z"/><path d="M3 13l9 5 9-5"/>',
   gauge: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 14l4-3.5"/>',
   shield: '<path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/>',
-  lineage: '<circle cx="5" cy="12" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="19" cy="18" r="2.2"/><path d="M7 11l10-4M7 13l10 4"/>',
-  chart: '<path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="13" width="3" height="4"/>',
+  lineage:
+    '<circle cx="5" cy="12" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="19" cy="18" r="2.2"/><path d="M7 11l10-4M7 13l10 4"/>',
+  chart:
+    '<path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="13" width="3" height="4"/>',
   report: '<rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   calendar: '<rect x="4" y="5" width="16" height="16" rx="1.6"/><path d="M4 9h16M8 3v4M16 3v4"/>',
   bot: '<rect x="5" y="8" width="14" height="11" rx="2.4"/><path d="M12 8V4M9 13h.01M15 13h.01"/><path d="M2 13h3M19 13h3"/>',
-  sparkles: '<path d="M12 4l1.5 4L18 9.5 13.5 11 12 15l-1.5-4L6 9.5 10.5 8z"/><path d="M18 16l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
-  brain: '<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-1 5.8V16a3 3 0 0 0 4 2.8"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 1 5.8V16a3 3 0 0 1-4 2.8"/><path d="M12 4v16"/>',
+  sparkles:
+    '<path d="M12 4l1.5 4L18 9.5 13.5 11 12 15l-1.5-4L6 9.5 10.5 8z"/><path d="M18 16l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
+  brain:
+    '<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-1 5.8V16a3 3 0 0 0 4 2.8"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 1 5.8V16a3 3 0 0 1-4 2.8"/><path d="M12 4v16"/>',
   book: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20"/>',
   play: '<path d="M7 5l12 7-12 7z"/>',
   run: '<circle cx="12" cy="12" r="8.5"/><path d="M10 9l5 3-5 3z"/>',
@@ -30,9 +36,12 @@ export const ICONS: Record<string, string> = {
   usage: '<path d="M4 20V4"/><path d="M4 20h16"/><path d="M7 15l4-5 3 3 4-6"/>',
   store: '<path d="M4 8l1-4h14l1 4"/><path d="M4 8h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M9 20v-6h6v6"/>',
   code: '<path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/>',
-  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
-  building: '<rect x="5" y="3" width="14" height="18" rx="1.2"/><path d="M9 7h.01M15 7h.01M9 11h.01M15 11h.01M9 15h.01M15 15h.01"/>',
-  users: '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 20a6 6 0 0 0-4-5.6"/>',
+  settings:
+    '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+  building:
+    '<rect x="5" y="3" width="14" height="18" rx="1.2"/><path d="M9 7h.01M15 7h.01M9 11h.01M15 11h.01M9 15h.01M15 15h.01"/>',
+  users:
+    '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 20a6 6 0 0 0-4-5.6"/>',
   flag: '<path d="M5 21V4"/><path d="M5 4h11l-2 3 2 3H5"/>',
   card: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="1.6"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
@@ -65,7 +74,8 @@ export const ICONS: Record<string, string> = {
   grid: '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>',
   save: '<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h6V4M8 20v-6h8v6"/>',
   eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.6"/>',
-  eyeOff: '<path d="M4 4l16 16"/><path d="M9.5 5.5A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3 3.5M6 7.5A17 17 0 0 0 2 12s3.5 6 10 6a10 10 0 0 0 3-.5"/>',
+  eyeOff:
+    '<path d="M4 4l16 16"/><path d="M9.5 5.5A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3 3.5M6 7.5A17 17 0 0 0 2 12s3.5 6 10 6a10 10 0 0 0 3-.5"/>',
   warning: '<path d="M12 4l9 15H3z"/><path d="M12 10v4M12 17h.01"/>',
   error: '<circle cx="12" cy="12" r="8.5"/><path d="M12 8v5M12 16h.01"/>',
   info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',
@@ -77,7 +87,8 @@ export const ICONS: Record<string, string> = {
   upload: '<path d="M12 20V9M8 13l4-4 4 4M5 4h14"/>',
   drag: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
   pin: '<path d="M15 3l6 6-4 1-3.5 3.5L13 20l-2 2-3-6-4 1z"/>',
-  share: '<circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8 11l8-4M8 13l8 4"/>',
+  share:
+    '<circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8 11l8-4M8 13l8 4"/>',
   link: '<path d="M9 15l6-6M8 12l-2 2a3.5 3.5 0 0 0 5 5l2-2M16 12l2-2a3.5 3.5 0 0 0-5-5l-2 2"/>',
   logout: '<path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 12H3M6 8l-4 4 4 4"/>',
   moon: '<path d="M20 14a8 8 0 1 1-10-10 6.5 6.5 0 0 0 10 10z"/>',
@@ -85,7 +96,8 @@ export const ICONS: Record<string, string> = {
   monitor: '<rect x="3" y="4" width="18" height="12" rx="1.6"/><path d="M8 20h8M12 16v4"/>',
   table: '<rect x="3" y="4" width="18" height="16" rx="1.4"/><path d="M3 9h18M3 14h18M9 4v16"/>',
   text: '<path d="M5 6h14M12 6v13M9 19h6"/>',
-  image: '<rect x="3" y="4" width="18" height="16" rx="1.6"/><circle cx="9" cy="9.5" r="1.6"/><path d="M4 18l5-4 4 3 3-2 4 3"/>',
+  image:
+    '<rect x="3" y="4" width="18" height="16" rx="1.6"/><circle cx="9" cy="9.5" r="1.6"/><path d="M4 18l5-4 4 3 3-2 4 3"/>',
   target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.3"/>',
   trendUp: '<path d="M4 16l5-5 3 3 8-8M14 6h6v6"/>',
   trendDown: '<path d="M4 8l5 5 3-3 8 8M14 18h6v-6"/>',
@@ -95,8 +107,10 @@ export const ICONS: Record<string, string> = {
   pieChart: '<path d="M12 3v9h9a9 9 0 1 0-9-9z"/><path d="M21 12a9 9 0 1 1-9-9"/>',
   circle: '<circle cx="12" cy="12" r="8.5"/>',
   hash: '<path d="M6 9h14M4 15h14M10 4l-2 16M16 4l-2 16"/>',
-  calendarClock: '<rect x="3" y="5" width="12" height="12" rx="1.4"/><path d="M3 9h12M7 3v4M11 3v4"/><circle cx="17" cy="16" r="4.5"/><path d="M17 14v2l1.5 1"/>',
-  scatter: '<path d="M4 20V4M4 20h16"/><circle cx="8" cy="15" r="1.4"/><circle cx="12" cy="9" r="1.4"/><circle cx="16" cy="12" r="1.4"/><circle cx="18" cy="7" r="1.4"/>',
+  calendarClock:
+    '<rect x="3" y="5" width="12" height="12" rx="1.4"/><path d="M3 9h12M7 3v4M11 3v4"/><circle cx="17" cy="16" r="4.5"/><path d="M17 14v2l1.5 1"/>',
+  scatter:
+    '<path d="M4 20V4M4 20h16"/><circle cx="8" cy="15" r="1.4"/><circle cx="12" cy="9" r="1.4"/><circle cx="16" cy="12" r="1.4"/><circle cx="18" cy="7" r="1.4"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   panelRight: '<rect x="3" y="4" width="18" height="16" rx="1.6"/><path d="M15 4v16"/>',
   panelBottom: '<rect x="3" y="4" width="18" height="16" rx="1.6"/><path d="M3 15h18"/>',

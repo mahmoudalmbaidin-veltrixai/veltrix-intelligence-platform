@@ -3,13 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import { useQuery } from '@/shared/lib/query'
 import { useUiStore } from '@/shared/stores/ui'
 import { relativeTime } from '@/shared/lib/format'
-import {
-  aiService,
-  AI_MODELS,
-  AI_TOOLS,
-  type Assistant,
-  type PublishStatus,
-} from './ai.service'
+import { aiService, AI_MODELS, AI_TOOLS, type Assistant, type PublishStatus } from './ai.service'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
@@ -98,25 +92,102 @@ function save(status: PublishStatus | 'test'): void {
 }
 
 /* ---- Mock content for the other tabs ---- */
-interface PromptEntry { id: string; name: string; version: string; owner: string; updatedAt: string; uses: number }
+interface PromptEntry {
+  id: string
+  name: string
+  version: string
+  owner: string
+  updatedAt: string
+  uses: number
+}
 const prompts: PromptEntry[] = [
-  { id: 'p1', name: 'Revenue variance explainer', version: 'v4', owner: 'RevOps', updatedAt: relativeTime(new Date(Date.now() - 36e5).toISOString()), uses: 1240 },
-  { id: 'p2', name: 'Dataset summarizer', version: 'v2', owner: 'Data Platform', updatedAt: relativeTime(new Date(Date.now() - 72e5).toISOString()), uses: 860 },
-  { id: 'p3', name: 'Exec narrative', version: 'v7', owner: 'Finance', updatedAt: relativeTime(new Date(Date.now() - 864e5).toISOString()), uses: 402 },
-  { id: 'p4', name: 'SQL guardrail preamble', version: 'v1', owner: 'Governance', updatedAt: relativeTime(new Date(Date.now() - 6048e5).toISOString()), uses: 3110 },
+  {
+    id: 'p1',
+    name: 'Revenue variance explainer',
+    version: 'v4',
+    owner: 'RevOps',
+    updatedAt: relativeTime(new Date(Date.now() - 36e5).toISOString()),
+    uses: 1240,
+  },
+  {
+    id: 'p2',
+    name: 'Dataset summarizer',
+    version: 'v2',
+    owner: 'Data Platform',
+    updatedAt: relativeTime(new Date(Date.now() - 72e5).toISOString()),
+    uses: 860,
+  },
+  {
+    id: 'p3',
+    name: 'Exec narrative',
+    version: 'v7',
+    owner: 'Finance',
+    updatedAt: relativeTime(new Date(Date.now() - 864e5).toISOString()),
+    uses: 402,
+  },
+  {
+    id: 'p4',
+    name: 'SQL guardrail preamble',
+    version: 'v1',
+    owner: 'Governance',
+    updatedAt: relativeTime(new Date(Date.now() - 6048e5).toISOString()),
+    uses: 3110,
+  },
 ]
 
 const modelCatalog = [
-  { id: 'veltrix-reasoning-pro', label: 'Veltrix Reasoning Pro', ctx: '200K context', tone: 'brand' as const, note: 'Deep multi-step analysis' },
-  { id: 'veltrix-reasoning', label: 'Veltrix Reasoning', ctx: '128K context', tone: 'info' as const, note: 'Balanced default' },
-  { id: 'veltrix-fast', label: 'Veltrix Fast', ctx: '32K context', tone: 'success' as const, note: 'Low-latency lookups' },
-  { id: 'veltrix-analyst', label: 'Veltrix Analyst', ctx: '128K context', tone: 'warning' as const, note: 'Tuned for metrics & SQL' },
+  {
+    id: 'veltrix-reasoning-pro',
+    label: 'Veltrix Reasoning Pro',
+    ctx: '200K context',
+    tone: 'brand' as const,
+    note: 'Deep multi-step analysis',
+  },
+  {
+    id: 'veltrix-reasoning',
+    label: 'Veltrix Reasoning',
+    ctx: '128K context',
+    tone: 'info' as const,
+    note: 'Balanced default',
+  },
+  {
+    id: 'veltrix-fast',
+    label: 'Veltrix Fast',
+    ctx: '32K context',
+    tone: 'success' as const,
+    note: 'Low-latency lookups',
+  },
+  {
+    id: 'veltrix-analyst',
+    label: 'Veltrix Analyst',
+    ctx: '128K context',
+    tone: 'warning' as const,
+    note: 'Tuned for metrics & SQL',
+  },
 ]
 
 const testSessions = [
-  { id: 't1', assistant: 'Revenue Analyst', turns: 12, verdict: 'pass', when: relativeTime(new Date(Date.now() - 18e5).toISOString()) },
-  { id: 't2', assistant: 'Executive Briefer', turns: 6, verdict: 'review', when: relativeTime(new Date(Date.now() - 54e5).toISOString()) },
-  { id: 't3', assistant: 'Data Catalog Guide', turns: 20, verdict: 'pass', when: relativeTime(new Date(Date.now() - 172e5).toISOString()) },
+  {
+    id: 't1',
+    assistant: 'Revenue Analyst',
+    turns: 12,
+    verdict: 'pass',
+    when: relativeTime(new Date(Date.now() - 18e5).toISOString()),
+  },
+  {
+    id: 't2',
+    assistant: 'Executive Briefer',
+    turns: 6,
+    verdict: 'review',
+    when: relativeTime(new Date(Date.now() - 54e5).toISOString()),
+  },
+  {
+    id: 't3',
+    assistant: 'Data Catalog Guide',
+    turns: 20,
+    verdict: 'pass',
+    when: relativeTime(new Date(Date.now() - 172e5).toISOString()),
+  },
 ]
 
 const knowledgeOptions = computed(() => knowledge.value ?? [])
@@ -124,7 +195,10 @@ const knowledgeOptions = computed(() => knowledge.value ?? [])
 
 <template>
   <div class="studio">
-    <VipPageHeader title="AI Studio" description="Build, test and govern assistants, prompts and models for your workspace.">
+    <VipPageHeader
+      title="AI Studio"
+      description="Build, test and govern assistants, prompts and models for your workspace."
+    >
       <template #actions>
         <VipButton v-if="tab === 'assistants'" variant="primary" icon="plus" @click="openBuilder">
           New assistant
@@ -202,13 +276,19 @@ const knowledgeOptions = computed(() => knowledge.value ?? [])
     <div v-else-if="tab === 'knowledge'" class="studio__grid">
       <VipCard v-for="k in knowledgeOptions" :key="k.id">
         <div class="studio__model-head">
-          <VipBadge :tone="k.status === 'ready' ? 'success' : k.status === 'indexing' ? 'info' : 'danger'" variant="soft" size="sm">
+          <VipBadge
+            :tone="k.status === 'ready' ? 'success' : k.status === 'indexing' ? 'info' : 'danger'"
+            variant="soft"
+            size="sm"
+          >
             {{ k.status }}
           </VipBadge>
           <VipIcon name="book" :size="16" />
         </div>
         <h3 class="studio__model-name">{{ k.name }}</h3>
-        <p class="studio__model-note">{{ k.documents.toLocaleString() }} documents · indexed {{ relativeTime(k.lastIndexed) }}</p>
+        <p class="studio__model-note">
+          {{ k.documents.toLocaleString() }} documents · indexed {{ relativeTime(k.lastIndexed) }}
+        </p>
       </VipCard>
     </div>
 
@@ -235,7 +315,9 @@ const knowledgeOptions = computed(() => knowledge.value ?? [])
               <span class="studio__name-desc">{{ s.turns }} turns · {{ s.when }}</span>
             </div>
           </div>
-          <VipBadge :tone="s.verdict === 'pass' ? 'success' : 'warning'" variant="soft" size="sm">{{ s.verdict }}</VipBadge>
+          <VipBadge :tone="s.verdict === 'pass' ? 'success' : 'warning'" variant="soft" size="sm">{{
+            s.verdict
+          }}</VipBadge>
         </div>
       </div>
     </VipCard>
@@ -299,32 +381,118 @@ const knowledgeOptions = computed(() => knowledge.value ?? [])
 </template>
 
 <style scoped>
-.studio { max-width: 1280px; margin: 0 auto; }
-.studio__name { display: flex; align-items: center; gap: var(--vip-sp-5); }
-.studio__name-icon {
-  width: 32px; height: 32px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: var(--vip-radius-md); background: var(--vip-brand-soft); color: var(--vip-brand-text);
+.studio {
+  max-width: 1280px;
+  margin: 0 auto;
 }
-.studio__name-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.studio__name-title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.studio__name-desc { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.studio__muted { color: var(--vip-text-muted); font-size: var(--vip-fs-sm); }
+.studio__name {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+}
+.studio__name-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--vip-radius-md);
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+}
+.studio__name-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.studio__name-title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.studio__name-desc {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.studio__muted {
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-sm);
+}
 
-.studio__list { display: flex; flex-direction: column; }
-.studio__row { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-5); padding: var(--vip-sp-5) var(--vip-sp-6); border-bottom: 1px solid var(--vip-border-subtle); }
-.studio__row:last-child { border-bottom: none; }
-.studio__row-main { display: flex; align-items: center; gap: var(--vip-sp-5); min-width: 0; }
-.studio__row-meta { display: flex; align-items: center; gap: var(--vip-sp-5); }
+.studio__list {
+  display: flex;
+  flex-direction: column;
+}
+.studio__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-5);
+  padding: var(--vip-sp-5) var(--vip-sp-6);
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.studio__row:last-child {
+  border-bottom: none;
+}
+.studio__row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+  min-width: 0;
+}
+.studio__row-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+}
 
-.studio__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--vip-sp-6); }
-.studio__model-head { display: flex; align-items: center; justify-content: space-between; color: var(--vip-text-muted); margin-bottom: var(--vip-sp-5); }
-.studio__model-name { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); margin-bottom: var(--vip-sp-2); }
-.studio__model-note { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
+.studio__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--vip-sp-6);
+}
+.studio__model-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--vip-text-muted);
+  margin-bottom: var(--vip-sp-5);
+}
+.studio__model-name {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  margin-bottom: var(--vip-sp-2);
+}
+.studio__model-note {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
 
-.studio__form { display: flex; flex-direction: column; gap: var(--vip-sp-6); }
-.studio__group { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.studio__group-label { font-size: var(--vip-fs-sm); font-weight: var(--vip-fw-medium); color: var(--vip-text-secondary); }
-.studio__checks { display: grid; grid-template-columns: 1fr 1fr; gap: var(--vip-sp-4); }
-.studio__switches { display: flex; flex-direction: column; gap: var(--vip-sp-5); }
+.studio__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-6);
+}
+.studio__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.studio__group-label {
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-secondary);
+}
+.studio__checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--vip-sp-4);
+}
+.studio__switches {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
 </style>

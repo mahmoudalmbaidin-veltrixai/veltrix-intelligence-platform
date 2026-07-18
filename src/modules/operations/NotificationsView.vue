@@ -27,7 +27,13 @@ const { data, isLoading } = useQuery('operations:notifications', (signal) =>
 )
 
 const items = ref<Notification[]>([])
-watch(data, (d) => { if (d) items.value = d.map((n) => ({ ...n })) }, { immediate: true })
+watch(
+  data,
+  (d) => {
+    if (d) items.value = d.map((n) => ({ ...n }))
+  },
+  { immediate: true },
+)
 const list = computed<Notification[]>(() => items.value)
 
 const SEVERITY_TONE: Record<Severity, 'info' | 'success' | 'warning' | 'danger'> = {
@@ -67,10 +73,7 @@ const categories = computed(() => {
   for (const n of list.value) set.set(n.category, (set.get(n.category) ?? 0) + 1)
   return [...set.entries()].map(([value, count]) => ({ value, label: value, count }))
 })
-const tabs = computed(() => [
-  { value: 'all', label: 'All', count: list.value.length },
-  ...categories.value,
-])
+const tabs = computed(() => [{ value: 'all', label: 'All', count: list.value.length }, ...categories.value])
 
 const filtered = computed(() =>
   list.value.filter((n) => {
@@ -131,17 +134,10 @@ function savePreferences() {
       description="Operational alerts across pipelines, governance, billing and the platform."
     >
       <template #status>
-        <VipBadge v-if="unreadCount" tone="brand" variant="soft" size="sm">
-          {{ unreadCount }} unread
-        </VipBadge>
+        <VipBadge v-if="unreadCount" tone="brand" variant="soft" size="sm"> {{ unreadCount }} unread </VipBadge>
       </template>
       <template #actions>
-        <VipButton
-          variant="tertiary"
-          icon="check"
-          :disabled="!unreadCount"
-          @click="markAllRead"
-        >
+        <VipButton variant="tertiary" icon="check" :disabled="!unreadCount" @click="markAllRead">
           Mark all read
         </VipButton>
       </template>
@@ -168,12 +164,7 @@ function savePreferences() {
             description="No notifications match the current filters."
           />
           <ul v-else class="ntf__list">
-            <li
-              v-for="n in filtered"
-              :key="n.id"
-              class="ntf__item"
-              :class="{ 'is-unread': !n.read }"
-            >
+            <li v-for="n in filtered" :key="n.id" class="ntf__item" :class="{ 'is-unread': !n.read }">
               <span class="ntf__dot" :class="`is-${n.severity}`">
                 <VipIcon :name="SEVERITY_ICON[n.severity]" :size="15" />
               </span>
@@ -196,27 +187,13 @@ function savePreferences() {
                   >
                     {{ n.resource.label }}
                   </VipButton>
-                  <VipButton
-                    v-if="!n.read"
-                    variant="ghost"
-                    size="xs"
-                    icon="check"
-                    @click="markRead(n)"
-                  >
+                  <VipButton v-if="!n.read" variant="ghost" size="xs" icon="check" @click="markRead(n)">
                     Mark read
                   </VipButton>
-                  <VipButton
-                    v-else
-                    variant="ghost"
-                    size="xs"
-                    icon="undo"
-                    @click="markUnread(n)"
-                  >
+                  <VipButton v-else variant="ghost" size="xs" icon="undo" @click="markUnread(n)">
                     Mark unread
                   </VipButton>
-                  <VipButton variant="ghost" size="xs" icon="trash" @click="archive(n)">
-                    Archive
-                  </VipButton>
+                  <VipButton variant="ghost" size="xs" icon="trash" @click="archive(n)"> Archive </VipButton>
                 </div>
               </div>
             </li>
@@ -236,9 +213,7 @@ function savePreferences() {
               <VipSwitch v-model="preferences[key]" size="sm" />
             </li>
           </ul>
-          <VipButton variant="secondary" size="sm" block @click="savePreferences">
-            Save preferences
-          </VipButton>
+          <VipButton variant="secondary" size="sm" block @click="savePreferences"> Save preferences </VipButton>
         </VipCard>
       </aside>
     </div>
@@ -246,49 +221,153 @@ function savePreferences() {
 </template>
 
 <style scoped>
-.ntf { max-width: 1280px; margin: 0 auto; }
-.ntf__layout { display: grid; grid-template-columns: 1fr 320px; gap: var(--vip-sp-6); align-items: start; }
-.ntf__main { min-width: 0; display: flex; flex-direction: column; gap: var(--vip-sp-5); }
-.ntf__filters { display: flex; gap: var(--vip-sp-4); flex-wrap: wrap; }
-.ntf__loading { display: flex; flex-direction: column; gap: var(--vip-sp-4); padding: var(--vip-sp-5); }
-.ntf__list { list-style: none; margin: 0; padding: 0; }
+.ntf {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.ntf__layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--vip-sp-6);
+  align-items: start;
+}
+.ntf__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
+.ntf__filters {
+  display: flex;
+  gap: var(--vip-sp-4);
+  flex-wrap: wrap;
+}
+.ntf__loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+  padding: var(--vip-sp-5);
+}
+.ntf__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 .ntf__item {
   display: flex;
   gap: var(--vip-sp-5);
   padding: var(--vip-sp-5) var(--vip-sp-6);
   border-bottom: 1px solid var(--vip-border-subtle);
 }
-.ntf__item:last-child { border-bottom: none; }
-.ntf__item.is-unread { background: var(--vip-surface-2); }
+.ntf__item:last-child {
+  border-bottom: none;
+}
+.ntf__item.is-unread {
+  background: var(--vip-surface-2);
+}
 .ntf__dot {
-  width: 32px; height: 32px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--vip-radius-md);
 }
-.ntf__dot.is-info { background: var(--vip-info-soft); color: var(--vip-info-text); }
-.ntf__dot.is-success { background: var(--vip-success-soft); color: var(--vip-success-text); }
-.ntf__dot.is-warning { background: var(--vip-warning-soft); color: var(--vip-warning-text); }
-.ntf__dot.is-danger { background: var(--vip-danger-soft); color: var(--vip-danger-text); }
-.ntf__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.ntf__row { display: flex; align-items: center; gap: var(--vip-sp-4); flex-wrap: wrap; }
-.ntf__title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.ntf__time { margin-left: auto; font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.ntf__text { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); margin: 0; }
-.ntf__actions { display: flex; align-items: center; gap: var(--vip-sp-3); flex-wrap: wrap; margin-top: var(--vip-sp-2); }
-.ntf__side { position: sticky; top: var(--vip-sp-6); }
-.ntf__pref-head { margin-bottom: var(--vip-sp-5); }
-.ntf__pref-title { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); }
-.ntf__pref-desc { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); margin-top: var(--vip-sp-2); }
-.ntf__pref-list { list-style: none; margin: 0 0 var(--vip-sp-5); padding: 0; display: flex; flex-direction: column; }
+.ntf__dot.is-info {
+  background: var(--vip-info-soft);
+  color: var(--vip-info-text);
+}
+.ntf__dot.is-success {
+  background: var(--vip-success-soft);
+  color: var(--vip-success-text);
+}
+.ntf__dot.is-warning {
+  background: var(--vip-warning-soft);
+  color: var(--vip-warning-text);
+}
+.ntf__dot.is-danger {
+  background: var(--vip-danger-soft);
+  color: var(--vip-danger-text);
+}
+.ntf__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.ntf__row {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  flex-wrap: wrap;
+}
+.ntf__title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.ntf__time {
+  margin-left: auto;
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.ntf__text {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  margin: 0;
+}
+.ntf__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--vip-sp-2);
+}
+.ntf__side {
+  position: sticky;
+  top: var(--vip-sp-6);
+}
+.ntf__pref-head {
+  margin-bottom: var(--vip-sp-5);
+}
+.ntf__pref-title {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+}
+.ntf__pref-desc {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+  margin-top: var(--vip-sp-2);
+}
+.ntf__pref-list {
+  list-style: none;
+  margin: 0 0 var(--vip-sp-5);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
 .ntf__pref-row {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: var(--vip-sp-4) 0;
   border-bottom: 1px solid var(--vip-border-subtle);
 }
-.ntf__pref-row:last-child { border-bottom: none; }
-.ntf__pref-label { font-size: var(--vip-fs-md); color: var(--vip-text-secondary); }
+.ntf__pref-row:last-child {
+  border-bottom: none;
+}
+.ntf__pref-label {
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-secondary);
+}
 @media (max-width: 960px) {
-  .ntf__layout { grid-template-columns: 1fr; }
-  .ntf__side { position: static; }
+  .ntf__layout {
+    grid-template-columns: 1fr;
+  }
+  .ntf__side {
+    position: static;
+  }
 }
 </style>

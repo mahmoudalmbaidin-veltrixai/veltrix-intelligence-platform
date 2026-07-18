@@ -18,7 +18,13 @@ export interface SearchProvider {
   search(query: string): SearchResult[]
 }
 
-function mockProvider(key: string, label: string, icon: string, base: string, records: [string, string, string][]): SearchProvider {
+function mockProvider(
+  key: string,
+  label: string,
+  icon: string,
+  base: string,
+  records: [string, string, string][],
+): SearchProvider {
   return {
     key,
     label,
@@ -27,7 +33,14 @@ function mockProvider(key: string, label: string, icon: string, base: string, re
       return records
         .filter(([, name]) => !q || name.toLowerCase().includes(q))
         .slice(0, 5)
-        .map(([id, name, sub]) => ({ id: `${key}-${id}`, title: name, subtitle: sub, icon, to: `${base}/${id}`, group: label }))
+        .map(([id, name, sub]) => ({
+          id: `${key}-${id}`,
+          title: name,
+          subtitle: sub,
+          icon,
+          to: `${base}/${id}`,
+          group: label,
+        }))
     },
   }
 }

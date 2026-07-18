@@ -85,8 +85,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    status, session, error, intendedRoute, expiredTick,
-    isAuthenticated, isBooting,
-    bootstrap, login, logout, onUnauthorized, setIntended, takeIntended,
+    status,
+    session,
+    error,
+    intendedRoute,
+    expiredTick,
+    isAuthenticated,
+    isBooting,
+    bootstrap,
+    login,
+    logout,
+    onUnauthorized,
+    setIntended,
+    takeIntended,
   }
 })

@@ -79,12 +79,7 @@ function connect(c: Connector) {
     </div>
 
     <div v-if="filtered.length" class="cat__grid">
-      <div
-        v-for="c in filtered"
-        :key="c.key"
-        class="cat__card"
-        :class="{ 'is-disabled': c.status === 'coming-soon' }"
-      >
+      <div v-for="c in filtered" :key="c.key" class="cat__card" :class="{ 'is-disabled': c.status === 'coming-soon' }">
         <div class="cat__card-top">
           <span class="cat__card-icon"><VipIcon :name="c.icon" :size="20" /></span>
           <VipBadge :tone="STATUS_TONE[c.status]" variant="soft" size="sm">
@@ -97,14 +92,7 @@ function connect(c: Connector) {
           <p class="cat__card-desc">{{ c.description }}</p>
         </div>
         <div class="cat__card-foot">
-          <VipButton
-            v-if="c.status === 'available'"
-            variant="primary"
-            size="sm"
-            icon="plus"
-            block
-            @click="connect(c)"
-          >
+          <VipButton v-if="c.status === 'available'" variant="primary" size="sm" icon="plus" block @click="connect(c)">
             Connect
           </VipButton>
           <VipButton
@@ -127,9 +115,7 @@ function connect(c: Connector) {
           >
             Request access
           </VipButton>
-          <VipButton v-else variant="ghost" size="sm" icon="clock" block disabled>
-            Coming soon
-          </VipButton>
+          <VipButton v-else variant="ghost" size="sm" icon="clock" block disabled> Coming soon </VipButton>
         </div>
       </div>
     </div>
@@ -144,7 +130,10 @@ function connect(c: Connector) {
 </template>
 
 <style scoped>
-.cat { max-width: 1280px; margin: 0 auto; }
+.cat {
+  max-width: 1280px;
+  margin: 0 auto;
+}
 .cat__controls {
   display: flex;
   align-items: center;
@@ -153,7 +142,9 @@ function connect(c: Connector) {
   margin-bottom: var(--vip-sp-7);
   flex-wrap: wrap;
 }
-.cat__search { width: min(300px, 100%); }
+.cat__search {
+  width: min(300px, 100%);
+}
 .cat__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -167,21 +158,50 @@ function connect(c: Connector) {
   border: 1px solid var(--vip-border-subtle);
   border-radius: var(--vip-radius-lg);
   padding: var(--vip-sp-6);
-  transition: border-color var(--vip-motion-fast), box-shadow var(--vip-motion-fast);
+  transition:
+    border-color var(--vip-motion-fast),
+    box-shadow var(--vip-motion-fast);
 }
-.cat__card:hover:not(.is-disabled) { border-color: var(--vip-border-strong); box-shadow: var(--vip-shadow-sm); }
-.cat__card.is-disabled { opacity: 0.65; }
-.cat__card-top { display: flex; align-items: center; justify-content: space-between; }
+.cat__card:hover:not(.is-disabled) {
+  border-color: var(--vip-border-strong);
+  box-shadow: var(--vip-shadow-sm);
+}
+.cat__card.is-disabled {
+  opacity: 0.65;
+}
+.cat__card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .cat__card-icon {
-  width: 40px; height: 40px;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--vip-radius-md);
   background: var(--vip-brand-soft);
   color: var(--vip-brand-text);
 }
-.cat__card-body { flex: 1; }
-.cat__card-title { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); }
-.cat__card-cat { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.cat__card-desc { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); margin-top: var(--vip-sp-4); line-height: var(--vip-lh-normal); }
-.cat__card-foot { margin-top: auto; }
+.cat__card-body {
+  flex: 1;
+}
+.cat__card-title {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+}
+.cat__card-cat {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.cat__card-desc {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  margin-top: var(--vip-sp-4);
+  line-height: var(--vip-lh-normal);
+}
+.cat__card-foot {
+  margin-top: auto;
+}
 </style>

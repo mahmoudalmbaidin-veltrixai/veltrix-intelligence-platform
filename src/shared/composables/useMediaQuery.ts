@@ -4,7 +4,9 @@ import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
 export function useMediaQuery(query: string): Ref<boolean> {
   const matches = ref(false)
   let mql: MediaQueryList | undefined
-  const update = () => { matches.value = mql?.matches ?? false }
+  const update = () => {
+    matches.value = mql?.matches ?? false
+  }
 
   onMounted(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return

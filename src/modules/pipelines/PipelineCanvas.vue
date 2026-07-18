@@ -31,7 +31,10 @@ function portPos(nodeId: string, port: string, kind: 'in' | 'out'): { x: number;
   if (!node) return { x: 0, y: 0 }
   const spec = NODE_TYPES[node.kind]
   const ports = kind === 'in' ? spec.inputs : spec.outputs
-  const idx = Math.max(0, ports.findIndex((p) => p.id === port))
+  const idx = Math.max(
+    0,
+    ports.findIndex((p) => p.id === port),
+  )
   const count = ports.length || 1
   const gap = 18
   const totalH = (count - 1) * gap
@@ -70,7 +73,9 @@ function onPortActivate({ nodeId, port, kind }: { nodeId: string; port: string; 
   const title = (id: string) => props.editor.pipeline.nodes.find((n) => n.id === id)?.title ?? id
   if (kind === 'out') {
     keyboardConnect.value = { nodeId, port }
-    announce(`Connection started from ${title(nodeId)}. Activate a target input port to connect, or press Escape to cancel.`)
+    announce(
+      `Connection started from ${title(nodeId)}. Activate a target input port to connect, or press Escape to cancel.`,
+    )
   } else {
     if (!keyboardConnect.value) {
       announce('Activate an output port first to start a connection.')
@@ -84,7 +89,10 @@ function onPortActivate({ nodeId, port, kind }: { nodeId: string; port: string; 
 }
 /** Called by the studio when Escape is pressed. */
 function cancelKeyboardConnect() {
-  if (keyboardConnect.value) { keyboardConnect.value = null; announce('Connection cancelled.') }
+  if (keyboardConnect.value) {
+    keyboardConnect.value = null
+    announce('Connection cancelled.')
+  }
 }
 defineExpose({ fitToScreen, zoomBy, cancelKeyboardConnect })
 
@@ -114,7 +122,17 @@ function onNodePointerDown({ id, event }: { id: string; event: PointerEvent }) {
   window.addEventListener('pointerup', onPointerUp)
 }
 
-function onPortPointerDown({ nodeId, port, kind, event }: { nodeId: string; port: string; kind: 'in' | 'out'; event: PointerEvent }) {
+function onPortPointerDown({
+  nodeId,
+  port,
+  kind,
+  event,
+}: {
+  nodeId: string
+  port: string
+  kind: 'in' | 'out'
+  event: PointerEvent
+}) {
   if (kind !== 'out') return
   const p = portPos(nodeId, port, 'out')
   const c = screenToCanvas(event.clientX, event.clientY)
@@ -157,7 +175,10 @@ function onPointerMove(event: PointerEvent) {
     const c = screenToCanvas(event.clientX, event.clientY)
     let dx = c.x - dragStart.x
     let dy = c.y - dragStart.y
-    if (snapGrid.value) { dx = Math.round(dx / 16) * 16; dy = Math.round(dy / 16) * 16 }
+    if (snapGrid.value) {
+      dx = Math.round(dx / 16) * 16
+      dy = Math.round(dy / 16) * 16
+    }
     if (dx || dy) {
       props.editor.moveNodes(movedIds, dx, dy)
       dragStart = { x: dragStart.x + dx, y: dragStart.y + dy }
@@ -177,7 +198,10 @@ function onPointerUp() {
   if (mode === 'drag') props.editor.commit()
   if (mode === 'marquee' && marquee.value) {
     const { x0, y0, x1, y1 } = marquee.value
-    const minX = Math.min(x0, x1), maxX = Math.max(x0, x1), minY = Math.min(y0, y1), maxY = Math.max(y0, y1)
+    const minX = Math.min(x0, x1),
+      maxX = Math.max(x0, x1),
+      minY = Math.min(y0, y1),
+      maxY = Math.max(y0, y1)
     const hits = props.editor.pipeline.nodes
       .filter((n) => n.x + NODE_W > minX && n.x < maxX && n.y + NODE_H > minY && n.y < maxY)
       .map((n) => n.id)
@@ -217,7 +241,12 @@ function zoomBy(factor: number) {
 
 function fitToScreen() {
   const nodes = props.editor.pipeline.nodes
-  if (!nodes.length || !root.value) { view.scale = 1; view.x = 40; view.y = 40; return }
+  if (!nodes.length || !root.value) {
+    view.scale = 1
+    view.x = 40
+    view.y = 40
+    return
+  }
   const minX = Math.min(...nodes.map((n) => n.x)) - 40
   const minY = Math.min(...nodes.map((n) => n.y)) - 40
   const maxX = Math.max(...nodes.map((n) => n.x + NODE_W)) + 40
@@ -260,7 +289,10 @@ onBeforeUnmount(() => {
   <div
     ref="root"
     class="pcanvas"
-    :style="{ backgroundSize: `${20 * view.scale}px ${20 * view.scale}px`, backgroundPosition: `${view.x}px ${view.y}px` }"
+    :style="{
+      backgroundSize: `${20 * view.scale}px ${20 * view.scale}px`,
+      backgroundPosition: `${view.x}px ${view.y}px`,
+    }"
     @pointerdown.self="onBackgroundPointerDown"
     @wheel="onWheel"
     @dragover.prevent
@@ -316,7 +348,9 @@ onBeforeUnmount(() => {
       <button title="Zoom out" @click="zoomBy(0.83)"><VipIcon name="zoomOut" :size="16" /></button>
       <button title="Fit to screen" @click="fitToScreen"><VipIcon name="fit" :size="16" /></button>
       <span class="pcanvas__zoom">{{ Math.round(view.scale * 100) }}%</span>
-      <button title="Toggle snap-to-grid" :class="{ 'is-on': snapGrid }" @click="snapGrid = !snapGrid"><VipIcon name="grid" :size="16" /></button>
+      <button title="Toggle snap-to-grid" :class="{ 'is-on': snapGrid }" @click="snapGrid = !snapGrid">
+        <VipIcon name="grid" :size="16" />
+      </button>
     </div>
 
     <!-- minimap -->
@@ -325,7 +359,11 @@ onBeforeUnmount(() => {
         <rect
           v-for="node in editor.pipeline.nodes"
           :key="node.id"
-          :x="node.x" :y="node.y" :width="NODE_W" :height="NODE_H" rx="6"
+          :x="node.x"
+          :y="node.y"
+          :width="NODE_W"
+          :height="NODE_H"
+          rx="6"
           class="pcanvas__mini-node"
           :class="{ 'is-selected': selectionSet.has(node.id) }"
         />
@@ -345,35 +383,121 @@ onBeforeUnmount(() => {
   cursor: default;
   touch-action: none;
 }
-.pcanvas__layer { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
-.pcanvas__edges { position: absolute; top: 0; left: 0; width: 1px; height: 1px; pointer-events: none; }
-.pcanvas__edge { fill: none; stroke: var(--vip-border-strong); stroke-width: 2; pointer-events: stroke; cursor: pointer; }
-.pcanvas__edge:hover { stroke: var(--vip-brand-400); }
-.pcanvas__edge.is-selected { stroke: var(--vip-brand-500); stroke-width: 2.5; }
-.pcanvas__edge.is-pending { stroke: var(--vip-brand-500); stroke-dasharray: 5 4; }
-.pcanvas__marquee { fill: var(--vip-brand-soft); stroke: var(--vip-brand-500); stroke-width: 1; }
+.pcanvas__layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+.pcanvas__edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+.pcanvas__edge {
+  fill: none;
+  stroke: var(--vip-border-strong);
+  stroke-width: 2;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.pcanvas__edge:hover {
+  stroke: var(--vip-brand-400);
+}
+.pcanvas__edge.is-selected {
+  stroke: var(--vip-brand-500);
+  stroke-width: 2.5;
+}
+.pcanvas__edge.is-pending {
+  stroke: var(--vip-brand-500);
+  stroke-dasharray: 5 4;
+}
+.pcanvas__marquee {
+  fill: var(--vip-brand-soft);
+  stroke: var(--vip-brand-500);
+  stroke-width: 1;
+}
 
-.pcanvas__empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--vip-sp-4); color: var(--vip-text-disabled); pointer-events: none; }
-.pcanvas__empty p { font-size: var(--vip-fs-md); }
+.pcanvas__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vip-sp-4);
+  color: var(--vip-text-disabled);
+  pointer-events: none;
+}
+.pcanvas__empty p {
+  font-size: var(--vip-fs-md);
+}
 
 .pcanvas__controls {
-  position: absolute; bottom: var(--vip-sp-5); left: var(--vip-sp-5);
-  display: flex; align-items: center; gap: var(--vip-sp-2);
-  background: var(--vip-surface-1); border: 1px solid var(--vip-border); border-radius: var(--vip-radius-md);
-  padding: var(--vip-sp-2); box-shadow: var(--vip-shadow-md);
+  position: absolute;
+  bottom: var(--vip-sp-5);
+  left: var(--vip-sp-5);
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  background: var(--vip-surface-1);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-md);
+  padding: var(--vip-sp-2);
+  box-shadow: var(--vip-shadow-md);
 }
-.pcanvas__controls button { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; border-radius: var(--vip-radius-sm); color: var(--vip-text-secondary); }
-.pcanvas__controls button:hover { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
-.pcanvas__controls button.is-on { background: var(--vip-brand-soft); color: var(--vip-brand-text); }
-.pcanvas__zoom { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); font-variant-numeric: tabular-nums; padding: 0 var(--vip-sp-3); min-width: 40px; text-align: center; }
+.pcanvas__controls button {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--vip-radius-sm);
+  color: var(--vip-text-secondary);
+}
+.pcanvas__controls button:hover {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
+.pcanvas__controls button.is-on {
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+}
+.pcanvas__zoom {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  font-variant-numeric: tabular-nums;
+  padding: 0 var(--vip-sp-3);
+  min-width: 40px;
+  text-align: center;
+}
 
 .pcanvas__minimap {
-  position: absolute; bottom: var(--vip-sp-5); right: var(--vip-sp-5);
-  width: 180px; height: 120px;
-  background: var(--vip-surface-1); border: 1px solid var(--vip-border); border-radius: var(--vip-radius-md);
-  padding: var(--vip-sp-3); box-shadow: var(--vip-shadow-md); opacity: 0.94;
+  position: absolute;
+  bottom: var(--vip-sp-5);
+  right: var(--vip-sp-5);
+  width: 180px;
+  height: 120px;
+  background: var(--vip-surface-1);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-md);
+  padding: var(--vip-sp-3);
+  box-shadow: var(--vip-shadow-md);
+  opacity: 0.94;
 }
-.pcanvas__minimap svg { width: 100%; height: 100%; }
-.pcanvas__mini-node { fill: var(--vip-text-disabled); }
-.pcanvas__mini-node.is-selected { fill: var(--vip-brand-500); }
+.pcanvas__minimap svg {
+  width: 100%;
+  height: 100%;
+}
+.pcanvas__mini-node {
+  fill: var(--vip-text-disabled);
+}
+.pcanvas__mini-node.is-selected {
+  fill: var(--vip-brand-500);
+}
 </style>

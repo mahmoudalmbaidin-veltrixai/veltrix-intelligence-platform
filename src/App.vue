@@ -29,7 +29,9 @@ const layout = computed(() => {
 // Announce navigation to screen readers (route titles are not read by default).
 watch(
   () => route.meta.title,
-  (title) => { if (title) announce(`${title} page loaded`) },
+  (title) => {
+    if (title) announce(`${title} page loaded`)
+  },
 )
 </script>
 

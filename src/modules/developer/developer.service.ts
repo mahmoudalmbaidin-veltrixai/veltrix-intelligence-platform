@@ -77,16 +77,66 @@ export const WEBHOOK_EVENTS = [
 ]
 
 const KEYS: ApiKey[] = [
-  { id: 'key_ci_deploy', name: 'ci-deploy', prefix: 'vip_live_a1b2', scopes: ['run:pipelines', 'read:pipelines'], createdAt: isoAgo(60 * 24 * 120), lastUsed: isoAgo(320), status: 'active' },
-  { id: 'key_reporting', name: 'reporting-readonly', prefix: 'vip_live_c3d4', scopes: ['read:datasets', 'read:dashboards', 'read:reports'], createdAt: isoAgo(60 * 24 * 40), lastUsed: isoAgo(90), status: 'active' },
-  { id: 'key_legacy', name: 'legacy-integration', prefix: 'vip_live_e5f6', scopes: ['read:connections'], createdAt: isoAgo(60 * 24 * 400), lastUsed: isoAgo(60 * 24 * 200), status: 'revoked' },
-  { id: 'key_sandbox', name: 'sandbox-test', prefix: 'vip_test_9z8y', scopes: ['read:datasets', 'write:dashboards'], createdAt: isoAgo(60 * 24 * 8), lastUsed: isoAgo(1200), status: 'active' },
+  {
+    id: 'key_ci_deploy',
+    name: 'ci-deploy',
+    prefix: 'vip_live_a1b2',
+    scopes: ['run:pipelines', 'read:pipelines'],
+    createdAt: isoAgo(60 * 24 * 120),
+    lastUsed: isoAgo(320),
+    status: 'active',
+  },
+  {
+    id: 'key_reporting',
+    name: 'reporting-readonly',
+    prefix: 'vip_live_c3d4',
+    scopes: ['read:datasets', 'read:dashboards', 'read:reports'],
+    createdAt: isoAgo(60 * 24 * 40),
+    lastUsed: isoAgo(90),
+    status: 'active',
+  },
+  {
+    id: 'key_legacy',
+    name: 'legacy-integration',
+    prefix: 'vip_live_e5f6',
+    scopes: ['read:connections'],
+    createdAt: isoAgo(60 * 24 * 400),
+    lastUsed: isoAgo(60 * 24 * 200),
+    status: 'revoked',
+  },
+  {
+    id: 'key_sandbox',
+    name: 'sandbox-test',
+    prefix: 'vip_test_9z8y',
+    scopes: ['read:datasets', 'write:dashboards'],
+    createdAt: isoAgo(60 * 24 * 8),
+    lastUsed: isoAgo(1200),
+    status: 'active',
+  },
 ]
 
 const WEBHOOKS: Webhook[] = [
-  { id: 'wh_slack_ops', url: 'https://hooks.veltrix.com/ops/pipeline-alerts', events: ['pipeline.run.failed', 'automation.failed'], status: 'active', lastDelivery: isoAgo(45) },
-  { id: 'wh_datacatalog', url: 'https://catalog.veltrix.internal/webhooks/certified', events: ['dataset.certified'], status: 'active', lastDelivery: isoAgo(140) },
-  { id: 'wh_legacy_bi', url: 'https://legacy-bi.example.com/hook', events: ['dashboard.published', 'report.approved'], status: 'disabled', lastDelivery: isoAgo(60 * 24 * 30) },
+  {
+    id: 'wh_slack_ops',
+    url: 'https://hooks.veltrix.com/ops/pipeline-alerts',
+    events: ['pipeline.run.failed', 'automation.failed'],
+    status: 'active',
+    lastDelivery: isoAgo(45),
+  },
+  {
+    id: 'wh_datacatalog',
+    url: 'https://catalog.veltrix.internal/webhooks/certified',
+    events: ['dataset.certified'],
+    status: 'active',
+    lastDelivery: isoAgo(140),
+  },
+  {
+    id: 'wh_legacy_bi',
+    url: 'https://legacy-bi.example.com/hook',
+    events: ['dashboard.published', 'report.approved'],
+    status: 'disabled',
+    lastDelivery: isoAgo(60 * 24 * 30),
+  },
 ]
 
 const DELIVERIES: WebhookDelivery[] = [

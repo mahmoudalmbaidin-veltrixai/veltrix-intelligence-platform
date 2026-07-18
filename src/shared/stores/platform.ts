@@ -6,8 +6,15 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type {
-  AuthContext, Entitlement, EntitlementKey, FeatureFlagKey,
-  Organization, Permission, RoleKey, UserProfile, Workspace,
+  AuthContext,
+  Entitlement,
+  EntitlementKey,
+  FeatureFlagKey,
+  Organization,
+  Permission,
+  RoleKey,
+  UserProfile,
+  Workspace,
 } from '@/shared/types/identity'
 import { hasPermission, permissionsFor } from '@/shared/permissions/roles'
 import { LocalStore, setStorageScope } from '@/shared/lib/mock'
@@ -89,9 +96,7 @@ export const usePlatformStore = defineStore('platform', () => {
   const organizations = computed(() => ORGS)
   const organization = computed(() => ORGS.find((o) => o.id === orgId.value) ?? ORGS[0])
   const workspaces = computed(() => WORKSPACES.filter((w) => w.orgId === orgId.value))
-  const workspace = computed(
-    () => WORKSPACES.find((w) => w.id === workspaceId.value) ?? workspaces.value[0],
-  )
+  const workspace = computed(() => WORKSPACES.find((w) => w.id === workspaceId.value) ?? workspaces.value[0])
   const permissions = computed(() => permissionsFor(role.value))
   const entitlements = computed<Entitlement[]>(() =>
     organization.value.plan === 'enterprise' ? ENTITLEMENTS.enterprise : ENTITLEMENTS.trial,
@@ -179,11 +184,28 @@ export const usePlatformStore = defineStore('platform', () => {
   }
 
   return {
-    user, role, orgId, workspaceId, featureFlags,
-    organizations, organization, workspaces, workspace,
-    permissions, entitlements, authContext,
-    can, entitled, entitlement, flagEnabled,
-    setRole, switchOrg, switchWorkspace, toggleFlag,
-    hydrate, clearContext, applyScope,
+    user,
+    role,
+    orgId,
+    workspaceId,
+    featureFlags,
+    organizations,
+    organization,
+    workspaces,
+    workspace,
+    permissions,
+    entitlements,
+    authContext,
+    can,
+    entitled,
+    entitlement,
+    flagEnabled,
+    setRole,
+    switchOrg,
+    switchWorkspace,
+    toggleFlag,
+    hydrate,
+    clearContext,
+    applyScope,
   }
 })

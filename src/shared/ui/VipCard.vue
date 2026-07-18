@@ -16,11 +16,16 @@ withDefaults(defineProps<{ padded?: boolean; hoverable?: boolean; inset?: boolea
   border: 1px solid var(--vip-border-subtle);
   border-radius: var(--vip-radius-lg);
 }
-.is-padded { padding: var(--vip-sp-7); }
-.is-inset { background: var(--vip-surface-2); }
+.is-padded {
+  padding: var(--vip-sp-7);
+}
+.is-inset {
+  background: var(--vip-surface-2);
+}
 .is-hoverable {
   cursor: pointer;
-  transition: border-color var(--vip-motion-fast) var(--vip-ease-standard),
+  transition:
+    border-color var(--vip-motion-fast) var(--vip-ease-standard),
     background var(--vip-motion-fast) var(--vip-ease-standard);
 }
 .is-hoverable:hover {

@@ -2,17 +2,20 @@
 import { watch, onBeforeUnmount, ref, nextTick } from 'vue'
 import VipIcon from './VipIcon.vue'
 
-const props = withDefaults(
-  defineProps<{ open: boolean; title?: string; side?: 'right' | 'left'; width?: number }>(),
-  { side: 'right', width: 440 },
-)
+const props = withDefaults(defineProps<{ open: boolean; title?: string; side?: 'right' | 'left'; width?: number }>(), {
+  side: 'right',
+  width: 440,
+})
 const emit = defineEmits<{ close: [] }>()
 
 const panel = ref<HTMLElement>()
 let lastFocused: HTMLElement | null = null
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') { emit('close'); return }
+  if (e.key === 'Escape') {
+    emit('close')
+    return
+  }
   if (e.key !== 'Tab' || !panel.value) return
   const focusables = panel.value.querySelectorAll<HTMLElement>(
     'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
@@ -20,8 +23,13 @@ function onKeydown(e: KeyboardEvent) {
   if (!focusables.length) return
   const first = focusables[0]
   const last = focusables[focusables.length - 1]
-  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
-  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault()
+    first.focus()
+  }
 }
 
 watch(
@@ -77,7 +85,9 @@ onBeforeUnmount(() => {
   z-index: var(--vip-z-drawer);
   display: flex;
 }
-.is-right { margin-left: auto; }
+.is-right {
+  margin-left: auto;
+}
 .vip-drawer {
   background: var(--vip-surface-1);
   border-left: 1px solid var(--vip-border);
@@ -87,7 +97,10 @@ onBeforeUnmount(() => {
   max-width: 96vw;
   box-shadow: var(--vip-shadow-lg);
 }
-.is-left { border-left: none; border-right: 1px solid var(--vip-border); }
+.is-left {
+  border-left: none;
+  border-right: 1px solid var(--vip-border);
+}
 .vip-drawer__header {
   display: flex;
   align-items: center;
@@ -95,21 +108,56 @@ onBeforeUnmount(() => {
   padding: var(--vip-sp-6) var(--vip-sp-7);
   border-bottom: 1px solid var(--vip-border-subtle);
 }
-.vip-drawer__title { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); }
-.vip-drawer__close {
-  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
-  background: none; border: none; border-radius: var(--vip-radius-sm); color: var(--vip-text-muted);
+.vip-drawer__title {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
 }
-.vip-drawer__close:hover { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
-.vip-drawer__body { flex: 1; overflow-y: auto; padding: var(--vip-sp-7); }
+.vip-drawer__close {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--vip-radius-sm);
+  color: var(--vip-text-muted);
+}
+.vip-drawer__close:hover {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
+.vip-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--vip-sp-7);
+}
 .vip-drawer__footer {
-  display: flex; justify-content: flex-end; gap: var(--vip-sp-4);
-  padding: var(--vip-sp-5) var(--vip-sp-7); border-top: 1px solid var(--vip-border-subtle);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--vip-sp-4);
+  padding: var(--vip-sp-5) var(--vip-sp-7);
+  border-top: 1px solid var(--vip-border-subtle);
 }
 
-.vip-drawer-enter-active, .vip-drawer-leave-active { transition: opacity var(--vip-motion-base); }
-.vip-drawer-enter-active .vip-drawer, .vip-drawer-leave-active .vip-drawer { transition: transform var(--vip-motion-base) var(--vip-ease-emphasized); }
-.vip-drawer-enter-from, .vip-drawer-leave-to { opacity: 0; }
-.vip-drawer-enter-from .is-right, .vip-drawer-leave-to .is-right { transform: translateX(100%); }
-.vip-drawer-enter-from .is-left, .vip-drawer-leave-to .is-left { transform: translateX(-100%); }
+.vip-drawer-enter-active,
+.vip-drawer-leave-active {
+  transition: opacity var(--vip-motion-base);
+}
+.vip-drawer-enter-active .vip-drawer,
+.vip-drawer-leave-active .vip-drawer {
+  transition: transform var(--vip-motion-base) var(--vip-ease-emphasized);
+}
+.vip-drawer-enter-from,
+.vip-drawer-leave-to {
+  opacity: 0;
+}
+.vip-drawer-enter-from .is-right,
+.vip-drawer-leave-to .is-right {
+  transform: translateX(100%);
+}
+.vip-drawer-enter-from .is-left,
+.vip-drawer-leave-to .is-left {
+  transform: translateX(-100%);
+}
 </style>

@@ -82,12 +82,14 @@ const form = reactive<WizardState>({
 const isFile = computed(() => form.connector !== '' && fileConnectors.includes(form.connector))
 const isApi = computed(() => form.connector !== '' && apiConnectors.includes(form.connector))
 const isStorage = computed(() => form.connector !== '' && storageConnectors.includes(form.connector))
-const isDatabase = computed(
-  () => form.connector !== '' && !isFile.value && !isApi.value && !isStorage.value,
-)
+const isDatabase = computed(() => form.connector !== '' && !isFile.value && !isApi.value && !isStorage.value)
 
 /* ---- resource selection (mock discovery) ---- */
-interface ResourceOption { id: string; label: string; type: string }
+interface ResourceOption {
+  id: string
+  label: string
+  type: string
+}
 const resourceCatalog: Record<'database' | 'api' | 'storage' | 'file', ResourceOption[]> = {
   database: [
     { id: 'public.orders', label: 'public.orders', type: 'table' },
@@ -134,7 +136,11 @@ async function runTest() {
   // Deterministic mock: fail if host contains "fail", otherwise succeed.
   const ok = !/fail|invalid/i.test(form.host + form.name)
   testResult.value = ok
-    ? { ok: true, latencyMs: 40 + Math.round(Math.random() * 180), message: 'Connection established and credentials verified.' }
+    ? {
+        ok: true,
+        latencyMs: 40 + Math.round(Math.random() * 180),
+        message: 'Connection established and credentials verified.',
+      }
     : { ok: false, latencyMs: 0, message: 'Authentication failed — check host and credentials, then retry.' }
   testing.value = false
 }
@@ -221,14 +227,9 @@ const summaryEndpoint = computed(() => {
 
 <template>
   <div class="wiz">
-    <VipPageHeader
-      title="New connection"
-      description="Connect a new data source in a few guided steps."
-    >
+    <VipPageHeader title="New connection" description="Connect a new data source in a few guided steps.">
       <template #actions>
-        <VipButton variant="tertiary" icon="close" @click="router.push('/connections')">
-          Cancel
-        </VipButton>
+        <VipButton variant="tertiary" icon="close" @click="router.push('/connections')"> Cancel </VipButton>
       </template>
     </VipPageHeader>
 
@@ -299,8 +300,8 @@ const summaryEndpoint = computed(() => {
 
             <template v-else>
               <VipAlert tone="info" title="File upload">
-                In a live environment you would upload the file here. In mock mode we simulate a
-                previously uploaded workbook.
+                In a live environment you would upload the file here. In mock mode we simulate a previously uploaded
+                workbook.
               </VipAlert>
             </template>
           </div>
@@ -311,8 +312,8 @@ const summaryEndpoint = computed(() => {
           <h2 class="wiz__heading">Credentials</h2>
           <p class="wiz__lead">Provide the authentication details used to connect.</p>
           <VipAlert tone="info" title="Your secrets are safe">
-            Secrets are never persisted in mock mode. They are used only for the connectivity test
-            and discarded immediately afterwards.
+            Secrets are never persisted in mock mode. They are used only for the connectivity test and discarded
+            immediately afterwards.
           </VipAlert>
           <div class="wiz__form wiz__form--spaced">
             <template v-if="isDatabase">
@@ -324,7 +325,13 @@ const summaryEndpoint = computed(() => {
             </template>
             <template v-else-if="isStorage">
               <VipInput v-model="form.username" type="password" label="Access key ID" required placeholder="AKIA…" />
-              <VipInput v-model="form.password" type="password" label="Secret access key" required placeholder="••••••••" />
+              <VipInput
+                v-model="form.password"
+                type="password"
+                label="Secret access key"
+                required
+                placeholder="••••••••"
+              />
             </template>
             <template v-else>
               <VipAlert tone="success" title="No credentials required">
@@ -376,7 +383,9 @@ const summaryEndpoint = computed(() => {
         <!-- STEP 5: resources -->
         <section v-else-if="currentStep.key === 'resources'" class="wiz__section">
           <h2 class="wiz__heading">Select resources</h2>
-          <p class="wiz__lead">Choose the {{ resourceKind === 'database' ? 'tables and views' : 'resources' }} to make available.</p>
+          <p class="wiz__lead">
+            Choose the {{ resourceKind === 'database' ? 'tables and views' : 'resources' }} to make available.
+          </p>
           <div class="wiz__resources">
             <label
               v-for="r in availableResources"
@@ -403,10 +412,22 @@ const summaryEndpoint = computed(() => {
               <dt>Connector</dt>
               <dd>{{ form.connector ? CONNECTOR_LABEL[form.connector] : '—' }}</dd>
             </div>
-            <div class="wiz__review-row"><dt>Name</dt><dd>{{ form.name || '—' }}</dd></div>
-            <div class="wiz__review-row"><dt>Owner</dt><dd>{{ form.owner || '—' }}</dd></div>
-            <div class="wiz__review-row"><dt>Endpoint</dt><dd class="is-mono">{{ summaryEndpoint }}</dd></div>
-            <div v-if="isDatabase" class="wiz__review-row"><dt>Database</dt><dd>{{ form.database || '—' }}</dd></div>
+            <div class="wiz__review-row">
+              <dt>Name</dt>
+              <dd>{{ form.name || '—' }}</dd>
+            </div>
+            <div class="wiz__review-row">
+              <dt>Owner</dt>
+              <dd>{{ form.owner || '—' }}</dd>
+            </div>
+            <div class="wiz__review-row">
+              <dt>Endpoint</dt>
+              <dd class="is-mono">{{ summaryEndpoint }}</dd>
+            </div>
+            <div v-if="isDatabase" class="wiz__review-row">
+              <dt>Database</dt>
+              <dd>{{ form.database || '—' }}</dd>
+            </div>
             <div class="wiz__review-row">
               <dt>Connectivity</dt>
               <dd>
@@ -430,9 +451,7 @@ const summaryEndpoint = computed(() => {
 
         <!-- footer nav -->
         <footer class="wiz__footer">
-          <VipButton variant="tertiary" icon="chevronLeft" :disabled="stepIndex === 0" @click="back">
-            Back
-          </VipButton>
+          <VipButton variant="tertiary" icon="chevronLeft" :disabled="stepIndex === 0" @click="back"> Back </VipButton>
           <div class="wiz__footer-right">
             <span class="wiz__progress">Step {{ stepIndex + 1 }} of {{ STEPS.length }}</span>
             <VipButton
@@ -461,21 +480,46 @@ const summaryEndpoint = computed(() => {
 </template>
 
 <style scoped>
-.wiz { max-width: 1100px; margin: 0 auto; }
-.wiz__layout { display: grid; grid-template-columns: 240px 1fr; gap: var(--vip-sp-8); align-items: start; }
+.wiz {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.wiz__layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--vip-sp-8);
+  align-items: start;
+}
 
-.wiz__steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--vip-sp-2); }
+.wiz__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-2);
+}
 .wiz__step {
-  display: flex; align-items: center; gap: var(--vip-sp-5);
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
   padding: var(--vip-sp-4) var(--vip-sp-5);
   border-radius: var(--vip-radius-md);
   cursor: pointer;
 }
-.wiz__step:hover { background: var(--vip-surface-hover); }
-.wiz__step.is-active { background: var(--vip-brand-soft); }
+.wiz__step:hover {
+  background: var(--vip-surface-hover);
+}
+.wiz__step.is-active {
+  background: var(--vip-brand-soft);
+}
 .wiz__step-marker {
-  width: 26px; height: 26px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   border: 1px solid var(--vip-border-strong);
   background: var(--vip-surface-2);
@@ -483,92 +527,262 @@ const summaryEndpoint = computed(() => {
   font-size: var(--vip-fs-sm);
   font-weight: var(--vip-fw-semibold);
 }
-.wiz__step.is-active .wiz__step-marker { background: var(--vip-brand-500); border-color: var(--vip-brand-500); color: var(--vip-text-on-brand); }
-.wiz__step.is-done .wiz__step-marker { background: var(--vip-success); border-color: var(--vip-success); color: #fff; }
-.wiz__step-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.wiz__step-label { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.wiz__step-desc { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
+.wiz__step.is-active .wiz__step-marker {
+  background: var(--vip-brand-500);
+  border-color: var(--vip-brand-500);
+  color: var(--vip-text-on-brand);
+}
+.wiz__step.is-done .wiz__step-marker {
+  background: var(--vip-success);
+  border-color: var(--vip-success);
+  color: #fff;
+}
+.wiz__step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.wiz__step-label {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.wiz__step-desc {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
 
-.wiz__panel { display: flex; flex-direction: column; }
-.wiz__section { display: flex; flex-direction: column; gap: var(--vip-sp-5); }
-.wiz__heading { font-size: var(--vip-fs-xl); font-weight: var(--vip-fw-semibold); }
-.wiz__lead { font-size: var(--vip-fs-md); color: var(--vip-text-muted); margin-top: calc(-1 * var(--vip-sp-3)); }
+.wiz__panel {
+  display: flex;
+  flex-direction: column;
+}
+.wiz__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
+.wiz__heading {
+  font-size: var(--vip-fs-xl);
+  font-weight: var(--vip-fw-semibold);
+}
+.wiz__lead {
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-muted);
+  margin-top: calc(-1 * var(--vip-sp-3));
+}
 
-.wiz__connector-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--vip-sp-5); }
+.wiz__connector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--vip-sp-5);
+}
 .wiz__connector {
   position: relative;
-  display: flex; flex-direction: column; align-items: flex-start; gap: var(--vip-sp-4);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--vip-sp-4);
   padding: var(--vip-sp-6);
   background: var(--vip-surface-2);
   border: 1px solid var(--vip-border);
   border-radius: var(--vip-radius-md);
   text-align: left;
-  transition: border-color var(--vip-motion-fast), background var(--vip-motion-fast);
+  transition:
+    border-color var(--vip-motion-fast),
+    background var(--vip-motion-fast);
 }
-.wiz__connector:hover { border-color: var(--vip-border-strong); }
-.wiz__connector.is-selected { border-color: var(--vip-brand-500); background: var(--vip-brand-soft); }
+.wiz__connector:hover {
+  border-color: var(--vip-border-strong);
+}
+.wiz__connector.is-selected {
+  border-color: var(--vip-brand-500);
+  background: var(--vip-brand-soft);
+}
 .wiz__connector-icon {
-  width: 36px; height: 36px;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--vip-radius-md);
-  background: var(--vip-surface-3); color: var(--vip-text-secondary);
+  background: var(--vip-surface-3);
+  color: var(--vip-text-secondary);
 }
-.wiz__connector.is-selected .wiz__connector-icon { background: var(--vip-brand-500); color: var(--vip-text-on-brand); }
-.wiz__connector-label { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.wiz__connector-check { position: absolute; top: var(--vip-sp-4); right: var(--vip-sp-4); color: var(--vip-brand-text); }
+.wiz__connector.is-selected .wiz__connector-icon {
+  background: var(--vip-brand-500);
+  color: var(--vip-text-on-brand);
+}
+.wiz__connector-label {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.wiz__connector-check {
+  position: absolute;
+  top: var(--vip-sp-4);
+  right: var(--vip-sp-4);
+  color: var(--vip-brand-text);
+}
 
-.wiz__form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--vip-sp-6); }
-.wiz__form--spaced { grid-template-columns: 1fr; max-width: 440px; }
+.wiz__form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--vip-sp-6);
+}
+.wiz__form--spaced {
+  grid-template-columns: 1fr;
+  max-width: 440px;
+}
 
-.wiz__test { display: flex; flex-direction: column; gap: var(--vip-sp-5); align-items: flex-start; }
-.wiz__test-progress { display: flex; align-items: center; gap: var(--vip-sp-4); color: var(--vip-text-secondary); font-size: var(--vip-fs-md); }
+.wiz__test {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+  align-items: flex-start;
+}
+.wiz__test-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  color: var(--vip-text-secondary);
+  font-size: var(--vip-fs-md);
+}
 .wiz__test-result {
-  display: flex; gap: var(--vip-sp-5); width: 100%;
+  display: flex;
+  gap: var(--vip-sp-5);
+  width: 100%;
   padding: var(--vip-sp-6);
   border-radius: var(--vip-radius-md);
   border: 1px solid var(--vip-border);
 }
-.wiz__test-result.is-ok { background: var(--vip-success-soft); border-color: transparent; }
-.wiz__test-result.is-fail { background: var(--vip-danger-soft); border-color: transparent; }
-.wiz__test-icon { flex: none; }
-.wiz__test-result.is-ok .wiz__test-icon { color: var(--vip-success-text); }
-.wiz__test-result.is-fail .wiz__test-icon { color: var(--vip-danger-text); }
-.wiz__test-title { display: flex; align-items: center; gap: var(--vip-sp-4); font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); color: var(--vip-text-primary); }
-.wiz__test-msg { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); margin-top: var(--vip-sp-3); }
-.wiz__test-hint { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); margin-top: var(--vip-sp-3); }
+.wiz__test-result.is-ok {
+  background: var(--vip-success-soft);
+  border-color: transparent;
+}
+.wiz__test-result.is-fail {
+  background: var(--vip-danger-soft);
+  border-color: transparent;
+}
+.wiz__test-icon {
+  flex: none;
+}
+.wiz__test-result.is-ok .wiz__test-icon {
+  color: var(--vip-success-text);
+}
+.wiz__test-result.is-fail .wiz__test-icon {
+  color: var(--vip-danger-text);
+}
+.wiz__test-title {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+}
+.wiz__test-msg {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  margin-top: var(--vip-sp-3);
+}
+.wiz__test-hint {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  margin-top: var(--vip-sp-3);
+}
 
-.wiz__resources { display: flex; flex-direction: column; gap: var(--vip-sp-3); }
+.wiz__resources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
 .wiz__resource {
-  display: flex; align-items: center; gap: var(--vip-sp-5);
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
   padding: var(--vip-sp-4) var(--vip-sp-5);
   border: 1px solid var(--vip-border);
   border-radius: var(--vip-radius-md);
   cursor: pointer;
 }
-.wiz__resource:hover { background: var(--vip-surface-hover); }
-.wiz__resource.is-checked { border-color: var(--vip-brand-500); background: var(--vip-brand-soft); }
-.wiz__resource-label { flex: 1; font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); color: var(--vip-text-primary); }
+.wiz__resource:hover {
+  background: var(--vip-surface-hover);
+}
+.wiz__resource.is-checked {
+  border-color: var(--vip-brand-500);
+  background: var(--vip-brand-soft);
+}
+.wiz__resource-label {
+  flex: 1;
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-primary);
+}
 
-.wiz__review { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md); overflow: hidden; }
-.wiz__review-row { display: flex; justify-content: space-between; gap: var(--vip-sp-6); padding: var(--vip-sp-5) var(--vip-sp-6); }
-.wiz__review-row:not(:last-child) { border-bottom: 1px solid var(--vip-border-subtle); }
-.wiz__review-row dt { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
-.wiz__review-row dd { font-size: var(--vip-fs-md); color: var(--vip-text-primary); font-weight: var(--vip-fw-medium); text-align: right; }
-.wiz__review-row dd.is-mono { font-family: var(--vip-font-mono); font-weight: var(--vip-fw-regular); }
+.wiz__review {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+  overflow: hidden;
+}
+.wiz__review-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--vip-sp-6);
+  padding: var(--vip-sp-5) var(--vip-sp-6);
+}
+.wiz__review-row:not(:last-child) {
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.wiz__review-row dt {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
+.wiz__review-row dd {
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-primary);
+  font-weight: var(--vip-fw-medium);
+  text-align: right;
+}
+.wiz__review-row dd.is-mono {
+  font-family: var(--vip-font-mono);
+  font-weight: var(--vip-fw-regular);
+}
 
 .wiz__footer {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-top: var(--vip-sp-8);
   padding-top: var(--vip-sp-6);
   border-top: 1px solid var(--vip-border-subtle);
 }
-.wiz__footer-right { display: flex; align-items: center; gap: var(--vip-sp-5); }
-.wiz__progress { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
+.wiz__footer-right {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+}
+.wiz__progress {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
 
 @media (max-width: 860px) {
-  .wiz__layout { grid-template-columns: 1fr; }
-  .wiz__steps { flex-direction: row; overflow-x: auto; }
-  .wiz__step-text { display: none; }
-  .wiz__form { grid-template-columns: 1fr; }
+  .wiz__layout {
+    grid-template-columns: 1fr;
+  }
+  .wiz__steps {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .wiz__step-text {
+    display: none;
+  }
+  .wiz__form {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

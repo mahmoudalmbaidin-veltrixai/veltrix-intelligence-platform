@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-const props = withDefaults(defineProps<{ value: number; max?: number; label?: string; suffix?: string }>(), { max: 100 })
+const props = withDefaults(defineProps<{ value: number; max?: number; label?: string; suffix?: string }>(), {
+  max: 100,
+})
 const pct = computed(() => Math.min(1, Math.max(0, props.value / props.max)))
 const R = 70
 const CX = 100
@@ -17,7 +19,9 @@ const fg = computed(() => {
   const large = pct.value > 0.5 ? 1 : 0
   return `M ${pointOnArc(0).x} ${pointOnArc(0).y} A ${R} ${R} 0 ${large} 1 ${end.x} ${end.y}`
 })
-const color = computed(() => (pct.value > 0.75 ? 'var(--vip-success)' : pct.value > 0.4 ? 'var(--vip-warning)' : 'var(--vip-danger)'))
+const color = computed(() =>
+  pct.value > 0.75 ? 'var(--vip-success)' : pct.value > 0.4 ? 'var(--vip-warning)' : 'var(--vip-danger)',
+)
 </script>
 
 <template>
@@ -32,8 +36,24 @@ const color = computed(() => (pct.value > 0.75 ? 'var(--vip-success)' : pct.valu
 </template>
 
 <style scoped>
-.gauge { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-.gauge__svg { width: 100%; max-height: 100%; }
-.gauge__val { fill: var(--vip-text-primary); font-size: 26px; font-weight: 700; }
-.gauge__label { fill: var(--vip-text-muted); font-size: 11px; }
+.gauge {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gauge__svg {
+  width: 100%;
+  max-height: 100%;
+}
+.gauge__val {
+  fill: var(--vip-text-primary);
+  font-size: 26px;
+  font-weight: 700;
+}
+.gauge__label {
+  fill: var(--vip-text-muted);
+  font-size: 11px;
+}
 </style>

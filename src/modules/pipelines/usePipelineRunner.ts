@@ -23,14 +23,18 @@ function topoOrder(pipeline: Pipeline): string[] {
     if (seen.has(id)) continue
     seen.add(id)
     order.push(id)
-    pipeline.edges.filter((e) => e.sourceNode === id).forEach((e) => {
-      const d = (indeg.get(e.targetNode) ?? 1) - 1
-      indeg.set(e.targetNode, d)
-      if (d <= 0) queue.push(e.targetNode)
-    })
+    pipeline.edges
+      .filter((e) => e.sourceNode === id)
+      .forEach((e) => {
+        const d = (indeg.get(e.targetNode) ?? 1) - 1
+        indeg.set(e.targetNode, d)
+        if (d <= 0) queue.push(e.targetNode)
+      })
   }
   // include any orphans
-  pipeline.nodes.forEach((n) => { if (!seen.has(n.id)) order.push(n.id) })
+  pipeline.nodes.forEach((n) => {
+    if (!seen.has(n.id)) order.push(n.id)
+  })
   return order
 }
 
@@ -50,7 +54,10 @@ export function usePipelineRunner() {
     run.value.logs.push({ ...entry, ts: new Date().toISOString() })
   }
 
-  function start(pipeline: Pipeline, opts: { trigger?: PipelineRun['trigger']; failNode?: string; attempt?: number } = {}) {
+  function start(
+    pipeline: Pipeline,
+    opts: { trigger?: PipelineRun['trigger']; failNode?: string; attempt?: number } = {},
+  ) {
     stop()
     cancelled = false
     const r = createRun(pipeline, opts.trigger ?? 'manual', opts.attempt ?? 1)
@@ -72,7 +79,11 @@ export function usePipelineRunner() {
         if (opts.failNode && prevId === opts.failNode) {
           st.status = 'failed'
           st.message = 'Runtime error: null key in join'
-          log({ level: 'error', nodeId: prevId, message: `${nodeTitle(pipeline, prevId)} failed — null key in join condition` })
+          log({
+            level: 'error',
+            nodeId: prevId,
+            message: `${nodeTitle(pipeline, prevId)} failed — null key in join condition`,
+          })
           run.value.status = 'failed'
           run.value.finishedAt = new Date().toISOString()
           run.value.durationMs = Date.now() - started
@@ -83,7 +94,11 @@ export function usePipelineRunner() {
         st.rows = Math.round(200_000 + Math.random() * 2_000_000)
         st.durationMs = Math.round(1500 + Math.random() * 6000)
         run.value.rowsProcessed += st.rows
-        log({ level: 'info', nodeId: prevId, message: `${nodeTitle(pipeline, prevId)} ✓ ${st.rows.toLocaleString()} rows in ${(st.durationMs / 1000).toFixed(1)}s` })
+        log({
+          level: 'info',
+          nodeId: prevId,
+          message: `${nodeTitle(pipeline, prevId)} ✓ ${st.rows.toLocaleString()} rows in ${(st.durationMs / 1000).toFixed(1)}s`,
+        })
       }
 
       idx += 1
@@ -93,7 +108,10 @@ export function usePipelineRunner() {
         run.value.currentNodeId = undefined
         run.value.finishedAt = new Date().toISOString()
         run.value.durationMs = Date.now() - started
-        log({ level: 'info', message: `Execution succeeded · ${run.value.rowsProcessed.toLocaleString()} rows processed` })
+        log({
+          level: 'info',
+          message: `Execution succeeded · ${run.value.rowsProcessed.toLocaleString()} rows processed`,
+        })
         stop()
         return
       }
@@ -103,7 +121,11 @@ export function usePipelineRunner() {
       st.status = 'running'
       run.value.currentNodeId = id
       run.value.progress = Math.round((idx / order.length) * 100)
-      log({ level: 'info', nodeId: id, message: `${nodeTitle(pipeline, id)} started (${NODE_TYPES[pipeline.nodes.find((n) => n.id === id)!.kind].label})` })
+      log({
+        level: 'info',
+        nodeId: id,
+        message: `${nodeTitle(pipeline, id)} started (${NODE_TYPES[pipeline.nodes.find((n) => n.id === id)!.kind].label})`,
+      })
     }, 900)
   }
 

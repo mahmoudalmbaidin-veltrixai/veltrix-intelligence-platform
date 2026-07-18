@@ -66,15 +66,22 @@ export function createWidget(type: WidgetType, x: number, y: number, modelId = '
     wells.values = [{ fieldId: 'revenue', aggregation: 'sum' }]
   } else if (type === 'scatter') {
     wells.category = ['category']
-    wells.values = [{ fieldId: 'revenue', aggregation: 'sum' }, { fieldId: 'profit', aggregation: 'sum' }]
+    wells.values = [
+      { fieldId: 'revenue', aggregation: 'sum' },
+      { fieldId: 'profit', aggregation: 'sum' },
+    ]
   } else if (['kpi', 'metric-comparison', 'gauge', 'progress'].includes(type)) {
     wells.values = [{ fieldId: 'revenue', aggregation: 'sum' }]
   } else if (type === 'table' || type === 'pivot') {
     wells.category = ['region', 'category']
-    wells.values = [{ fieldId: 'revenue', aggregation: 'sum' }, { fieldId: 'orders', aggregation: 'sum' }]
+    wells.values = [
+      { fieldId: 'revenue', aggregation: 'sum' },
+      { fieldId: 'orders', aggregation: 'sum' },
+    ]
   }
 
-  const contentDefault = type === 'text' || type === 'rich-text' ? 'New text block' : type === 'image' ? 'Image placeholder' : undefined
+  const contentDefault =
+    type === 'text' || type === 'rich-text' ? 'New text block' : type === 'image' ? 'Image placeholder' : undefined
 
   return {
     id,

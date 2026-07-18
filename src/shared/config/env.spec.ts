@@ -27,7 +27,9 @@ describe('env config', () => {
   })
 
   it('fails closed in staging even with the opt-in flag (no silent mock)', () => {
-    expect(() => buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'staging', VITE_ALLOW_MOCK_FALLBACK: 'true' })).toThrow(EnvConfigError)
+    expect(() =>
+      buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'staging', VITE_ALLOW_MOCK_FALLBACK: 'true' }),
+    ).toThrow(EnvConfigError)
   })
 
   it('throws in production when live has no base url', () => {

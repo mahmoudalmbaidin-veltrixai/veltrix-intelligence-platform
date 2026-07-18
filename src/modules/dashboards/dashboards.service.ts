@@ -65,8 +65,14 @@ const mockDashboardService: DashboardService = {
     await latency()
     return Object.values(db())
       .map((d) => ({
-        id: d.id, name: d.name, status: d.status, owner: d.owner, tags: d.tags,
-        updatedAt: d.updatedAt, favorite: d.favorite, pageCount: d.pages.length,
+        id: d.id,
+        name: d.name,
+        status: d.status,
+        owner: d.owner,
+        tags: d.tags,
+        updatedAt: d.updatedAt,
+        favorite: d.favorite,
+        pageCount: d.pages.length,
         widgetCount: d.pages.reduce((s, p) => s + p.widgets.length, 0),
       }))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -88,7 +94,12 @@ const mockDashboardService: DashboardService = {
   },
   async publish(dashboard: Dashboard): Promise<Dashboard> {
     await latency(200, 420)
-    const published = { ...dashboard, status: 'published' as const, version: dashboard.version + 1, updatedAt: nowIso() }
+    const published = {
+      ...dashboard,
+      status: 'published' as const,
+      version: dashboard.version + 1,
+      updatedAt: nowIso(),
+    }
     const current = db()
     current[published.id] = published
     store.write(current)
@@ -97,7 +108,10 @@ const mockDashboardService: DashboardService = {
   async toggleFavorite(id: string): Promise<void> {
     await latency(60, 140)
     const current = db()
-    if (current[id]) { current[id].favorite = !current[id].favorite; store.write(current) }
+    if (current[id]) {
+      current[id].favorite = !current[id].favorite
+      store.write(current)
+    }
   },
 }
 

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import VipBadge from './VipBadge.vue'
-interface Tab { value: string; label: string; count?: number }
+interface Tab {
+  value: string
+  label: string
+  count?: number
+}
 defineProps<{ modelValue: string; tabs: Tab[] }>()
 const emit = defineEmits<{ 'update:modelValue': [string] }>()
 </script>
@@ -41,8 +45,15 @@ const emit = defineEmits<{ 'update:modelValue': [string] }>()
   font-weight: var(--vip-fw-medium);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  transition: color var(--vip-motion-fast), border-color var(--vip-motion-fast);
+  transition:
+    color var(--vip-motion-fast),
+    border-color var(--vip-motion-fast);
 }
-.vip-tabs__tab:hover { color: var(--vip-text-primary); }
-.vip-tabs__tab.is-active { color: var(--vip-text-primary); border-bottom-color: var(--vip-brand-500); }
+.vip-tabs__tab:hover {
+  color: var(--vip-text-primary);
+}
+.vip-tabs__tab.is-active {
+  color: var(--vip-text-primary);
+  border-bottom-color: var(--vip-brand-500);
+}
 </style>

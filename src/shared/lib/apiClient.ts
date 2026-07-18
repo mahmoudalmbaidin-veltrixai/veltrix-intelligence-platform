@@ -90,7 +90,11 @@ async function parseError(res: Response): Promise<ApiError> {
   return ApiError.fromStatus(res.status, { message, correlationId, fieldErrors, detail })
 }
 
-async function once<T>(path: string, opts: RequestOptions, controller: AbortController): Promise<{ data: T; res: Response }> {
+async function once<T>(
+  path: string,
+  opts: RequestOptions,
+  controller: AbortController,
+): Promise<{ data: T; res: Response }> {
   const url = `${config.apiBaseUrl}${path}${buildQuery(opts.query)}`
   const res = await fetch(url, {
     method: opts.method ?? 'GET',
@@ -131,7 +135,10 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     inflight.add(controller)
     // Distinguish a timeout abort from a user/external cancellation.
     let timedOut = false
-    const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeout)
+    const timer = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, timeout)
     const onAbort = () => controller.abort()
     opts.signal?.addEventListener('abort', onAbort)
     try {
@@ -140,7 +147,10 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     } catch (raw) {
       // Classify aborts precisely: timeout vs user cancellation.
       if (raw instanceof DOMException && raw.name === 'AbortError') {
-        throw new ApiError(timedOut ? 'timeout' : 'cancelled', timedOut ? 'The request timed out.' : 'The request was cancelled.')
+        throw new ApiError(
+          timedOut ? 'timeout' : 'cancelled',
+          timedOut ? 'The request timed out.' : 'The request was cancelled.',
+        )
       }
       const err = ApiError.from(raw)
       if (attempt < maxRetry && err.retryable && !opts.signal?.aborted) {
@@ -158,13 +168,20 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 }
 
 export const apiClient = {
-  get: <T>(path: string, opts?: Omit<RequestOptions, 'method' | 'body'>) => request<T>(path, { ...opts, method: 'GET' }),
-  post: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, 'method'>) => request<T>(path, { ...opts, method: 'POST', body }),
-  put: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, 'method'>) => request<T>(path, { ...opts, method: 'PUT', body }),
-  patch: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, 'method'>) => request<T>(path, { ...opts, method: 'PATCH', body }),
-  delete: <T>(path: string, opts?: Omit<RequestOptions, 'method' | 'body'>) => request<T>(path, { ...opts, method: 'DELETE' }),
-  upload: <T>(path: string, form: FormData, opts?: Omit<RequestOptions, 'method' | 'body' | 'form'>) => request<T>(path, { ...opts, method: 'POST', form }),
-  download: (path: string, opts?: Omit<RequestOptions, 'method' | 'download'>) => request<Blob>(path, { ...opts, method: 'GET', download: true }),
+  get: <T>(path: string, opts?: Omit<RequestOptions, 'method' | 'body'>) =>
+    request<T>(path, { ...opts, method: 'GET' }),
+  post: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, 'method'>) =>
+    request<T>(path, { ...opts, method: 'POST', body }),
+  put: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, 'method'>) =>
+    request<T>(path, { ...opts, method: 'PUT', body }),
+  patch: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, 'method'>) =>
+    request<T>(path, { ...opts, method: 'PATCH', body }),
+  delete: <T>(path: string, opts?: Omit<RequestOptions, 'method' | 'body'>) =>
+    request<T>(path, { ...opts, method: 'DELETE' }),
+  upload: <T>(path: string, form: FormData, opts?: Omit<RequestOptions, 'method' | 'body' | 'form'>) =>
+    request<T>(path, { ...opts, method: 'POST', form }),
+  download: (path: string, opts?: Omit<RequestOptions, 'method' | 'download'>) =>
+    request<Blob>(path, { ...opts, method: 'GET', download: true }),
   /** Exposed for tests: builds the query string. */
   _buildQuery: buildQuery,
   _statusToKind: statusToKind,

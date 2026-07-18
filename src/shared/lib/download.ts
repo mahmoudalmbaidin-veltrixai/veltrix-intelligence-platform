@@ -30,5 +30,10 @@ export function downloadText(filename: string, text: string, mime = 'text/plain'
 
 /** Slugify a name for use in a filename. */
 export function slug(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'export'
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'export'
+  )
 }

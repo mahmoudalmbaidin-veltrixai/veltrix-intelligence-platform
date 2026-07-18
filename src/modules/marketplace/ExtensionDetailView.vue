@@ -4,12 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { useUiStore } from '@/shared/stores/ui'
 import { formatNumber } from '@/shared/lib/format'
-import {
-  marketplaceService,
-  CATEGORY_ICON,
-  type Extension,
-  type ExtensionStatus,
-} from './marketplace.service'
+import { marketplaceService, CATEGORY_ICON, type Extension, type ExtensionStatus } from './marketplace.service'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
@@ -75,7 +70,11 @@ function remove() {
 }
 function requestAccess() {
   if (!extension.value) return
-  ui.pushToast({ kind: 'info', title: 'Access requested', message: `${extension.value.name} requires governance approval.` })
+  ui.pushToast({
+    kind: 'info',
+    title: 'Access requested',
+    message: `${extension.value.name} requires governance approval.`,
+  })
 }
 </script>
 
@@ -103,17 +102,15 @@ function requestAccess() {
         </template>
         <template #actions>
           <VipButton v-if="status === 'installed'" variant="danger" icon="trash" @click="remove">Remove</VipButton>
-          <VipButton v-else-if="status === 'restricted'" variant="primary" icon="lock" @click="requestAccess">Request access</VipButton>
+          <VipButton v-else-if="status === 'restricted'" variant="primary" icon="lock" @click="requestAccess"
+            >Request access</VipButton
+          >
           <VipButton v-else-if="canInstall" variant="primary" icon="download" @click="install">Install</VipButton>
           <VipButton v-else variant="secondary" disabled>Unavailable</VipButton>
         </template>
       </VipPageHeader>
 
-      <VipAlert
-        v-if="status === 'incompatible'"
-        tone="danger"
-        title="Incompatible with your deployment"
-      >
+      <VipAlert v-if="status === 'incompatible'" tone="danger" title="Incompatible with your deployment">
         This extension requires {{ extension.compatibility }}. Upgrade the platform runtime to install it.
       </VipAlert>
       <VipAlert
@@ -157,15 +154,32 @@ function requestAccess() {
           <VipCard>
             <h2 class="ext__heading">Details</h2>
             <dl class="ext__dl">
-              <div class="ext__dl-row"><dt>Category</dt><dd>{{ extension.category }}</dd></div>
-              <div class="ext__dl-row"><dt>Version</dt><dd>{{ extension.version }}</dd></div>
+              <div class="ext__dl-row">
+                <dt>Category</dt>
+                <dd>{{ extension.category }}</dd>
+              </div>
+              <div class="ext__dl-row">
+                <dt>Version</dt>
+                <dd>{{ extension.version }}</dd>
+              </div>
               <div class="ext__dl-row">
                 <dt>Rating</dt>
-                <dd class="ext__rating"><VipIcon name="star" :size="13" /> {{ extension.rating ? extension.rating.toFixed(1) : '—' }}</dd>
+                <dd class="ext__rating">
+                  <VipIcon name="star" :size="13" /> {{ extension.rating ? extension.rating.toFixed(1) : '—' }}
+                </dd>
               </div>
-              <div class="ext__dl-row"><dt>Installs</dt><dd>{{ formatNumber(extension.installs) }}</dd></div>
-              <div class="ext__dl-row"><dt>Compatibility</dt><dd>{{ extension.compatibility ?? '—' }}</dd></div>
-              <div class="ext__dl-row"><dt>Required plan</dt><dd>{{ extension.requiredPlan ?? 'Any' }}</dd></div>
+              <div class="ext__dl-row">
+                <dt>Installs</dt>
+                <dd>{{ formatNumber(extension.installs) }}</dd>
+              </div>
+              <div class="ext__dl-row">
+                <dt>Compatibility</dt>
+                <dd>{{ extension.compatibility ?? '—' }}</dd>
+              </div>
+              <div class="ext__dl-row">
+                <dt>Required plan</dt>
+                <dd>{{ extension.requiredPlan ?? 'Any' }}</dd>
+              </div>
             </dl>
           </VipCard>
 
@@ -182,42 +196,128 @@ function requestAccess() {
 </template>
 
 <style scoped>
-.ext { max-width: 1100px; margin: 0 auto; }
-.ext__back { margin-bottom: var(--vip-sp-4); }
-.ext__loading { display: flex; justify-content: center; padding: var(--vip-sp-12); }
-.ext__layout { display: grid; grid-template-columns: 1fr 320px; gap: var(--vip-sp-5); align-items: start; }
-.ext__main { display: flex; flex-direction: column; gap: var(--vip-sp-5); min-width: 0; }
-.ext__side { display: flex; flex-direction: column; gap: var(--vip-sp-5); }
-.ext__hero-icon {
-  width: 52px; height: 52px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: var(--vip-radius-lg);
-  background: var(--vip-brand-soft); color: var(--vip-brand-text);
+.ext {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.ext__back {
   margin-bottom: var(--vip-sp-4);
 }
-.ext__heading { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); margin-bottom: var(--vip-sp-4); }
-.ext__desc { font-size: var(--vip-fs-md); color: var(--vip-text-secondary); line-height: var(--vip-lh-normal); }
-.ext__shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--vip-sp-4); }
+.ext__loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--vip-sp-12);
+}
+.ext__layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--vip-sp-5);
+  align-items: start;
+}
+.ext__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+  min-width: 0;
+}
+.ext__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
+.ext__hero-icon {
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--vip-radius-lg);
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+  margin-bottom: var(--vip-sp-4);
+}
+.ext__heading {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  margin-bottom: var(--vip-sp-4);
+}
+.ext__desc {
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-secondary);
+  line-height: var(--vip-lh-normal);
+}
+.ext__shots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--vip-sp-4);
+}
 .ext__shot {
   aspect-ratio: 4 / 3;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--vip-sp-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vip-sp-3);
   background: var(--vip-surface-2);
   border: 1px dashed var(--vip-border);
   border-radius: var(--vip-radius-md);
   color: var(--vip-text-muted);
   font-size: var(--vip-fs-xs);
 }
-.ext__perms { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.ext__perms li { display: flex; align-items: center; gap: var(--vip-sp-3); color: var(--vip-text-secondary); }
-.ext__perms code { font-family: var(--vip-font-mono); font-size: var(--vip-fs-xs); }
-.ext__dl { margin: 0; }
-.ext__dl-row { display: flex; align-items: center; justify-content: space-between; padding: var(--vip-sp-4) 0; border-bottom: 1px solid var(--vip-border-subtle); }
-.ext__dl-row:last-child { border-bottom: none; }
-.ext__dl-row dt { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
-.ext__dl-row dd { margin: 0; font-size: var(--vip-fs-sm); color: var(--vip-text-primary); font-weight: var(--vip-fw-medium); }
-.ext__rating { display: inline-flex; align-items: center; gap: 4px; color: var(--vip-warning-text); }
-.ext__note { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
+.ext__perms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.ext__perms li {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  color: var(--vip-text-secondary);
+}
+.ext__perms code {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-xs);
+}
+.ext__dl {
+  margin: 0;
+}
+.ext__dl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--vip-sp-4) 0;
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.ext__dl-row:last-child {
+  border-bottom: none;
+}
+.ext__dl-row dt {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
+.ext__dl-row dd {
+  margin: 0;
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-primary);
+  font-weight: var(--vip-fw-medium);
+}
+.ext__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--vip-warning-text);
+}
+.ext__note {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
 @media (max-width: 900px) {
-  .ext__layout { grid-template-columns: 1fr; }
+  .ext__layout {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

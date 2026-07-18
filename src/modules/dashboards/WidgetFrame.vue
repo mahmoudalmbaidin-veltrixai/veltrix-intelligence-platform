@@ -24,7 +24,9 @@ const widgetRef = toRef(props, 'widget')
 const filtersRef = toRef(props, 'crossFilters')
 const { result, loading, error } = useWidgetData(widgetRef, filtersRef)
 
-const showChrome = computed(() => props.widget.format.showTitle && props.widget.type !== 'text' && props.widget.type !== 'image')
+const showChrome = computed(
+  () => props.widget.format.showTitle && props.widget.type !== 'text' && props.widget.type !== 'image',
+)
 
 const menuItems = [
   { key: 'edit', label: 'Edit visual', icon: 'settings' },
@@ -52,9 +54,13 @@ function onMenu(key: string) {
         <div v-if="widget.format.subtitle" class="wframe__sub">{{ widget.format.subtitle }}</div>
       </div>
       <div class="wframe__actions" @pointerdown.stop>
-        <span v-if="widget.interactions.crossFilter" class="wframe__badge" title="Cross-filtering enabled"><VipIcon name="filter" :size="11" /></span>
+        <span v-if="widget.interactions.crossFilter" class="wframe__badge" title="Cross-filtering enabled"
+          ><VipIcon name="filter" :size="11"
+        /></span>
         <VipMenu v-if="editable" :items="menuItems" @select="onMenu">
-          <template #trigger><button class="wframe__menu" aria-label="Widget menu"><VipIcon name="dotsV" :size="15" /></button></template>
+          <template #trigger
+            ><button class="wframe__menu" aria-label="Widget menu"><VipIcon name="dotsV" :size="15" /></button
+          ></template>
         </VipMenu>
       </div>
     </header>
@@ -74,20 +80,67 @@ function onMenu(key: string) {
 
 <style scoped>
 .wframe {
-  width: 100%; height: 100%;
+  width: 100%;
+  height: 100%;
   border: 1px solid var(--vip-border-subtle);
   border-radius: var(--vip-radius-lg);
-  display: flex; flex-direction: column; overflow: hidden;
-  transition: border-color var(--vip-motion-fast), box-shadow var(--vip-motion-fast);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition:
+    border-color var(--vip-motion-fast),
+    box-shadow var(--vip-motion-fast);
 }
-.wframe.no-border { border-color: transparent; }
-.wframe.is-selected { border-color: var(--vip-brand-500); box-shadow: 0 0 0 2px var(--vip-brand-soft); }
-.wframe__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--vip-sp-3); margin-bottom: var(--vip-sp-4); flex: none; }
-.wframe__title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); }
-.wframe__sub { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); margin-top: 1px; }
-.wframe__actions { display: flex; align-items: center; gap: var(--vip-sp-2); }
-.wframe__badge { color: var(--vip-text-disabled); display: inline-flex; }
-.wframe__menu { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; border-radius: var(--vip-radius-sm); color: var(--vip-text-muted); }
-.wframe__menu:hover { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
-.wframe__body { flex: 1; min-height: 0; }
+.wframe.no-border {
+  border-color: transparent;
+}
+.wframe.is-selected {
+  border-color: var(--vip-brand-500);
+  box-shadow: 0 0 0 2px var(--vip-brand-soft);
+}
+.wframe__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--vip-sp-3);
+  margin-bottom: var(--vip-sp-4);
+  flex: none;
+}
+.wframe__title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+}
+.wframe__sub {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  margin-top: 1px;
+}
+.wframe__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+}
+.wframe__badge {
+  color: var(--vip-text-disabled);
+  display: inline-flex;
+}
+.wframe__menu {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--vip-radius-sm);
+  color: var(--vip-text-muted);
+}
+.wframe__menu:hover {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
+.wframe__body {
+  flex: 1;
+  min-height: 0;
+}
 </style>

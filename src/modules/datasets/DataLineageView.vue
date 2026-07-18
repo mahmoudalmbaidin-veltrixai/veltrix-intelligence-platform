@@ -73,7 +73,11 @@ const ROW_GAP = 70
 const MARGIN_X = 24
 const MARGIN_Y = 56
 
-interface Placed extends LineageNode { x: number; y: number; col: number }
+interface Placed extends LineageNode {
+  x: number
+  y: number
+  col: number
+}
 
 const placed = computed<Placed[]>(() => {
   const out: Placed[] = []
@@ -97,13 +101,13 @@ const placedById = computed<Record<string, Placed>>(() => {
   return map
 })
 
-const maxRows = computed(() =>
-  Math.max(...STAGES.map((s) => NODES.filter((n) => n.stage === s.key).length)),
-)
+const maxRows = computed(() => Math.max(...STAGES.map((s) => NODES.filter((n) => n.stage === s.key).length)))
 const svgWidth = computed(() => MARGIN_X * 2 + (STAGES.length - 1) * COL_GAP + NODE_W)
 const svgHeight = computed(() => MARGIN_Y + maxRows.value * ROW_GAP)
 
-interface DrawnEdge extends Edge { d: string }
+interface DrawnEdge extends Edge {
+  d: string
+}
 const edgePaths = computed<DrawnEdge[]>(() =>
   EDGES.map((e) => {
     const a = placedById.value[e.from]
@@ -191,7 +195,11 @@ function select(id: string) {
               v-for="n in placed"
               :key="n.id"
               class="dlg__node"
-              :class="{ 'is-selected': n.id === selectedId, 'is-connected': connectedIds.has(n.id) && n.id !== selectedId, 'is-dim': !connectedIds.has(n.id) }"
+              :class="{
+                'is-selected': n.id === selectedId,
+                'is-connected': connectedIds.has(n.id) && n.id !== selectedId,
+                'is-dim': !connectedIds.has(n.id),
+              }"
               :transform="`translate(${n.x}, ${n.y})`"
               role="button"
               :aria-label="`${stageLabel(n.stage)}: ${n.label}`"
@@ -257,14 +265,22 @@ function select(id: string) {
             <span class="dlg__fallback-dep">
               Upstream:
               <template v-if="EDGES.some((e) => e.to === n.id)">
-                {{ EDGES.filter((e) => e.to === n.id).map((e) => placedById[e.from].label).join(', ') }}
+                {{
+                  EDGES.filter((e) => e.to === n.id)
+                    .map((e) => placedById[e.from].label)
+                    .join(', ')
+                }}
               </template>
               <template v-else>none</template>
             </span>
             <span class="dlg__fallback-dep">
               Downstream:
               <template v-if="EDGES.some((e) => e.from === n.id)">
-                {{ EDGES.filter((e) => e.from === n.id).map((e) => placedById[e.to].label).join(', ') }}
+                {{
+                  EDGES.filter((e) => e.from === n.id)
+                    .map((e) => placedById[e.to].label)
+                    .join(', ')
+                }}
               </template>
               <template v-else>none</template>
             </span>
@@ -276,10 +292,20 @@ function select(id: string) {
 </template>
 
 <style scoped>
-.dlg { max-width: 1280px; margin: 0 auto; }
-.dlg__layout { display: grid; grid-template-columns: 1fr 300px; gap: var(--vip-sp-6); align-items: start; }
+.dlg {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.dlg__layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: var(--vip-sp-6);
+  align-items: start;
+}
 
-.dlg__graph-card { overflow: hidden; }
+.dlg__graph-card {
+  overflow: hidden;
+}
 .dlg__stage-heads {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -287,48 +313,196 @@ function select(id: string) {
   padding: var(--vip-sp-5) var(--vip-sp-6);
   border-bottom: 1px solid var(--vip-border-subtle);
 }
-.dlg__stage-head { display: flex; align-items: center; gap: var(--vip-sp-3); font-size: var(--vip-fs-xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-muted); }
-.dlg__graph-scroll { overflow-x: auto; padding: var(--vip-sp-5); }
-.dlg__svg { display: block; }
+.dlg__stage-head {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-muted);
+}
+.dlg__graph-scroll {
+  overflow-x: auto;
+  padding: var(--vip-sp-5);
+}
+.dlg__svg {
+  display: block;
+}
 
-.dlg__edge { stroke: var(--vip-border-strong); stroke-width: 1.5; transition: stroke var(--vip-motion-fast); }
-.dlg__edge.is-active { stroke: var(--vip-brand-500); stroke-width: 2.5; }
+.dlg__edge {
+  stroke: var(--vip-border-strong);
+  stroke-width: 1.5;
+  transition: stroke var(--vip-motion-fast);
+}
+.dlg__edge.is-active {
+  stroke: var(--vip-brand-500);
+  stroke-width: 2.5;
+}
 
-.dlg__node { cursor: pointer; transition: opacity var(--vip-motion-fast); }
+.dlg__node {
+  cursor: pointer;
+  transition: opacity var(--vip-motion-fast);
+}
 .dlg__node-rect {
   fill: var(--vip-surface-2);
   stroke: var(--vip-border);
   stroke-width: 1.5;
-  transition: fill var(--vip-motion-fast), stroke var(--vip-motion-fast);
+  transition:
+    fill var(--vip-motion-fast),
+    stroke var(--vip-motion-fast);
 }
-.dlg__node:hover .dlg__node-rect { stroke: var(--vip-border-strong); }
-.dlg__node.is-selected .dlg__node-rect { fill: var(--vip-brand-soft); stroke: var(--vip-brand-500); stroke-width: 2; }
-.dlg__node.is-connected .dlg__node-rect { stroke: var(--vip-brand-400); }
-.dlg__node.is-dim { opacity: 0.5; }
-.dlg__node-label { fill: var(--vip-text-primary); font-size: 12px; font-weight: 600; font-family: var(--vip-font-sans); }
-.dlg__node-detail { fill: var(--vip-text-muted); font-size: 9.5px; font-family: var(--vip-font-sans); }
+.dlg__node:hover .dlg__node-rect {
+  stroke: var(--vip-border-strong);
+}
+.dlg__node.is-selected .dlg__node-rect {
+  fill: var(--vip-brand-soft);
+  stroke: var(--vip-brand-500);
+  stroke-width: 2;
+}
+.dlg__node.is-connected .dlg__node-rect {
+  stroke: var(--vip-brand-400);
+}
+.dlg__node.is-dim {
+  opacity: 0.5;
+}
+.dlg__node-label {
+  fill: var(--vip-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--vip-font-sans);
+}
+.dlg__node-detail {
+  fill: var(--vip-text-muted);
+  font-size: 9.5px;
+  font-family: var(--vip-font-sans);
+}
 
-.dlg__panel { position: sticky; top: var(--vip-sp-6); }
-.dlg__panel-head { display: flex; gap: var(--vip-sp-4); align-items: flex-start; margin-bottom: var(--vip-sp-5); }
-.dlg__panel-icon { width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--vip-radius-md); background: var(--vip-brand-soft); color: var(--vip-brand-text); }
-.dlg__panel-title { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); margin-bottom: var(--vip-sp-3); }
-.dlg__panel-detail { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); margin-bottom: var(--vip-sp-6); }
-.dlg__rel { margin-bottom: var(--vip-sp-6); }
-.dlg__rel-title { display: block; font-size: var(--vip-fs-xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-muted); margin-bottom: var(--vip-sp-4); }
-.dlg__rel-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.dlg__rel-list li { display: flex; align-items: center; gap: var(--vip-sp-3); padding: var(--vip-sp-3) var(--vip-sp-4); background: var(--vip-surface-2); border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-sm); font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); cursor: pointer; }
-.dlg__rel-list li:hover { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
-.dlg__rel-empty { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
+.dlg__panel {
+  position: sticky;
+  top: var(--vip-sp-6);
+}
+.dlg__panel-head {
+  display: flex;
+  gap: var(--vip-sp-4);
+  align-items: flex-start;
+  margin-bottom: var(--vip-sp-5);
+}
+.dlg__panel-icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--vip-radius-md);
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+}
+.dlg__panel-title {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+  margin-bottom: var(--vip-sp-3);
+}
+.dlg__panel-detail {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  margin-bottom: var(--vip-sp-6);
+}
+.dlg__rel {
+  margin-bottom: var(--vip-sp-6);
+}
+.dlg__rel-title {
+  display: block;
+  font-size: var(--vip-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-muted);
+  margin-bottom: var(--vip-sp-4);
+}
+.dlg__rel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.dlg__rel-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  padding: var(--vip-sp-3) var(--vip-sp-4);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-sm);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  cursor: pointer;
+}
+.dlg__rel-list li:hover {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
+.dlg__rel-empty {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
 
-.dlg__fallback { margin-top: var(--vip-sp-6); }
-.dlg__fallback-title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); }
-.dlg__muted { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); margin-bottom: var(--vip-sp-5); }
-.dlg__fallback-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--vip-sp-4); margin: 0; }
-.dlg__fallback-row { padding: var(--vip-sp-4) var(--vip-sp-5); border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md); }
-.dlg__fallback-row dt { display: flex; align-items: center; gap: var(--vip-sp-3); font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.dlg__fallback-stage { font-size: var(--vip-fs-2xs); color: var(--vip-text-muted); font-weight: var(--vip-fw-regular); margin-left: auto; }
-.dlg__fallback-row dd { margin: var(--vip-sp-4) 0 0; display: flex; flex-direction: column; gap: var(--vip-sp-2); }
-.dlg__fallback-dep { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
+.dlg__fallback {
+  margin-top: var(--vip-sp-6);
+}
+.dlg__fallback-title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+}
+.dlg__muted {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+  margin-bottom: var(--vip-sp-5);
+}
+.dlg__fallback-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--vip-sp-4);
+  margin: 0;
+}
+.dlg__fallback-row {
+  padding: var(--vip-sp-4) var(--vip-sp-5);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+}
+.dlg__fallback-row dt {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.dlg__fallback-stage {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-muted);
+  font-weight: var(--vip-fw-regular);
+  margin-left: auto;
+}
+.dlg__fallback-row dd {
+  margin: var(--vip-sp-4) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-2);
+}
+.dlg__fallback-dep {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
 
-@media (max-width: 1000px) { .dlg__layout { grid-template-columns: 1fr; } .dlg__panel { position: static; } }
+@media (max-width: 1000px) {
+  .dlg__layout {
+    grid-template-columns: 1fr;
+  }
+  .dlg__panel {
+    position: static;
+  }
+}
 </style>

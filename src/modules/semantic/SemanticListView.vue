@@ -29,7 +29,11 @@ function open(id: string) {
 }
 function newModel() {
   if (!canWrite.value) {
-    ui.pushToast({ kind: 'warning', title: 'Insufficient permission', message: 'You need semantic:write to create a model.' })
+    ui.pushToast({
+      kind: 'warning',
+      title: 'Insufficient permission',
+      message: 'You need semantic:write to create a model.',
+    })
     return
   }
   ui.pushToast({ kind: 'info', title: 'New model', message: 'Model scaffolding is not available in this preview.' })
@@ -42,7 +46,10 @@ function counts(dimensions: number, measures: number): string {
 
 <template>
   <div class="wrap">
-    <VipPageHeader title="Semantic models" description="Governed, reusable definitions of your business — entities, fields, metrics and relationships.">
+    <VipPageHeader
+      title="Semantic models"
+      description="Governed, reusable definitions of your business — entities, fields, metrics and relationships."
+    >
       <template #actions>
         <VipButton variant="primary" icon="plus" :disabled="!canWrite" @click="newModel">New model</VipButton>
       </template>
@@ -66,12 +73,7 @@ function counts(dimensions: number, measures: number): string {
     </VipEmptyState>
 
     <div v-else class="grid">
-      <VipCard
-        v-for="m in data"
-        :key="m.id"
-        hoverable
-        @click="open(m.id)"
-      >
+      <VipCard v-for="m in data" :key="m.id" hoverable @click="open(m.id)">
         <div class="card-head">
           <span class="card-icon"><VipIcon name="layers" :size="18" /></span>
           <div class="card-titles">
@@ -86,8 +88,19 @@ function counts(dimensions: number, measures: number): string {
         </div>
         <p class="card-desc">{{ m.description }}</p>
         <div class="card-meta">
-          <span class="meta"><VipIcon name="database" :size="13" /> {{ m.entities.length }} {{ m.entities.length === 1 ? 'entity' : 'entities' }}</span>
-          <span class="meta"><VipIcon name="hash" :size="13" /> {{ counts(m.fields.filter((f) => f.role === 'dimension' || f.role === 'time').length, m.fields.filter((f) => f.role === 'measure' || f.role === 'metric').length) }}</span>
+          <span class="meta"
+            ><VipIcon name="database" :size="13" /> {{ m.entities.length }}
+            {{ m.entities.length === 1 ? 'entity' : 'entities' }}</span
+          >
+          <span class="meta"
+            ><VipIcon name="hash" :size="13" />
+            {{
+              counts(
+                m.fields.filter((f) => f.role === 'dimension' || f.role === 'time').length,
+                m.fields.filter((f) => f.role === 'measure' || f.role === 'metric').length,
+              )
+            }}</span
+          >
           <span class="meta"><VipIcon name="clock" :size="13" /> Refreshed {{ relativeTime(m.freshness) }}</span>
         </div>
       </VipCard>
@@ -96,21 +109,71 @@ function counts(dimensions: number, measures: number): string {
 </template>
 
 <style scoped>
-.wrap { max-width: 1120px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--vip-sp-6); }
-.card-head { display: flex; gap: var(--vip-sp-5); align-items: flex-start; }
+.wrap {
+  max-width: 1120px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--vip-sp-6);
+}
+.card-head {
+  display: flex;
+  gap: var(--vip-sp-5);
+  align-items: flex-start;
+}
 .card-icon {
-  width: 36px; height: 36px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--vip-brand-soft); color: var(--vip-brand-text);
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
   border-radius: var(--vip-radius-md);
 }
-.card-titles { min-width: 0; }
-.card-title-row { display: flex; align-items: center; gap: var(--vip-sp-4); flex-wrap: wrap; }
-.card-title { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); color: var(--vip-text-primary); }
-.card-owner { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); margin-top: 2px; }
-.card-desc { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); margin-top: var(--vip-sp-5); line-height: var(--vip-lh-normal); }
-.card-meta { display: flex; flex-wrap: wrap; gap: var(--vip-sp-5); margin-top: var(--vip-sp-6); padding-top: var(--vip-sp-5); border-top: 1px solid var(--vip-border-subtle); }
-.meta { display: inline-flex; align-items: center; gap: var(--vip-sp-3); font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.card-title-row :deep(.vip-badge) { gap: 3px; }
+.card-titles {
+  min-width: 0;
+}
+.card-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  flex-wrap: wrap;
+}
+.card-title {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+}
+.card-owner {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  margin-top: 2px;
+}
+.card-desc {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  margin-top: var(--vip-sp-5);
+  line-height: var(--vip-lh-normal);
+}
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vip-sp-5);
+  margin-top: var(--vip-sp-6);
+  padding-top: var(--vip-sp-5);
+  border-top: 1px solid var(--vip-border-subtle);
+}
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.card-title-row :deep(.vip-badge) {
+  gap: 3px;
+}
 </style>

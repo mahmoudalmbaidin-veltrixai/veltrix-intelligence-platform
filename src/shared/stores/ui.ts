@@ -38,7 +38,10 @@ export const useUiStore = defineStore('ui', () => {
     const id = crypto.randomUUID()
     toasts.value.push({ ...t, id })
     // Announce to screen readers — errors/warnings assertively.
-    announce(`${t.title}${t.message ? `. ${t.message}` : ''}`, t.kind === 'error' || t.kind === 'warning' ? 'assertive' : 'polite')
+    announce(
+      `${t.title}${t.message ? `. ${t.message}` : ''}`,
+      t.kind === 'error' || t.kind === 'warning' ? 'assertive' : 'polite',
+    )
     setTimeout(() => dismissToast(id), 5200)
     return id
   }
@@ -47,8 +50,16 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   return {
-    sidebarCollapsed, mobileNavOpen, commandOpen, notificationDrawerOpen,
-    unreadNotifications, toasts,
-    toggleSidebar, openCommand, closeCommand, pushToast, dismissToast,
+    sidebarCollapsed,
+    mobileNavOpen,
+    commandOpen,
+    notificationDrawerOpen,
+    unreadNotifications,
+    toasts,
+    toggleSidebar,
+    openCommand,
+    closeCommand,
+    pushToast,
+    dismissToast,
   }
 })

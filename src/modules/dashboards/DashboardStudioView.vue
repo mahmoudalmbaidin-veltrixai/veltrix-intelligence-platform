@@ -45,6 +45,22 @@ const right = useResizable({ key: 'dash.right', initial: 320, min: 260, max: 460
 const compact = useIsCompact()
 const fieldsOpen = ref(false)
 const inspectorOpen = ref(false)
+function toggleFields() {
+  fieldsOpen.value = !fieldsOpen.value
+  inspectorOpen.value = false
+}
+function toggleInspector() {
+  inspectorOpen.value = !inspectorOpen.value
+  fieldsOpen.value = false
+}
+function closeOverlays() {
+  fieldsOpen.value = false
+  inspectorOpen.value = false
+}
+function addWidgetFromPanel(t: WidgetType) {
+  editor.value?.addWidget(t)
+  if (compact.value) fieldsOpen.value = false
+}
 
 const canEdit = computed(() => platform.can('dashboard:write'))
 
@@ -54,7 +70,9 @@ const canUndo = computed(() => editor.value?.canUndo.value ?? false)
 const canRedo = computed(() => editor.value?.canRedo.value ?? false)
 const activePageId = computed<string>({
   get: () => editor.value?.activePageId.value ?? '',
-  set: (v: string) => { if (editor.value) editor.value.activePageId.value = v },
+  set: (v: string) => {
+    if (editor.value) editor.value.activePageId.value = v
+  },
 })
 
 // Reveal the inspector when a widget is selected (compact) + announce it.
@@ -62,7 +80,10 @@ watch(
   () => editor.value?.selectedId.value ?? null,
   (id) => {
     if (!id) return
-    if (compact.value) { inspectorOpen.value = true; fieldsOpen.value = false }
+    if (compact.value) {
+      inspectorOpen.value = true
+      fieldsOpen.value = false
+    }
     announce(`Selected ${editor.value?.selectedWidget.value?.general.name ?? 'widget'}`)
   },
 )
@@ -101,40 +122,62 @@ async function publish() {
 function onCrossFilter({ field, value }: { field: string; value: string }) {
   const existing = crossFilters.value.find((f) => f.fieldId === field && f.value === value)
   if (existing) crossFilters.value = crossFilters.value.filter((f) => f !== existing)
-  else crossFilters.value = [...crossFilters.value.filter((f) => f.fieldId !== field), { fieldId: field, operator: 'eq', value, label: `${field} = ${value}` }]
+  else
+    crossFilters.value = [
+      ...crossFilters.value.filter((f) => f.fieldId !== field),
+      { fieldId: field, operator: 'eq', value, label: `${field} = ${value}` },
+    ]
 }
 
 /* autosave */
 let timer: number | undefined
-watch(() => editor.value?.dirty, (d) => {
-  if (d && canEdit.value) {
-    window.clearTimeout(timer)
-    timer = window.setTimeout(async () => {
-      if (!editor.value?.dirty) return
-      await dashboardService.save(editor.value.dashboard as Dashboard)
-      editor.value.markSaved()
-      savedAt.value = new Date().toISOString()
-    }, 2500)
-  }
-})
+watch(
+  () => editor.value?.dirty,
+  (d) => {
+    if (d && canEdit.value) {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(async () => {
+        if (!editor.value?.dirty) return
+        await dashboardService.save(editor.value.dashboard as Dashboard)
+        editor.value.markSaved()
+        savedAt.value = new Date().toISOString()
+      }, 2500)
+    }
+  },
+)
 
 function onKeydown(e: KeyboardEvent) {
   if (!editor.value) return
   const tag = (e.target as HTMLElement).tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save() }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault()
+      save()
+    }
     return
   }
   const mod = e.metaKey || e.ctrlKey
   const sel = editor.value.selectedId.value
-  if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); save() }
-  else if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); editor.value.deleteWidget(sel) }
-  else if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); editor.value.undo() }
-  else if (mod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); editor.value.redo() }
-  else if (mod && e.key.toLowerCase() === 'd' && sel) { e.preventDefault(); editor.value.duplicateWidget(sel) }
-  else if (mod && e.key.toLowerCase() === 'c' && sel) { editor.value.copyWidget(sel) }
-  else if (mod && e.key.toLowerCase() === 'v') { editor.value.paste() }
-  else if (e.key.startsWith('Arrow') && sel) {
+  if (mod && e.key.toLowerCase() === 's') {
+    e.preventDefault()
+    save()
+  } else if ((e.key === 'Delete' || e.key === 'Backspace') && sel) {
+    e.preventDefault()
+    editor.value.deleteWidget(sel)
+  } else if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+    e.preventDefault()
+    editor.value.undo()
+  } else if (mod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+    e.preventDefault()
+    editor.value.redo()
+  } else if (mod && e.key.toLowerCase() === 'd' && sel) {
+    e.preventDefault()
+    editor.value.duplicateWidget(sel)
+  } else if (mod && e.key.toLowerCase() === 'c' && sel) {
+    editor.value.copyWidget(sel)
+  } else if (mod && e.key.toLowerCase() === 'v') {
+    editor.value.paste()
+  } else if (e.key.startsWith('Arrow') && sel) {
     // Keyboard move (arrows) and resize (Shift+arrows) of the selected widget
     // on the 12-column grid (QA VIP-FE-C004).
     e.preventDefault()
@@ -147,17 +190,25 @@ function onKeydown(e: KeyboardEvent) {
       editor.value.updatePosition(w.id, { ...w.pos, w: Math.max(2, w.pos.w + dx), h: Math.max(2, w.pos.h + dy) })
       announce(`Resized to ${Math.max(2, w.pos.w + dx)} by ${Math.max(2, w.pos.h + dy)}`)
     } else {
-      editor.value.updatePosition(w.id, { ...w.pos, x: Math.max(0, Math.min(11, w.pos.x + dx)), y: Math.max(0, w.pos.y + dy) })
+      editor.value.updatePosition(w.id, {
+        ...w.pos,
+        x: Math.max(0, Math.min(11, w.pos.x + dx)),
+        y: Math.max(0, w.pos.y + dy),
+      })
     }
-  }
-  else if (e.key === 'Escape') {
+  } else if (e.key === 'Escape') {
     fieldsOpen.value = false
     inspectorOpen.value = false
     editor.value.select(null)
   }
 }
 
-function beforeUnload(e: BeforeUnloadEvent) { if (editor.value?.dirty) { e.preventDefault(); e.returnValue = '' } }
+function beforeUnload(e: BeforeUnloadEvent) {
+  if (editor.value?.dirty) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
 onBeforeRouteLeave(() => (editor.value?.dirty ? window.confirm('You have unsaved changes. Leave anyway?') : true))
 
 function renamePagePrompt(id: string, current: string) {
@@ -189,9 +240,18 @@ onBeforeUnmount(() => {
       <div class="dstudio__tb-left">
         <VipButton variant="ghost" size="sm" icon="chevronLeft" title="Back" @click="router.push('/dashboards')" />
         <div class="dstudio__title">
-          <input v-if="editor" v-model="editor.dashboard.name" class="dstudio__name" aria-label="Dashboard name" :readonly="!canEdit" @input="editor.commit()" />
+          <input
+            v-if="editor"
+            v-model="editor.dashboard.name"
+            class="dstudio__name"
+            aria-label="Dashboard name"
+            :readonly="!canEdit"
+            @input="editor.commit()"
+          />
           <div class="dstudio__meta">
-            <VipBadge :tone="editor?.dashboard.status === 'published' ? 'success' : 'neutral'" size="sm">{{ editor?.dashboard.status }}</VipBadge>
+            <VipBadge :tone="editor?.dashboard.status === 'published' ? 'success' : 'neutral'" size="sm">{{
+              editor?.dashboard.status
+            }}</VipBadge>
             <span class="dstudio__ver">v{{ editor?.dashboard.version }}</span>
             <span v-if="dirty" class="dstudio__dirty">● Unsaved</span>
             <span v-else-if="savedAt" class="dstudio__saved">Saved {{ relativeTime(savedAt) }}</span>
@@ -200,25 +260,57 @@ onBeforeUnmount(() => {
       </div>
       <div class="dstudio__tb-right">
         <div v-if="compact && mode === 'edit'" class="dstudio__group">
-          <VipButton variant="ghost" size="sm" icon="panelRight" title="Fields & visuals" :active="fieldsOpen" :aria-expanded="fieldsOpen" aria-controls="dstudio-fields" @click="fieldsOpen = !fieldsOpen; inspectorOpen = false" />
-          <VipButton variant="ghost" size="sm" icon="settings" title="Inspector" :active="inspectorOpen" :aria-expanded="inspectorOpen" aria-controls="dstudio-inspector" @click="inspectorOpen = !inspectorOpen; fieldsOpen = false" />
+          <VipButton
+            variant="ghost"
+            size="sm"
+            icon="panelRight"
+            title="Fields & visuals"
+            :active="fieldsOpen"
+            :aria-expanded="fieldsOpen"
+            aria-controls="dstudio-fields"
+            @click="toggleFields"
+          />
+          <VipButton
+            variant="ghost"
+            size="sm"
+            icon="settings"
+            title="Inspector"
+            :active="inspectorOpen"
+            :aria-expanded="inspectorOpen"
+            aria-controls="dstudio-inspector"
+            @click="toggleInspector"
+          />
         </div>
-        <VipSegmented v-model="mode" :options="[{ value: 'edit', label: 'Edit', icon: 'settings' }, { value: 'preview', label: 'Preview', icon: 'eye' }]" size="sm" />
+        <VipSegmented
+          v-model="mode"
+          :options="[
+            { value: 'edit', label: 'Edit', icon: 'settings' },
+            { value: 'preview', label: 'Preview', icon: 'eye' },
+          ]"
+          size="sm"
+        />
         <div class="dstudio__group">
           <VipButton variant="ghost" size="sm" icon="undo" title="Undo" :disabled="!canUndo" @click="editor?.undo()" />
           <VipButton variant="ghost" size="sm" icon="redo" title="Redo" :disabled="!canRedo" @click="editor?.redo()" />
         </div>
-        <VipButton variant="secondary" size="sm" icon="save" :loading="saving" :disabled="!canEdit" @click="save">Save</VipButton>
+        <VipButton variant="secondary" size="sm" icon="save" :loading="saving" :disabled="!canEdit" @click="save"
+          >Save</VipButton
+        >
         <VipButton variant="secondary" size="sm" icon="share" @click="shareOpen = true">Share</VipButton>
         <VipButton variant="primary" size="sm" icon="upload" :disabled="!canEdit" @click="publish">Publish</VipButton>
-        <VipButton variant="ghost" size="sm" :icon="fullscreen ? 'minimize' : 'maximize'" @click="fullscreen = !fullscreen" />
+        <VipButton
+          variant="ghost"
+          size="sm"
+          :icon="fullscreen ? 'minimize' : 'maximize'"
+          @click="fullscreen = !fullscreen"
+        />
       </div>
     </header>
 
     <div v-if="loading" class="dstudio__loading"><VipSpinner :size="24" label="Loading dashboard…" /></div>
 
     <div v-else-if="editor" class="dstudio__body" :class="{ 'is-compact': compact }">
-      <div v-if="compact && (fieldsOpen || inspectorOpen)" class="dstudio__scrim" @click="fieldsOpen = false; inspectorOpen = false" />
+      <div v-if="compact && (fieldsOpen || inspectorOpen)" class="dstudio__scrim" @click="closeOverlays" />
       <div
         v-if="mode === 'edit'"
         id="dstudio-fields"
@@ -229,7 +321,7 @@ onBeforeUnmount(() => {
         :class="{ 'is-overlay': compact, 'is-open': fieldsOpen }"
         :style="compact ? {} : { width: `${left.size.value}px` }"
       >
-        <FieldsPanel v-model:model-id="modelId" @add-widget="(t) => { editor!.addWidget(t); if (compact) fieldsOpen = false }" />
+        <FieldsPanel v-model:model-id="modelId" @add-widget="addWidgetFromPanel" />
       </div>
       <div v-if="mode === 'edit' && !compact" class="dstudio__resizer" @pointerdown="left.startResize" />
 
@@ -244,14 +336,28 @@ onBeforeUnmount(() => {
               :class="{ 'is-active': activePageId === p.id }"
               @click="activePageId = p.id"
               @dblclick="renamePagePrompt(p.id, p.name)"
-            >{{ p.name }}
-              <VipIcon v-if="mode === 'edit' && editor.dashboard.pages.length > 1" name="close" :size="11" class="dstudio__page-x" @click.stop="editor.removePage(p.id)" />
+            >
+              {{ p.name }}
+              <VipIcon
+                v-if="mode === 'edit' && editor.dashboard.pages.length > 1"
+                name="close"
+                :size="11"
+                class="dstudio__page-x"
+                @click.stop="editor.removePage(p.id)"
+              />
             </button>
-            <button v-if="mode === 'edit'" class="dstudio__page-add" title="Add page" @click="editor.addPage()"><VipIcon name="plus" :size="14" /></button>
+            <button v-if="mode === 'edit'" class="dstudio__page-add" title="Add page" @click="editor.addPage()">
+              <VipIcon name="plus" :size="14" />
+            </button>
           </div>
         </div>
 
-        <DashboardFilterBar :dashboard="editor.dashboard" :cross-filters="crossFilters" @clear-cross="crossFilters = []" @remove-cross="(f) => crossFilters = crossFilters.filter((x) => x !== f)" />
+        <DashboardFilterBar
+          :dashboard="editor.dashboard"
+          :cross-filters="crossFilters"
+          @clear-cross="crossFilters = []"
+          @remove-cross="(f) => (crossFilters = crossFilters.filter((x) => x !== f))"
+        />
 
         <div class="dstudio__canvas" @dragover.prevent @drop="onCanvasDrop">
           <DashboardGridCanvas
@@ -283,62 +389,238 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.dstudio { display: flex; flex-direction: column; height: 100vh; width: 100%; background: var(--vip-bg-canvas); }
-.dstudio.is-fullscreen { position: fixed; inset: 0; z-index: var(--vip-z-modal); }
-.dstudio__toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-5); height: 52px; padding: 0 var(--vip-sp-5); background: var(--vip-surface-1); border-bottom: 1px solid var(--vip-border); flex: none; }
-.dstudio__tb-left { display: flex; align-items: center; gap: var(--vip-sp-4); min-width: 0; }
-.dstudio__name { background: none; border: 1px solid transparent; border-radius: var(--vip-radius-sm); padding: 2px 6px; color: var(--vip-text-primary); font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); max-width: 320px; }
-.dstudio__name:hover { border-color: var(--vip-border); }
-.dstudio__name:focus { border-color: var(--vip-brand-500); outline: none; }
-.dstudio__meta { display: flex; align-items: center; gap: var(--vip-sp-4); padding: 0 6px; margin-top: 2px; }
-.dstudio__ver { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.dstudio__dirty { font-size: var(--vip-fs-xs); color: var(--vip-warning-text); }
-.dstudio__saved { font-size: var(--vip-fs-xs); color: var(--vip-text-disabled); }
-.dstudio__tb-right { display: flex; align-items: center; gap: var(--vip-sp-4); }
-.dstudio__group { display: flex; gap: 2px; }
+.dstudio {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: var(--vip-bg-canvas);
+}
+.dstudio.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--vip-z-modal);
+}
+.dstudio__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-5);
+  height: 52px;
+  padding: 0 var(--vip-sp-5);
+  background: var(--vip-surface-1);
+  border-bottom: 1px solid var(--vip-border);
+  flex: none;
+}
+.dstudio__tb-left {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  min-width: 0;
+}
+.dstudio__name {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--vip-radius-sm);
+  padding: 2px 6px;
+  color: var(--vip-text-primary);
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  max-width: 320px;
+}
+.dstudio__name:hover {
+  border-color: var(--vip-border);
+}
+.dstudio__name:focus {
+  border-color: var(--vip-brand-500);
+  outline: none;
+}
+.dstudio__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  padding: 0 6px;
+  margin-top: 2px;
+}
+.dstudio__ver {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.dstudio__dirty {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-warning-text);
+}
+.dstudio__saved {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-disabled);
+}
+.dstudio__tb-right {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+}
+.dstudio__group {
+  display: flex;
+  gap: 2px;
+}
 
-.dstudio__loading { flex: 1; display: flex; align-items: center; justify-content: center; }
-.dstudio__body { flex: 1; display: flex; min-height: 0; }
-.dstudio__left, .dstudio__right { flex: none; overflow: hidden; border-right: 1px solid var(--vip-border); }
-.dstudio__right { border-right: none; border-left: 1px solid var(--vip-border); }
-.dstudio__center { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.dstudio__resizer { width: 5px; flex: none; cursor: col-resize; margin: 0 -2px; z-index: 2; }
-.dstudio__resizer:hover { background: var(--vip-brand-soft); }
+.dstudio__loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dstudio__body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.dstudio__left,
+.dstudio__right {
+  flex: none;
+  overflow: hidden;
+  border-right: 1px solid var(--vip-border);
+}
+.dstudio__right {
+  border-right: none;
+  border-left: 1px solid var(--vip-border);
+}
+.dstudio__center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dstudio__resizer {
+  width: 5px;
+  flex: none;
+  cursor: col-resize;
+  margin: 0 -2px;
+  z-index: 2;
+}
+.dstudio__resizer:hover {
+  background: var(--vip-brand-soft);
+}
 
-.dstudio__pages { border-bottom: 1px solid var(--vip-border-subtle); background: var(--vip-surface-1); padding: 0 var(--vip-sp-5); flex: none; }
-.dstudio__page-tabs { display: flex; align-items: center; gap: var(--vip-sp-2); }
-.dstudio__page-tab { display: inline-flex; align-items: center; gap: var(--vip-sp-2); padding: var(--vip-sp-4) var(--vip-sp-4); background: none; border: none; border-bottom: 2px solid transparent; color: var(--vip-text-muted); font-size: var(--vip-fs-sm); font-weight: var(--vip-fw-medium); margin-bottom: -1px; }
-.dstudio__page-tab.is-active { color: var(--vip-text-primary); border-bottom-color: var(--vip-brand-500); }
-.dstudio__page-x { color: var(--vip-text-disabled); border-radius: 3px; }
-.dstudio__page-x:hover { background: var(--vip-danger-soft); color: var(--vip-danger-text); }
-.dstudio__page-add { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; color: var(--vip-text-muted); border-radius: var(--vip-radius-sm); }
-.dstudio__page-add:hover { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
+.dstudio__pages {
+  border-bottom: 1px solid var(--vip-border-subtle);
+  background: var(--vip-surface-1);
+  padding: 0 var(--vip-sp-5);
+  flex: none;
+}
+.dstudio__page-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+}
+.dstudio__page-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  padding: var(--vip-sp-4) var(--vip-sp-4);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-medium);
+  margin-bottom: -1px;
+}
+.dstudio__page-tab.is-active {
+  color: var(--vip-text-primary);
+  border-bottom-color: var(--vip-brand-500);
+}
+.dstudio__page-x {
+  color: var(--vip-text-disabled);
+  border-radius: 3px;
+}
+.dstudio__page-x:hover {
+  background: var(--vip-danger-soft);
+  color: var(--vip-danger-text);
+}
+.dstudio__page-add {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--vip-text-muted);
+  border-radius: var(--vip-radius-sm);
+}
+.dstudio__page-add:hover {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
 
-.dstudio__canvas { flex: 1; overflow: auto; padding: var(--vip-sp-6); }
+.dstudio__canvas {
+  flex: 1;
+  overflow: auto;
+  padding: var(--vip-sp-6);
+}
 
 /* ---- compact / responsive ---- */
-.dstudio__scrim { position: absolute; inset: 0; background: var(--vip-scrim); z-index: 8; }
-.dstudio__body.is-compact { position: relative; }
+.dstudio__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--vip-scrim);
+  z-index: 8;
+}
+.dstudio__body.is-compact {
+  position: relative;
+}
 .dstudio__body.is-compact .dstudio__left,
 .dstudio__body.is-compact .dstudio__right {
-  position: absolute; top: 0; bottom: 0; z-index: 9;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 9;
   width: min(88vw, 340px);
   box-shadow: var(--vip-shadow-lg);
   transition: transform var(--vip-motion-base) var(--vip-ease-emphasized);
 }
-.dstudio__body.is-compact .dstudio__left { left: 0; transform: translateX(-101%); }
-.dstudio__body.is-compact .dstudio__right { right: 0; transform: translateX(101%); }
-.dstudio__body.is-compact .dstudio__left.is-open { transform: translateX(0); }
-.dstudio__body.is-compact .dstudio__right.is-open { transform: translateX(0); }
+.dstudio__body.is-compact .dstudio__left {
+  left: 0;
+  transform: translateX(-101%);
+}
+.dstudio__body.is-compact .dstudio__right {
+  right: 0;
+  transform: translateX(101%);
+}
+.dstudio__body.is-compact .dstudio__left.is-open {
+  transform: translateX(0);
+}
+.dstudio__body.is-compact .dstudio__right.is-open {
+  transform: translateX(0);
+}
 
 @media (max-width: 899px) {
-  .dstudio__toolbar { flex-wrap: wrap; height: auto; min-height: 52px; padding: var(--vip-sp-3) var(--vip-sp-4); gap: var(--vip-sp-3); }
-  .dstudio__tb-right { flex-wrap: wrap; gap: var(--vip-sp-2); }
-  .dstudio__name { max-width: 40vw; }
-  .dstudio__canvas { padding: var(--vip-sp-4); }
+  .dstudio__toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 52px;
+    padding: var(--vip-sp-3) var(--vip-sp-4);
+    gap: var(--vip-sp-3);
+  }
+  .dstudio__tb-right {
+    flex-wrap: wrap;
+    gap: var(--vip-sp-2);
+  }
+  .dstudio__name {
+    max-width: 40vw;
+  }
+  .dstudio__canvas {
+    padding: var(--vip-sp-4);
+  }
 }
 @media (max-width: 599px) {
-  .dstudio__tb-left { min-width: 0; flex: 1; }
-  .dstudio__meta { display: none; }
+  .dstudio__tb-left {
+    min-width: 0;
+    flex: 1;
+  }
+  .dstudio__meta {
+    display: none;
+  }
 }
 </style>

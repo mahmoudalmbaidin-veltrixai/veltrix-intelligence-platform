@@ -45,7 +45,11 @@ watch(loaded, (r) => {
 
 /* ---- block palette + document ---- */
 type BlockKind = 'cover' | 'header' | 'footer' | 'text' | 'table' | 'chart' | 'kpi' | 'image' | 'pagebreak' | 'section'
-interface PaletteItem { kind: BlockKind; label: string; icon: string }
+interface PaletteItem {
+  kind: BlockKind
+  label: string
+  icon: string
+}
 const palette: PaletteItem[] = [
   { kind: 'cover', label: 'Cover', icon: 'image' },
   { kind: 'header', label: 'Header', icon: 'panelBottom' },
@@ -59,7 +63,12 @@ const palette: PaletteItem[] = [
   { kind: 'pagebreak', label: 'Page break', icon: 'minus' },
 ]
 
-interface Block { id: string; kind: BlockKind; title: string; binding: string }
+interface Block {
+  id: string
+  kind: BlockKind
+  title: string
+  binding: string
+}
 const BLOCK_META: Record<BlockKind, { icon: string; label: string; defaultTitle: string; binding: string }> = {
   cover: { icon: 'image', label: 'Cover', defaultTitle: 'Report cover', binding: 'Static — title, logo, period' },
   header: { icon: 'panelBottom', label: 'Header', defaultTitle: 'Page header', binding: 'Static — running header' },
@@ -79,12 +88,7 @@ function makeBlock(kind: BlockKind): Block {
   return { id: `blk_${blockSeq++}`, kind, title: meta.defaultTitle, binding: meta.binding }
 }
 
-const blocks = reactive<Block[]>([
-  makeBlock('cover'),
-  makeBlock('kpi'),
-  makeBlock('chart'),
-  makeBlock('table'),
-])
+const blocks = reactive<Block[]>([makeBlock('cover'), makeBlock('kpi'), makeBlock('chart'), makeBlock('table')])
 
 const selectedId = ref<string | null>(blocks[0]?.id ?? null)
 const selected = computed(() => blocks.find((b) => b.id === selectedId.value) ?? null)
@@ -110,7 +114,11 @@ function removeBlock(i: number) {
 }
 
 /* ---- report parameters ---- */
-interface Param { id: string; label: string; value: string }
+interface Param {
+  id: string
+  label: string
+  value: string
+}
 const params = reactive<Param[]>([
   { id: 'p_period', label: 'Reporting period', value: 'Q3 2026' },
   { id: 'p_region', label: 'Region', value: 'All regions' },
@@ -126,10 +134,18 @@ const modeOptions = [
 
 /* ---- workflow ---- */
 const STATUS_TONE: Record<ReportStatus, 'neutral' | 'warning' | 'info' | 'success' | 'danger'> = {
-  draft: 'neutral', 'in-review': 'warning', approved: 'info', published: 'success', rejected: 'danger',
+  draft: 'neutral',
+  'in-review': 'warning',
+  approved: 'info',
+  published: 'success',
+  rejected: 'danger',
 }
 const STATUS_LABEL: Record<ReportStatus, string> = {
-  draft: 'Draft', 'in-review': 'In review', approved: 'Approved', published: 'Published', rejected: 'Rejected',
+  draft: 'Draft',
+  'in-review': 'In review',
+  approved: 'Approved',
+  published: 'Published',
+  rejected: 'Rejected',
 }
 const workflowSteps: { key: ReportStatus; label: string }[] = [
   { key: 'draft', label: 'Draft' },
@@ -146,10 +162,28 @@ const stepIndex = computed(() => {
 const drawerOpen = ref(false)
 const comment = ref('')
 
-interface Decision { id: string; actor: string; decision: string; comment: string; when: string }
+interface Decision {
+  id: string
+  actor: string
+  decision: string
+  comment: string
+  when: string
+}
 const history = reactive<Decision[]>([
-  { id: 'h1', actor: 'A. Rahman', decision: 'Submitted for review', comment: 'Draft complete, figures reconciled to ledger.', when: isoAgo(60 * 6) },
-  { id: 'h2', actor: 'Finance', decision: 'Comment', comment: 'Please add a YoY comparison to the revenue chart.', when: isoAgo(60 * 4) },
+  {
+    id: 'h1',
+    actor: 'A. Rahman',
+    decision: 'Submitted for review',
+    comment: 'Draft complete, figures reconciled to ledger.',
+    when: isoAgo(60 * 6),
+  },
+  {
+    id: 'h2',
+    actor: 'Finance',
+    decision: 'Comment',
+    comment: 'Please add a YoY comparison to the revenue chart.',
+    when: isoAgo(60 * 4),
+  },
 ])
 
 let decisionSeq = 0
@@ -189,7 +223,11 @@ function reject() {
 }
 function publish() {
   if (status.value !== 'approved') {
-    ui.pushToast({ kind: 'warning', title: 'Approval required', message: 'The report must be approved before publishing.' })
+    ui.pushToast({
+      kind: 'warning',
+      title: 'Approval required',
+      message: 'The report must be approved before publishing.',
+    })
     return
   }
   status.value = 'published'
@@ -218,21 +256,25 @@ function exit() {
         <VipSegmented v-model="mode" :options="modeOptions" size="sm" />
         <span class="toolbar__sep" />
         <VipButton variant="tertiary" icon="workflow" size="sm" @click="drawerOpen = true">Approval</VipButton>
-        <VipButton variant="secondary" icon="save" size="sm" :disabled="!canWrite" @click="saveDraft">Save draft</VipButton>
+        <VipButton variant="secondary" icon="save" size="sm" :disabled="!canWrite" @click="saveDraft"
+          >Save draft</VipButton
+        >
         <VipButton
           v-if="status === 'draft' || status === 'rejected'"
           variant="secondary"
           size="sm"
           :disabled="!canWrite"
           @click="submitForReview"
-        >Submit for review</VipButton>
+          >Submit for review</VipButton
+        >
         <VipButton
           variant="primary"
           icon="check"
           size="sm"
           :disabled="!canWrite || status !== 'approved'"
           @click="publish"
-        >Publish</VipButton>
+          >Publish</VipButton
+        >
       </div>
     </header>
 
@@ -260,7 +302,11 @@ function exit() {
       <div class="canvas" :class="{ 'is-print': mode === 'print' }">
         <div class="page">
           <div v-if="!blocks.length" class="page__empty">
-            <VipEmptyState icon="report" title="Empty document" description="Add blocks from the palette to build your report." />
+            <VipEmptyState
+              icon="report"
+              title="Empty document"
+              description="Add blocks from the palette to build your report."
+            />
           </div>
           <div
             v-for="(b, i) in blocks"
@@ -271,11 +317,22 @@ function exit() {
             @click="selectedId = b.id"
           >
             <div v-if="mode === 'edit'" class="block__bar">
-              <span class="block__kind"><VipIcon :name="BLOCK_META[b.kind].icon" :size="12" /> {{ BLOCK_META[b.kind].label }}</span>
+              <span class="block__kind"
+                ><VipIcon :name="BLOCK_META[b.kind].icon" :size="12" /> {{ BLOCK_META[b.kind].label }}</span
+              >
               <div class="block__tools" @click.stop>
-                <VipTooltip text="Move up"><button type="button" class="tool" :disabled="i === 0" @click="moveUp(i)"><VipIcon name="chevronUp" :size="13" /></button></VipTooltip>
-                <VipTooltip text="Move down"><button type="button" class="tool" :disabled="i === blocks.length - 1" @click="moveDown(i)"><VipIcon name="chevronDown" :size="13" /></button></VipTooltip>
-                <VipTooltip text="Delete"><button type="button" class="tool tool--danger" @click="removeBlock(i)"><VipIcon name="trash" :size="13" /></button></VipTooltip>
+                <VipTooltip text="Move up"
+                  ><button type="button" class="tool" :disabled="i === 0" @click="moveUp(i)">
+                    <VipIcon name="chevronUp" :size="13" /></button
+                ></VipTooltip>
+                <VipTooltip text="Move down"
+                  ><button type="button" class="tool" :disabled="i === blocks.length - 1" @click="moveDown(i)">
+                    <VipIcon name="chevronDown" :size="13" /></button
+                ></VipTooltip>
+                <VipTooltip text="Delete"
+                  ><button type="button" class="tool tool--danger" @click="removeBlock(i)">
+                    <VipIcon name="trash" :size="13" /></button
+                ></VipTooltip>
               </div>
             </div>
 
@@ -310,7 +367,9 @@ function exit() {
             <div v-else-if="b.kind === 'section'" class="section">{{ b.title }}</div>
             <div v-else-if="b.kind === 'header'" class="hf hf--head">{{ b.title }} · {{ name }}</div>
             <div v-else-if="b.kind === 'footer'" class="hf hf--foot">{{ b.title }} · Page 1 · Confidential</div>
-            <div v-else-if="b.kind === 'image'" class="img"><VipIcon name="image" :size="22" /><span>{{ b.title }}</span></div>
+            <div v-else-if="b.kind === 'image'" class="img">
+              <VipIcon name="image" :size="22" /><span>{{ b.title }}</span>
+            </div>
             <div v-else class="text">
               <div class="text__title">{{ b.title }}</div>
               <div class="text__lines"><span v-for="n in 4" :key="n" :style="{ width: `${100 - n * 8}%` }" /></div>
@@ -325,8 +384,19 @@ function exit() {
         <div class="inspector__body">
           <template v-if="selected">
             <div class="inspector__section-title">Selected block</div>
-            <VipInput :model-value="selected.title" label="Block title" :disabled="!canWrite" @update:model-value="(v) => (selected!.title = String(v))" />
-            <VipInput :model-value="selected.binding" label="Data binding" :disabled="!canWrite" help="Where this block sources its content." @update:model-value="(v) => (selected!.binding = String(v))" />
+            <VipInput
+              :model-value="selected.title"
+              label="Block title"
+              :disabled="!canWrite"
+              @update:model-value="(v) => (selected!.title = String(v))"
+            />
+            <VipInput
+              :model-value="selected.binding"
+              label="Data binding"
+              :disabled="!canWrite"
+              help="Where this block sources its content."
+              @update:model-value="(v) => (selected!.binding = String(v))"
+            />
             <div class="inspector__kind">
               <VipIcon :name="BLOCK_META[selected.kind].icon" :size="13" />
               {{ BLOCK_META[selected.kind].label }} block
@@ -367,7 +437,11 @@ function exit() {
             v-for="(s, i) in workflowSteps"
             :key="s.key"
             class="wf__step"
-            :class="{ 'is-done': i < stepIndex, 'is-active': i === stepIndex && status !== 'rejected', 'is-rejected': status === 'rejected' && s.key === 'in-review' }"
+            :class="{
+              'is-done': i < stepIndex,
+              'is-active': i === stepIndex && status !== 'rejected',
+              'is-rejected': status === 'rejected' && s.key === 'in-review',
+            }"
           >
             <span class="wf__dot"><VipIcon :name="i < stepIndex ? 'check' : 'circle'" :size="11" /></span>
             <span class="wf__label">{{ s.label }}</span>
@@ -387,20 +461,19 @@ function exit() {
         </div>
 
         <div class="wf__block">
-          <VipTextarea v-model="comment" label="Decision comment" :rows="3" placeholder="Add context for your decision…" />
+          <VipTextarea
+            v-model="comment"
+            label="Decision comment"
+            :rows="3"
+            placeholder="Add context for your decision…"
+          />
           <div class="wf__actions">
-            <VipButton
-              variant="secondary"
-              size="sm"
-              :disabled="!canWrite || status !== 'in-review'"
-              @click="reject"
-            >Reject</VipButton>
-            <VipButton
-              variant="primary"
-              size="sm"
-              :disabled="!canWrite || status !== 'in-review'"
-              @click="approve"
-            >Approve</VipButton>
+            <VipButton variant="secondary" size="sm" :disabled="!canWrite || status !== 'in-review'" @click="reject"
+              >Reject</VipButton
+            >
+            <VipButton variant="primary" size="sm" :disabled="!canWrite || status !== 'in-review'" @click="approve"
+              >Approve</VipButton
+            >
           </div>
         </div>
 
@@ -426,116 +499,507 @@ function exit() {
 </template>
 
 <style scoped>
-.studio { display: flex; flex-direction: column; height: 100vh; background: var(--vip-bg-canvas); }
+.studio {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--vip-bg-canvas);
+}
 
 .toolbar {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-6);
   padding: var(--vip-sp-4) var(--vip-sp-6);
-  background: var(--vip-surface-1); border-bottom: 1px solid var(--vip-border); flex: none;
+  background: var(--vip-surface-1);
+  border-bottom: 1px solid var(--vip-border);
+  flex: none;
 }
-.toolbar__left, .toolbar__right { display: flex; align-items: center; gap: var(--vip-sp-4); min-width: 0; }
-.toolbar__sep { width: 1px; height: 20px; background: var(--vip-border); }
-.toolbar__doc-icon { color: var(--vip-text-muted); }
+.toolbar__left,
+.toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  min-width: 0;
+}
+.toolbar__sep {
+  width: 1px;
+  height: 20px;
+  background: var(--vip-border);
+}
+.toolbar__doc-icon {
+  color: var(--vip-text-muted);
+}
 .toolbar__name {
-  background: none; border: 1px solid transparent; border-radius: var(--vip-radius-sm);
-  color: var(--vip-text-primary); font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold);
-  padding: var(--vip-sp-2) var(--vip-sp-4); min-width: 120px; max-width: 320px; outline: none;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--vip-radius-sm);
+  color: var(--vip-text-primary);
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  padding: var(--vip-sp-2) var(--vip-sp-4);
+  min-width: 120px;
+  max-width: 320px;
+  outline: none;
 }
-.toolbar__name:hover { background: var(--vip-surface-hover); }
-.toolbar__name:focus { border-color: var(--vip-brand-500); background: var(--vip-surface-2); }
+.toolbar__name:hover {
+  background: var(--vip-surface-hover);
+}
+.toolbar__name:focus {
+  border-color: var(--vip-brand-500);
+  background: var(--vip-surface-2);
+}
 
-.body { flex: 1; display: grid; grid-template-columns: 200px 1fr 288px; min-height: 0; }
+.body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 200px 1fr 288px;
+  min-height: 0;
+}
 
-.palette { background: var(--vip-surface-1); border-right: 1px solid var(--vip-border); overflow-y: auto; }
-.palette__head, .inspector__head { padding: var(--vip-sp-5) var(--vip-sp-6); font-size: var(--vip-fs-xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-muted); font-weight: var(--vip-fw-semibold); border-bottom: 1px solid var(--vip-border-subtle); }
-.palette__grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--vip-sp-3); padding: var(--vip-sp-4); }
+.palette {
+  background: var(--vip-surface-1);
+  border-right: 1px solid var(--vip-border);
+  overflow-y: auto;
+}
+.palette__head,
+.inspector__head {
+  padding: var(--vip-sp-5) var(--vip-sp-6);
+  font-size: var(--vip-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-muted);
+  font-weight: var(--vip-fw-semibold);
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.palette__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--vip-sp-3);
+  padding: var(--vip-sp-4);
+}
 .palette__item {
-  display: flex; flex-direction: column; align-items: center; gap: var(--vip-sp-3);
-  padding: var(--vip-sp-5) var(--vip-sp-3); background: var(--vip-surface-2);
-  border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md);
-  color: var(--vip-text-secondary); font-size: var(--vip-fs-xs); cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  padding: var(--vip-sp-5) var(--vip-sp-3);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+  color: var(--vip-text-secondary);
+  font-size: var(--vip-fs-xs);
+  cursor: pointer;
 }
-.palette__item:hover:not(:disabled) { background: var(--vip-surface-hover); border-color: var(--vip-border-strong); color: var(--vip-text-primary); }
-.palette__item:disabled { opacity: 0.5; cursor: not-allowed; }
-.palette__hint { padding: var(--vip-sp-3) var(--vip-sp-6) var(--vip-sp-6); font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
+.palette__item:hover:not(:disabled) {
+  background: var(--vip-surface-hover);
+  border-color: var(--vip-border-strong);
+  color: var(--vip-text-primary);
+}
+.palette__item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.palette__hint {
+  padding: var(--vip-sp-3) var(--vip-sp-6) var(--vip-sp-6);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
 
-.canvas { overflow-y: auto; padding: var(--vip-sp-8); display: flex; justify-content: center; }
+.canvas {
+  overflow-y: auto;
+  padding: var(--vip-sp-8);
+  display: flex;
+  justify-content: center;
+}
 .page {
-  width: 100%; max-width: 720px; min-height: 900px;
-  background: var(--vip-surface-1); border: 1px solid var(--vip-border-subtle);
-  border-radius: var(--vip-radius-sm); box-shadow: var(--vip-shadow-md);
-  padding: var(--vip-sp-7); display: flex; flex-direction: column; gap: var(--vip-sp-5); height: fit-content;
+  width: 100%;
+  max-width: 720px;
+  min-height: 900px;
+  background: var(--vip-surface-1);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-sm);
+  box-shadow: var(--vip-shadow-md);
+  padding: var(--vip-sp-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+  height: fit-content;
 }
-.canvas.is-print .page { box-shadow: var(--vip-shadow-lg); }
-.page__empty { margin: auto; }
+.canvas.is-print .page {
+  box-shadow: var(--vip-shadow-lg);
+}
+.page__empty {
+  margin: auto;
+}
 
-.block { border: 1px solid transparent; border-radius: var(--vip-radius-md); padding: var(--vip-sp-3); cursor: pointer; }
-.canvas:not(.is-print) .block:hover { border-color: var(--vip-border); }
-.block.is-selected { border-color: var(--vip-brand-500); box-shadow: 0 0 0 3px var(--vip-brand-soft); }
-.block__bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--vip-sp-3); }
-.block__kind { display: inline-flex; align-items: center; gap: var(--vip-sp-2); font-size: var(--vip-fs-2xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-disabled); }
-.block__tools { display: flex; gap: 2px; }
-.tool { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; border-radius: var(--vip-radius-sm); color: var(--vip-text-muted); cursor: pointer; }
-.tool:hover:not(:disabled) { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
-.tool:disabled { opacity: 0.35; cursor: not-allowed; }
-.tool--danger:hover:not(:disabled) { background: var(--vip-danger-soft); color: var(--vip-danger-text); }
+.block {
+  border: 1px solid transparent;
+  border-radius: var(--vip-radius-md);
+  padding: var(--vip-sp-3);
+  cursor: pointer;
+}
+.canvas:not(.is-print) .block:hover {
+  border-color: var(--vip-border);
+}
+.block.is-selected {
+  border-color: var(--vip-brand-500);
+  box-shadow: 0 0 0 3px var(--vip-brand-soft);
+}
+.block__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--vip-sp-3);
+}
+.block__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  font-size: var(--vip-fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-disabled);
+}
+.block__tools {
+  display: flex;
+  gap: 2px;
+}
+.tool {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--vip-radius-sm);
+  color: var(--vip-text-muted);
+  cursor: pointer;
+}
+.tool:hover:not(:disabled) {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
+.tool:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.tool--danger:hover:not(:disabled) {
+  background: var(--vip-danger-soft);
+  color: var(--vip-danger-text);
+}
 
-.cover { padding: var(--vip-sp-9) var(--vip-sp-7); background: var(--vip-surface-2); border-radius: var(--vip-radius-md); }
-.cover__eyebrow { font-size: var(--vip-fs-xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-brand-text); }
-.cover__title { font-size: var(--vip-fs-3xl); font-weight: var(--vip-fw-bold); color: var(--vip-text-primary); margin-top: var(--vip-sp-4); }
-.cover__owner { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); margin-top: var(--vip-sp-5); }
+.cover {
+  padding: var(--vip-sp-9) var(--vip-sp-7);
+  background: var(--vip-surface-2);
+  border-radius: var(--vip-radius-md);
+}
+.cover__eyebrow {
+  font-size: var(--vip-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-brand-text);
+}
+.cover__title {
+  font-size: var(--vip-fs-3xl);
+  font-weight: var(--vip-fw-bold);
+  color: var(--vip-text-primary);
+  margin-top: var(--vip-sp-4);
+}
+.cover__owner {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+  margin-top: var(--vip-sp-5);
+}
 
-.kpi__title, .chart__title, .tbl__title, .text__title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); color: var(--vip-text-primary); margin-bottom: var(--vip-sp-4); }
-.kpi__row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--vip-sp-4); }
-.kpi__tile { background: var(--vip-surface-2); border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md); padding: var(--vip-sp-5); }
-.kpi__label { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.kpi__value { font-size: var(--vip-fs-xl); font-weight: var(--vip-fw-bold); color: var(--vip-text-primary); letter-spacing: 2px; }
+.kpi__title,
+.chart__title,
+.tbl__title,
+.text__title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+  margin-bottom: var(--vip-sp-4);
+}
+.kpi__row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--vip-sp-4);
+}
+.kpi__tile {
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+  padding: var(--vip-sp-5);
+}
+.kpi__label {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.kpi__value {
+  font-size: var(--vip-fs-xl);
+  font-weight: var(--vip-fw-bold);
+  color: var(--vip-text-primary);
+  letter-spacing: 2px;
+}
 
-.chart__bars { display: flex; align-items: flex-end; gap: var(--vip-sp-3); height: 120px; padding: var(--vip-sp-4); background: var(--vip-surface-2); border-radius: var(--vip-radius-md); }
-.chart__bars span { flex: 1; background: var(--vip-brand-500); border-radius: var(--vip-radius-xs) var(--vip-radius-xs) 0 0; opacity: 0.8; }
+.chart__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--vip-sp-3);
+  height: 120px;
+  padding: var(--vip-sp-4);
+  background: var(--vip-surface-2);
+  border-radius: var(--vip-radius-md);
+}
+.chart__bars span {
+  flex: 1;
+  background: var(--vip-brand-500);
+  border-radius: var(--vip-radius-xs) var(--vip-radius-xs) 0 0;
+  opacity: 0.8;
+}
 
-.tbl__grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--vip-border-subtle); border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-sm); overflow: hidden; }
-.tbl__cell { height: 22px; background: var(--vip-surface-1); }
-.tbl__cell.is-head { background: var(--vip-surface-3); }
+.tbl__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--vip-border-subtle);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-sm);
+  overflow: hidden;
+}
+.tbl__cell {
+  height: 22px;
+  background: var(--vip-surface-1);
+}
+.tbl__cell.is-head {
+  background: var(--vip-surface-3);
+}
 
-.section { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); color: var(--vip-text-primary); padding: var(--vip-sp-4) 0; border-bottom: 2px solid var(--vip-brand-500); }
-.hf { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); padding: var(--vip-sp-3) 0; }
-.hf--head { border-bottom: 1px solid var(--vip-border); }
-.hf--foot { border-top: 1px solid var(--vip-border); text-align: center; }
-.img { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--vip-sp-3); height: 140px; background: var(--vip-surface-2); border: 1px dashed var(--vip-border-strong); border-radius: var(--vip-radius-md); color: var(--vip-text-muted); font-size: var(--vip-fs-sm); }
-.pb { text-align: center; color: var(--vip-text-disabled); font-size: var(--vip-fs-2xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); border-top: 1px dashed var(--vip-border-strong); border-bottom: 1px dashed var(--vip-border-strong); padding: var(--vip-sp-3); }
-.text__lines { display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.text__lines span { height: 8px; background: var(--vip-surface-3); border-radius: var(--vip-radius-full); }
+.section {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+  padding: var(--vip-sp-4) 0;
+  border-bottom: 2px solid var(--vip-brand-500);
+}
+.hf {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  padding: var(--vip-sp-3) 0;
+}
+.hf--head {
+  border-bottom: 1px solid var(--vip-border);
+}
+.hf--foot {
+  border-top: 1px solid var(--vip-border);
+  text-align: center;
+}
+.img {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vip-sp-3);
+  height: 140px;
+  background: var(--vip-surface-2);
+  border: 1px dashed var(--vip-border-strong);
+  border-radius: var(--vip-radius-md);
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-sm);
+}
+.pb {
+  text-align: center;
+  color: var(--vip-text-disabled);
+  font-size: var(--vip-fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  border-top: 1px dashed var(--vip-border-strong);
+  border-bottom: 1px dashed var(--vip-border-strong);
+  padding: var(--vip-sp-3);
+}
+.text__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.text__lines span {
+  height: 8px;
+  background: var(--vip-surface-3);
+  border-radius: var(--vip-radius-full);
+}
 
-.inspector { background: var(--vip-surface-1); border-left: 1px solid var(--vip-border); overflow-y: auto; }
-.inspector__body { padding: var(--vip-sp-6); display: flex; flex-direction: column; gap: var(--vip-sp-5); }
-.inspector__section-title { font-size: var(--vip-fs-2xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-muted); }
-.inspector__none { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
-.inspector__kind { display: inline-flex; align-items: center; gap: var(--vip-sp-3); font-size: var(--vip-fs-xs); color: var(--vip-text-secondary); background: var(--vip-surface-2); padding: var(--vip-sp-3) var(--vip-sp-4); border-radius: var(--vip-radius-sm); width: fit-content; }
-.inspector__divider { height: 1px; background: var(--vip-border-subtle); }
-.params { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.inspector__mode { display: flex; align-items: center; justify-content: space-between; font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
+.inspector {
+  background: var(--vip-surface-1);
+  border-left: 1px solid var(--vip-border);
+  overflow-y: auto;
+}
+.inspector__body {
+  padding: var(--vip-sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
+.inspector__section-title {
+  font-size: var(--vip-fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-muted);
+}
+.inspector__none {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
+.inspector__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-secondary);
+  background: var(--vip-surface-2);
+  padding: var(--vip-sp-3) var(--vip-sp-4);
+  border-radius: var(--vip-radius-sm);
+  width: fit-content;
+}
+.inspector__divider {
+  height: 1px;
+  background: var(--vip-border-subtle);
+}
+.params {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.inspector__mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
 
-.wf { display: flex; flex-direction: column; gap: var(--vip-sp-7); }
-.wf__steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.wf__step { display: flex; align-items: center; gap: var(--vip-sp-4); color: var(--vip-text-muted); font-size: var(--vip-fs-sm); }
-.wf__dot { width: 22px; height: 22px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--vip-surface-3); color: var(--vip-text-disabled); }
-.wf__step.is-done .wf__dot { background: var(--vip-success-soft); color: var(--vip-success-text); }
-.wf__step.is-done { color: var(--vip-text-secondary); }
-.wf__step.is-active .wf__dot { background: var(--vip-brand-500); color: #fff; }
-.wf__step.is-active { color: var(--vip-text-primary); font-weight: var(--vip-fw-medium); }
-.wf__step.is-rejected .wf__dot { background: var(--vip-danger-soft); color: var(--vip-danger-text); }
-.wf__rejected { display: flex; align-items: center; gap: var(--vip-sp-3); font-size: var(--vip-fs-sm); color: var(--vip-danger-text); background: var(--vip-danger-soft); padding: var(--vip-sp-4) var(--vip-sp-5); border-radius: var(--vip-radius-md); }
-.wf__block { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.wf__title { font-size: var(--vip-fs-xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-muted); }
-.wf__reviewers { display: flex; flex-wrap: wrap; gap: var(--vip-sp-3); }
-.wf__muted { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
-.wf__actions { display: flex; justify-content: flex-end; gap: var(--vip-sp-4); }
-.wf__history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--vip-sp-5); }
-.wf__hist { border-left: 2px solid var(--vip-border); padding-left: var(--vip-sp-5); }
-.wf__hist-row { display: flex; align-items: center; gap: var(--vip-sp-3); flex-wrap: wrap; }
-.wf__hist-actor { font-size: var(--vip-fs-sm); font-weight: var(--vip-fw-semibold); color: var(--vip-text-primary); }
-.wf__hist-decision { font-size: var(--vip-fs-xs); color: var(--vip-brand-text); }
-.wf__hist-time { font-size: var(--vip-fs-xs); color: var(--vip-text-disabled); margin-left: auto; }
-.wf__hist-comment { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); margin-top: 2px; }
+.wf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-7);
+}
+.wf__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.wf__step {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-sm);
+}
+.wf__dot {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--vip-surface-3);
+  color: var(--vip-text-disabled);
+}
+.wf__step.is-done .wf__dot {
+  background: var(--vip-success-soft);
+  color: var(--vip-success-text);
+}
+.wf__step.is-done {
+  color: var(--vip-text-secondary);
+}
+.wf__step.is-active .wf__dot {
+  background: var(--vip-brand-500);
+  color: #fff;
+}
+.wf__step.is-active {
+  color: var(--vip-text-primary);
+  font-weight: var(--vip-fw-medium);
+}
+.wf__step.is-rejected .wf__dot {
+  background: var(--vip-danger-soft);
+  color: var(--vip-danger-text);
+}
+.wf__rejected {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-danger-text);
+  background: var(--vip-danger-soft);
+  padding: var(--vip-sp-4) var(--vip-sp-5);
+  border-radius: var(--vip-radius-md);
+}
+.wf__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.wf__title {
+  font-size: var(--vip-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-muted);
+}
+.wf__reviewers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vip-sp-3);
+}
+.wf__muted {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
+.wf__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--vip-sp-4);
+}
+.wf__history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
+.wf__hist {
+  border-left: 2px solid var(--vip-border);
+  padding-left: var(--vip-sp-5);
+}
+.wf__hist-row {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  flex-wrap: wrap;
+}
+.wf__hist-actor {
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+}
+.wf__hist-decision {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-brand-text);
+}
+.wf__hist-time {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-disabled);
+  margin-left: auto;
+}
+.wf__hist-comment {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  margin-top: 2px;
+}
 </style>

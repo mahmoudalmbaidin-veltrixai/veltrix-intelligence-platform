@@ -3,12 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { relativeTime } from '@/shared/lib/format'
-import {
-  automationService,
-  TRIGGER_META,
-  type Automation,
-  type AutomationStatus,
-} from './automation.service'
+import { automationService, TRIGGER_META, type Automation, type AutomationStatus } from './automation.service'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
@@ -62,7 +57,10 @@ function open(row: Automation): void {
 
 <template>
   <div class="al">
-    <VipPageHeader title="Automation" description="Event-driven workflows that react to pipelines, data quality and approvals.">
+    <VipPageHeader
+      title="Automation"
+      description="Event-driven workflows that react to pipelines, data quality and approvals."
+    >
       <template #actions>
         <VipButton variant="primary" icon="plus" @click="router.push('/automation/new')">New automation</VipButton>
       </template>
@@ -117,7 +115,9 @@ function open(row: Automation): void {
       <h2 class="al__templates-title">Start from a template</h2>
       <div class="al__template-grid">
         <VipCard v-for="t in templates" :key="t.id" hoverable @click="router.push('/automation/new')">
-          <div class="al__template-head"><span class="al__name-icon"><VipIcon :name="t.icon" :size="15" /></span></div>
+          <div class="al__template-head">
+            <span class="al__name-icon"><VipIcon :name="t.icon" :size="15" /></span>
+          </div>
           <h3 class="al__template-name">{{ t.name }}</h3>
           <p class="al__template-desc">{{ t.desc }}</p>
         </VipCard>
@@ -127,21 +127,86 @@ function open(row: Automation): void {
 </template>
 
 <style scoped>
-.al { max-width: 1280px; margin: 0 auto; }
-.al__toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-5); padding: var(--vip-sp-5) var(--vip-sp-6); border-bottom: 1px solid var(--vip-border-subtle); }
-.al__search { width: min(360px, 100%); }
-.al__count { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); white-space: nowrap; }
-.al__name { display: flex; align-items: center; gap: var(--vip-sp-5); }
-.al__name-icon { width: 30px; height: 30px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--vip-radius-md); background: var(--vip-surface-3); color: var(--vip-text-secondary); }
-.al__name-title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.al__trigger { display: inline-flex; align-items: center; gap: var(--vip-sp-3); font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
-.al__muted { color: var(--vip-text-muted); }
-.al__mono { font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
+.al {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.al__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-5);
+  padding: var(--vip-sp-5) var(--vip-sp-6);
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.al__search {
+  width: min(360px, 100%);
+}
+.al__count {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+  white-space: nowrap;
+}
+.al__name {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+}
+.al__name-icon {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--vip-radius-md);
+  background: var(--vip-surface-3);
+  color: var(--vip-text-secondary);
+}
+.al__name-title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.al__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
+.al__muted {
+  color: var(--vip-text-muted);
+}
+.al__mono {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
 
-.al__templates { margin-top: var(--vip-sp-9); }
-.al__templates-title { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); margin-bottom: var(--vip-sp-5); }
-.al__template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--vip-sp-6); }
-.al__template-head { margin-bottom: var(--vip-sp-5); }
-.al__template-name { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); margin-bottom: var(--vip-sp-2); }
-.al__template-desc { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
+.al__templates {
+  margin-top: var(--vip-sp-9);
+}
+.al__templates-title {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+  margin-bottom: var(--vip-sp-5);
+}
+.al__template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--vip-sp-6);
+}
+.al__template-head {
+  margin-bottom: var(--vip-sp-5);
+}
+.al__template-name {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  margin-bottom: var(--vip-sp-2);
+}
+.al__template-desc {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
 </style>

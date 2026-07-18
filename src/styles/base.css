@@ -23,20 +23,29 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   margin: 0;
   font-weight: var(--vip-fw-semibold);
   line-height: var(--vip-lh-tight);
   letter-spacing: var(--vip-ls-tight);
 }
 
-p { margin: 0; }
+p {
+  margin: 0;
+}
 
 a {
   color: var(--vip-brand-text);
   text-decoration: none;
 }
-a:hover { text-decoration: underline; }
+a:hover {
+  text-decoration: underline;
+}
 
 button {
   font-family: inherit;
@@ -44,13 +53,17 @@ button {
   cursor: pointer;
 }
 
-input, textarea, select {
+input,
+textarea,
+select {
   font-family: inherit;
   font-size: inherit;
   color: inherit;
 }
 
-code, pre, kbd {
+code,
+pre,
+kbd {
   font-family: var(--vip-font-mono);
 }
 
@@ -118,8 +131,12 @@ code, pre, kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.vip-mono { font-family: var(--vip-font-mono); }
-.vip-muted { color: var(--vip-text-muted); }
+.vip-mono {
+  font-family: var(--vip-font-mono);
+}
+.vip-muted {
+  color: var(--vip-text-muted);
+}
 
 /* Fade/slide transition primitives */
 .vip-fade-enter-active,

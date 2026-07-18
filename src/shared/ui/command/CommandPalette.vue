@@ -15,7 +15,14 @@ const query = ref('')
 const activeIndex = ref(0)
 const inputEl = ref<HTMLInputElement>()
 
-interface Cmd { id: string; title: string; subtitle?: string; icon: string; group: string; run: () => void }
+interface Cmd {
+  id: string
+  title: string
+  subtitle?: string
+  icon: string
+  group: string
+  run: () => void
+}
 
 function allowed(item: NavItem): boolean {
   if (item.permission && !platform.can(item.permission)) return false
@@ -48,7 +55,13 @@ const createCommands = computed<Cmd[]>(() =>
 )
 const actionCommands = computed<Cmd[]>(() => [
   { id: 'act-ai', title: 'Open AI Assistant', icon: 'bot', group: 'Actions', run: () => router.push('/ai/assistant') },
-  { id: 'act-theme', title: 'Toggle theme', icon: 'moon', group: 'Actions', run: () => import('@/shared/stores/theme').then((m) => m.useThemeStore().cycle()) },
+  {
+    id: 'act-theme',
+    title: 'Toggle theme',
+    icon: 'moon',
+    group: 'Actions',
+    run: () => import('@/shared/stores/theme').then((m) => m.useThemeStore().cycle()),
+  },
 ])
 
 const searchResults = computed<Cmd[]>(() => {
@@ -66,7 +79,9 @@ const searchResults = computed<Cmd[]>(() => {
 const results = computed<Cmd[]>(() => {
   const q = query.value.trim().toLowerCase()
   const base = [...createCommands.value, ...navCommands.value, ...actionCommands.value]
-  const filtered = q ? base.filter((c) => c.title.toLowerCase().includes(q) || c.subtitle?.toLowerCase().includes(q)) : base
+  const filtered = q
+    ? base.filter((c) => c.title.toLowerCase().includes(q) || c.subtitle?.toLowerCase().includes(q))
+    : base
   return [...searchResults.value, ...filtered].slice(0, 40)
 })
 
@@ -95,20 +110,32 @@ function onKey(e: KeyboardEvent) {
     return
   }
   if (!ui.commandOpen) return
-  if (e.key === 'ArrowDown') { e.preventDefault(); activeIndex.value = Math.min(results.value.length - 1, activeIndex.value + 1) }
-  else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex.value = Math.max(0, activeIndex.value - 1) }
-  else if (e.key === 'Enter') { e.preventDefault(); const c = results.value[activeIndex.value]; if (c) run(c) }
-  else if (e.key === 'Escape') { ui.closeCommand() }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    activeIndex.value = Math.min(results.value.length - 1, activeIndex.value + 1)
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    activeIndex.value = Math.max(0, activeIndex.value - 1)
+  } else if (e.key === 'Enter') {
+    e.preventDefault()
+    const c = results.value[activeIndex.value]
+    if (c) run(c)
+  } else if (e.key === 'Escape') {
+    ui.closeCommand()
+  }
 }
 
-watch(() => ui.commandOpen, async (open) => {
-  if (open) {
-    query.value = ''
-    activeIndex.value = 0
-    await nextTick()
-    inputEl.value?.focus()
-  }
-})
+watch(
+  () => ui.commandOpen,
+  async (open) => {
+    if (open) {
+      query.value = ''
+      activeIndex.value = 0
+      await nextTick()
+      inputEl.value?.focus()
+    }
+  },
+)
 watch(query, () => (activeIndex.value = 0))
 
 onMounted(() => window.addEventListener('keydown', onKey))
@@ -122,7 +149,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <div class="vip-cmd" role="dialog" aria-modal="true" aria-label="Command palette">
           <div class="vip-cmd__search">
             <VipIcon name="search" :size="17" />
-            <input ref="inputEl" v-model="query" class="vip-cmd__input" placeholder="Search resources, run commands, navigate…" aria-label="Command search" />
+            <input
+              ref="inputEl"
+              v-model="query"
+              class="vip-cmd__input"
+              placeholder="Search resources, run commands, navigate…"
+              aria-label="Command search"
+            />
             <kbd class="vip-cmd__esc">ESC</kbd>
           </div>
           <div class="vip-cmd__results">
@@ -157,31 +190,122 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <style scoped>
 .vip-cmd__scrim {
-  position: fixed; inset: 0; z-index: var(--vip-z-popover);
-  background: var(--vip-scrim); backdrop-filter: blur(3px);
-  display: flex; align-items: flex-start; justify-content: center; padding: 12vh var(--vip-sp-6) var(--vip-sp-6);
+  position: fixed;
+  inset: 0;
+  z-index: var(--vip-z-popover);
+  background: var(--vip-scrim);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh var(--vip-sp-6) var(--vip-sp-6);
 }
 .vip-cmd {
-  width: 100%; max-width: 620px;
-  background: var(--vip-surface-1); border: 1px solid var(--vip-border);
-  border-radius: var(--vip-radius-xl); box-shadow: var(--vip-shadow-lg); overflow: hidden;
-  display: flex; flex-direction: column; max-height: 66vh;
+  width: 100%;
+  max-width: 620px;
+  background: var(--vip-surface-1);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-xl);
+  box-shadow: var(--vip-shadow-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 66vh;
 }
-.vip-cmd__search { display: flex; align-items: center; gap: var(--vip-sp-4); padding: var(--vip-sp-6); border-bottom: 1px solid var(--vip-border-subtle); color: var(--vip-text-muted); }
-.vip-cmd__input { flex: 1; background: none; border: none; outline: none; color: var(--vip-text-primary); font-size: var(--vip-fs-lg); }
-.vip-cmd__esc { font-family: var(--vip-font-mono); font-size: var(--vip-fs-2xs); color: var(--vip-text-muted); background: var(--vip-surface-3); padding: 2px 6px; border-radius: var(--vip-radius-xs); }
-.vip-cmd__results { overflow-y: auto; padding: var(--vip-sp-4); }
-.vip-cmd__empty { padding: var(--vip-sp-8); text-align: center; color: var(--vip-text-muted); }
-.vip-cmd__group { margin-bottom: var(--vip-sp-4); }
-.vip-cmd__group-label { font-size: var(--vip-fs-2xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-disabled); padding: var(--vip-sp-3) var(--vip-sp-4); }
-.vip-cmd__item { display: flex; align-items: center; gap: var(--vip-sp-4); width: 100%; padding: var(--vip-sp-4); border: none; background: none; border-radius: var(--vip-radius-md); color: var(--vip-text-secondary); text-align: left; }
-.vip-cmd__item.is-active { background: var(--vip-brand-soft); color: var(--vip-brand-text); }
-.vip-cmd__title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); }
-.vip-cmd__sub { margin-left: auto; font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.vip-cmd__footer { display: flex; gap: var(--vip-sp-7); padding: var(--vip-sp-4) var(--vip-sp-6); border-top: 1px solid var(--vip-border-subtle); font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.vip-cmd__footer kbd { font-family: var(--vip-font-mono); background: var(--vip-surface-3); padding: 1px 5px; border-radius: var(--vip-radius-xs); margin-right: 2px; }
-.vip-cmd-enter-active, .vip-cmd-leave-active { transition: opacity var(--vip-motion-fast); }
-.vip-cmd-enter-active .vip-cmd { transition: transform var(--vip-motion-base) var(--vip-ease-emphasized); }
-.vip-cmd-enter-from { opacity: 0; }
-.vip-cmd-enter-from .vip-cmd { transform: translateY(-14px); }
+.vip-cmd__search {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  padding: var(--vip-sp-6);
+  border-bottom: 1px solid var(--vip-border-subtle);
+  color: var(--vip-text-muted);
+}
+.vip-cmd__input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--vip-text-primary);
+  font-size: var(--vip-fs-lg);
+}
+.vip-cmd__esc {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-muted);
+  background: var(--vip-surface-3);
+  padding: 2px 6px;
+  border-radius: var(--vip-radius-xs);
+}
+.vip-cmd__results {
+  overflow-y: auto;
+  padding: var(--vip-sp-4);
+}
+.vip-cmd__empty {
+  padding: var(--vip-sp-8);
+  text-align: center;
+  color: var(--vip-text-muted);
+}
+.vip-cmd__group {
+  margin-bottom: var(--vip-sp-4);
+}
+.vip-cmd__group-label {
+  font-size: var(--vip-fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-disabled);
+  padding: var(--vip-sp-3) var(--vip-sp-4);
+}
+.vip-cmd__item {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  width: 100%;
+  padding: var(--vip-sp-4);
+  border: none;
+  background: none;
+  border-radius: var(--vip-radius-md);
+  color: var(--vip-text-secondary);
+  text-align: left;
+}
+.vip-cmd__item.is-active {
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+}
+.vip-cmd__title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+}
+.vip-cmd__sub {
+  margin-left: auto;
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.vip-cmd__footer {
+  display: flex;
+  gap: var(--vip-sp-7);
+  padding: var(--vip-sp-4) var(--vip-sp-6);
+  border-top: 1px solid var(--vip-border-subtle);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.vip-cmd__footer kbd {
+  font-family: var(--vip-font-mono);
+  background: var(--vip-surface-3);
+  padding: 1px 5px;
+  border-radius: var(--vip-radius-xs);
+  margin-right: 2px;
+}
+.vip-cmd-enter-active,
+.vip-cmd-leave-active {
+  transition: opacity var(--vip-motion-fast);
+}
+.vip-cmd-enter-active .vip-cmd {
+  transition: transform var(--vip-motion-base) var(--vip-ease-emphasized);
+}
+.vip-cmd-enter-from {
+  opacity: 0;
+}
+.vip-cmd-enter-from .vip-cmd {
+  transform: translateY(-14px);
+}
 </style>

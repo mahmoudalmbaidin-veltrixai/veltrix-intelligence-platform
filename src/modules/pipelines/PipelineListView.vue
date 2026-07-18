@@ -47,7 +47,13 @@ function statusTone(s?: string) {
   <div>
     <VipPageHeader title="Pipelines" description="Design, validate, publish and monitor data pipelines.">
       <template #actions>
-        <VipButton v-if="platform.can('pipeline:write')" variant="primary" icon="plus" @click="router.push('/pipelines/new')">New pipeline</VipButton>
+        <VipButton
+          v-if="platform.can('pipeline:write')"
+          variant="primary"
+          icon="plus"
+          @click="router.push('/pipelines/new')"
+          >New pipeline</VipButton
+        >
       </template>
     </VipPageHeader>
 
@@ -55,7 +61,11 @@ function statusTone(s?: string) {
       <VipInput v-model="search" icon="search" placeholder="Search pipelines or tags…" size="sm" />
       <VipSegmented
         v-model="statusFilter"
-        :options="[{ value: 'all', label: 'All' }, { value: 'published', label: 'Published' }, { value: 'draft', label: 'Drafts' }]"
+        :options="[
+          { value: 'all', label: 'All' },
+          { value: 'published', label: 'Published' },
+          { value: 'draft', label: 'Drafts' },
+        ]"
         size="sm"
       />
     </div>
@@ -95,18 +105,54 @@ function statusTone(s?: string) {
       <template #cell-nextSchedule="{ row }">
         <span class="pl-muted">{{ row.nextSchedule ? relativeTime(row.nextSchedule) : '—' }}</span>
       </template>
-      <template #cell-version="{ row }"><span class="pl-muted">v{{ row.version }}</span></template>
+      <template #cell-version="{ row }"
+        ><span class="pl-muted">v{{ row.version }}</span></template
+      >
     </VipTable>
   </div>
 </template>
 
 <style scoped>
-.pl-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-4); margin-bottom: var(--vip-sp-6); flex-wrap: wrap; }
-.pl-name { display: flex; align-items: center; gap: var(--vip-sp-4); color: var(--vip-text-muted); }
-.pl-name__title { color: var(--vip-text-primary); font-weight: var(--vip-fw-medium); }
-.pl-name__tags { display: flex; gap: var(--vip-sp-3); margin-top: 3px; }
-.pl-tag { font-size: var(--vip-fs-2xs); color: var(--vip-brand-text); background: var(--vip-brand-soft); padding: 1px 6px; border-radius: var(--vip-radius-full); }
-.pl-nodes { font-size: var(--vip-fs-2xs); color: var(--vip-text-disabled); }
-.pl-run { display: inline-flex; align-items: center; gap: var(--vip-sp-3); }
-.pl-muted { color: var(--vip-text-muted); }
+.pl-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-4);
+  margin-bottom: var(--vip-sp-6);
+  flex-wrap: wrap;
+}
+.pl-name {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  color: var(--vip-text-muted);
+}
+.pl-name__title {
+  color: var(--vip-text-primary);
+  font-weight: var(--vip-fw-medium);
+}
+.pl-name__tags {
+  display: flex;
+  gap: var(--vip-sp-3);
+  margin-top: 3px;
+}
+.pl-tag {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-brand-text);
+  background: var(--vip-brand-soft);
+  padding: 1px 6px;
+  border-radius: var(--vip-radius-full);
+}
+.pl-nodes {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-disabled);
+}
+.pl-run {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+}
+.pl-muted {
+  color: var(--vip-text-muted);
+}
 </style>

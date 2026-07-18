@@ -20,7 +20,10 @@ const ui = useUiStore()
 const platform = usePlatformStore()
 const canWrite = computed(() => platform.can('report:write'))
 
-const { data: reports, isLoading } = useQuery(() => 'reports:list', () => reportService.list())
+const { data: reports, isLoading } = useQuery(
+  () => 'reports:list',
+  () => reportService.list(),
+)
 const { data: templates, isLoading: templatesLoading } = useQuery(
   () => 'reports:templates',
   () => reportService.listTemplates(),
@@ -33,10 +36,18 @@ const tabs = computed(() => [
 ])
 
 const STATUS_TONE: Record<ReportStatus, 'neutral' | 'warning' | 'info' | 'success' | 'danger'> = {
-  draft: 'neutral', 'in-review': 'warning', approved: 'info', published: 'success', rejected: 'danger',
+  draft: 'neutral',
+  'in-review': 'warning',
+  approved: 'info',
+  published: 'success',
+  rejected: 'danger',
 }
 const STATUS_LABEL: Record<ReportStatus, string> = {
-  draft: 'Draft', 'in-review': 'In review', approved: 'Approved', published: 'Published', rejected: 'Rejected',
+  draft: 'Draft',
+  'in-review': 'In review',
+  approved: 'Approved',
+  published: 'Published',
+  rejected: 'Rejected',
 }
 
 const columns: Column<Report>[] = [
@@ -52,7 +63,11 @@ function openReport(r: Report) {
 }
 function newReport() {
   if (!canWrite.value) {
-    ui.pushToast({ kind: 'warning', title: 'Insufficient permission', message: 'You need report:write to create a report.' })
+    ui.pushToast({
+      kind: 'warning',
+      title: 'Insufficient permission',
+      message: 'You need report:write to create a report.',
+    })
     return
   }
   router.push('/reports/new')
@@ -66,9 +81,14 @@ function useTemplate(name: string) {
 
 <template>
   <div class="wrap">
-    <VipPageHeader title="Reports" description="Author, review and publish governed reports, then schedule them for delivery.">
+    <VipPageHeader
+      title="Reports"
+      description="Author, review and publish governed reports, then schedule them for delivery."
+    >
       <template #actions>
-        <VipButton variant="secondary" icon="calendarClock" @click="router.push('/reports/deliveries')">Deliveries</VipButton>
+        <VipButton variant="secondary" icon="calendarClock" @click="router.push('/reports/deliveries')"
+          >Deliveries</VipButton
+        >
         <VipButton variant="primary" icon="plus" :disabled="!canWrite" @click="newReport">New report</VipButton>
       </template>
       <template #tabs>
@@ -96,7 +116,9 @@ function useTemplate(name: string) {
         <template #cell-status="{ row }">
           <VipBadge :tone="STATUS_TONE[row.status]" variant="soft" size="sm">{{ STATUS_LABEL[row.status] }}</VipBadge>
         </template>
-        <template #cell-version="{ value }"><span class="mono">{{ value }}</span></template>
+        <template #cell-version="{ value }"
+          ><span class="mono">{{ value }}</span></template
+        >
         <template #cell-updatedAt="{ value }">{{ relativeTime(String(value)) }}</template>
       </VipTable>
     </VipCard>
@@ -105,7 +127,7 @@ function useTemplate(name: string) {
       <template v-if="templatesLoading">
         <VipCard v-for="n in 6" :key="n">
           <VipSkeleton width="50%" height="15px" />
-          <VipSkeleton width="90%" height="11px" style="margin-top:10px" />
+          <VipSkeleton width="90%" height="11px" style="margin-top: 10px" />
         </VipCard>
       </template>
       <VipCard v-for="t in templates" v-else :key="t.id" hoverable @click="useTemplate(t.name)">
@@ -124,17 +146,76 @@ function useTemplate(name: string) {
 </template>
 
 <style scoped>
-.wrap { max-width: 1120px; }
-.c-name { display: flex; flex-direction: column; gap: 2px; }
-.c-name__label { font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.c-name__desc { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mono { font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
+.wrap {
+  max-width: 1120px;
+}
+.c-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.c-name__label {
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.c-name__desc {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mono {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
 
-.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--vip-sp-6); }
-.tpl__head { display: flex; align-items: center; gap: var(--vip-sp-4); }
-.tpl__icon { width: 34px; height: 34px; flex: none; display: inline-flex; align-items: center; justify-content: center; background: var(--vip-brand-soft); color: var(--vip-brand-text); border-radius: var(--vip-radius-md); }
-.tpl__title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); color: var(--vip-text-primary); }
-.tpl__desc { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); margin-top: var(--vip-sp-5); line-height: var(--vip-lh-normal); }
-.tpl__foot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--vip-sp-6); }
-.tpl__cta { display: inline-flex; align-items: center; gap: var(--vip-sp-2); font-size: var(--vip-fs-sm); color: var(--vip-brand-text); font-weight: var(--vip-fw-medium); }
+.tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--vip-sp-6);
+}
+.tpl__head {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+}
+.tpl__icon {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+  border-radius: var(--vip-radius-md);
+}
+.tpl__title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+}
+.tpl__desc {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  margin-top: var(--vip-sp-5);
+  line-height: var(--vip-lh-normal);
+}
+.tpl__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--vip-sp-6);
+}
+.tpl__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-brand-text);
+  font-weight: var(--vip-fw-medium);
+}
 </style>

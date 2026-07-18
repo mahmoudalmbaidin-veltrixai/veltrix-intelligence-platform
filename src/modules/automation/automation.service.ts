@@ -40,12 +40,7 @@ export interface Automation {
   runsToday: number
 }
 
-export type AutomationRunStatus =
-  | 'succeeded'
-  | 'failed'
-  | 'running'
-  | 'waiting-approval'
-  | 'dead-letter'
+export type AutomationRunStatus = 'succeeded' | 'failed' | 'running' | 'waiting-approval' | 'dead-letter'
 
 export interface AutomationRunStep {
   name: string
@@ -100,13 +95,69 @@ export const ACTION_CATALOG: { type: string; label: string; icon: string }[] = [
 ]
 
 const AUTOMATIONS: Automation[] = [
-  { id: 'au_1', name: 'Alert on revenue pipeline failure', trigger: 'pipeline-failed', status: 'active', owner: 'A. Rahman', lastRun: isoAgo(18), runsToday: 3 },
-  { id: 'au_2', name: 'Nightly executive briefing', trigger: 'schedule', status: 'active', owner: 'RevOps', lastRun: isoAgo(480), runsToday: 1 },
-  { id: 'au_3', name: 'Quarantine dataset on quality incident', trigger: 'quality-incident', status: 'active', owner: 'Data Quality', lastRun: isoAgo(95), runsToday: 2 },
-  { id: 'au_4', name: 'Reconnect on connection failure', trigger: 'connection-failed', status: 'paused', owner: 'Platform', lastRun: isoAgo(2880), runsToday: 0 },
-  { id: 'au_5', name: 'Refresh downstream on source update', trigger: 'dataset-refreshed', status: 'active', owner: 'Analytics', lastRun: isoAgo(42), runsToday: 11 },
-  { id: 'au_6', name: 'Publish approved reports', trigger: 'approval-decision', status: 'draft', owner: 'Finance', lastRun: isoAgo(4320), runsToday: 0 },
-  { id: 'au_7', name: 'Inbound webhook → ingest', trigger: 'webhook', status: 'active', owner: 'Integrations', lastRun: isoAgo(7), runsToday: 46 },
+  {
+    id: 'au_1',
+    name: 'Alert on revenue pipeline failure',
+    trigger: 'pipeline-failed',
+    status: 'active',
+    owner: 'A. Rahman',
+    lastRun: isoAgo(18),
+    runsToday: 3,
+  },
+  {
+    id: 'au_2',
+    name: 'Nightly executive briefing',
+    trigger: 'schedule',
+    status: 'active',
+    owner: 'RevOps',
+    lastRun: isoAgo(480),
+    runsToday: 1,
+  },
+  {
+    id: 'au_3',
+    name: 'Quarantine dataset on quality incident',
+    trigger: 'quality-incident',
+    status: 'active',
+    owner: 'Data Quality',
+    lastRun: isoAgo(95),
+    runsToday: 2,
+  },
+  {
+    id: 'au_4',
+    name: 'Reconnect on connection failure',
+    trigger: 'connection-failed',
+    status: 'paused',
+    owner: 'Platform',
+    lastRun: isoAgo(2880),
+    runsToday: 0,
+  },
+  {
+    id: 'au_5',
+    name: 'Refresh downstream on source update',
+    trigger: 'dataset-refreshed',
+    status: 'active',
+    owner: 'Analytics',
+    lastRun: isoAgo(42),
+    runsToday: 11,
+  },
+  {
+    id: 'au_6',
+    name: 'Publish approved reports',
+    trigger: 'approval-decision',
+    status: 'draft',
+    owner: 'Finance',
+    lastRun: isoAgo(4320),
+    runsToday: 0,
+  },
+  {
+    id: 'au_7',
+    name: 'Inbound webhook → ingest',
+    trigger: 'webhook',
+    status: 'active',
+    owner: 'Integrations',
+    lastRun: isoAgo(7),
+    runsToday: 46,
+  },
 ]
 
 const RUNS: AutomationRun[] = [
@@ -172,11 +223,46 @@ const RUNS: AutomationRun[] = [
 ]
 
 const APPROVALS: Approval[] = [
-  { id: 'ap_1', title: 'Publish "Q3 Board Report" to leadership space', requestedBy: 'Nightly Briefing', requestedAt: isoAgo(65), status: 'pending', context: 'Automation "Publish approved reports" is holding at the publish step pending sign-off.' },
-  { id: 'ap_2', title: 'Trigger full reload of fct_orders', requestedBy: 'Refresh downstream', requestedAt: isoAgo(120), status: 'pending', context: 'Source dataset changed schema; a full reload is estimated at 22 minutes and 1.4M rows.' },
-  { id: 'ap_3', title: 'Send customer-impact email to 4,200 recipients', requestedBy: 'Incident Response', requestedAt: isoAgo(240), status: 'pending', context: 'Large external send requires human approval per governance policy.' },
-  { id: 'ap_4', title: 'Rotate warehouse credentials', requestedBy: 'Platform', requestedAt: isoAgo(1440), status: 'approved', context: 'Approved by M. Almbaidin. Credentials rotated successfully.' },
-  { id: 'ap_5', title: 'Delete deprecated dashboard "Legacy KPIs"', requestedBy: 'Cleanup', requestedAt: isoAgo(2880), status: 'rejected', context: 'Rejected — dashboard still referenced by an active subscription.' },
+  {
+    id: 'ap_1',
+    title: 'Publish "Q3 Board Report" to leadership space',
+    requestedBy: 'Nightly Briefing',
+    requestedAt: isoAgo(65),
+    status: 'pending',
+    context: 'Automation "Publish approved reports" is holding at the publish step pending sign-off.',
+  },
+  {
+    id: 'ap_2',
+    title: 'Trigger full reload of fct_orders',
+    requestedBy: 'Refresh downstream',
+    requestedAt: isoAgo(120),
+    status: 'pending',
+    context: 'Source dataset changed schema; a full reload is estimated at 22 minutes and 1.4M rows.',
+  },
+  {
+    id: 'ap_3',
+    title: 'Send customer-impact email to 4,200 recipients',
+    requestedBy: 'Incident Response',
+    requestedAt: isoAgo(240),
+    status: 'pending',
+    context: 'Large external send requires human approval per governance policy.',
+  },
+  {
+    id: 'ap_4',
+    title: 'Rotate warehouse credentials',
+    requestedBy: 'Platform',
+    requestedAt: isoAgo(1440),
+    status: 'approved',
+    context: 'Approved by M. Almbaidin. Credentials rotated successfully.',
+  },
+  {
+    id: 'ap_5',
+    title: 'Delete deprecated dashboard "Legacy KPIs"',
+    requestedBy: 'Cleanup',
+    requestedAt: isoAgo(2880),
+    status: 'rejected',
+    context: 'Rejected — dashboard still referenced by an active subscription.',
+  },
 ]
 
 /**
@@ -231,7 +317,4 @@ const apiAutomationService: AutomationService = {
 }
 
 /** Selected by VITE_API_MODE. Views import this, not a concrete class. */
-export const automationService: AutomationService = defineService(
-  mockAutomationService,
-  () => apiAutomationService,
-)
+export const automationService: AutomationService = defineService(mockAutomationService, () => apiAutomationService)

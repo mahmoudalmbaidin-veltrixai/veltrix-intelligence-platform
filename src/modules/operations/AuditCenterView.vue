@@ -161,16 +161,11 @@ function pretty(value: Record<string, unknown> | undefined): string {
       </VipTable>
     </VipCard>
 
-    <VipDrawer
-      :open="!!selected"
-      :title="selected ? selected.action : 'Audit event'"
-      :width="520"
-      @close="closeDetail"
-    >
+    <VipDrawer :open="!!selected" :title="selected ? selected.action : 'Audit event'" :width="520" @close="closeDetail">
       <div v-if="selected" class="aud__detail">
         <VipAlert tone="info" title="Sensitive fields redacted">
-          Credentials, tokens and secrets are automatically redacted from before/after
-          snapshots and never stored in the audit trail.
+          Credentials, tokens and secrets are automatically redacted from before/after snapshots and never stored in the
+          audit trail.
         </VipAlert>
 
         <dl class="aud__dl">
@@ -182,16 +177,43 @@ function pretty(value: Record<string, unknown> | undefined): string {
               </VipBadge>
             </dd>
           </div>
-          <div class="aud__dl-row"><dt>Actor</dt><dd>{{ selected.actor }}</dd></div>
-          <div class="aud__dl-row"><dt>Action</dt><dd><code class="aud__code">{{ selected.action }}</code></dd></div>
-          <div class="aud__dl-row"><dt>Resource</dt><dd><code class="aud__code">{{ selected.resource }}</code></dd></div>
-          <div class="aud__dl-row"><dt>Workspace</dt><dd>{{ selected.workspace }}</dd></div>
-          <div class="aud__dl-row"><dt>Organization</dt><dd>{{ selected.org }}</dd></div>
-          <div class="aud__dl-row"><dt>IP address</dt><dd>{{ selected.ip }}</dd></div>
-          <div class="aud__dl-row"><dt>Timestamp</dt><dd>{{ formatDateTime(selected.ts) }}</dd></div>
+          <div class="aud__dl-row">
+            <dt>Actor</dt>
+            <dd>{{ selected.actor }}</dd>
+          </div>
+          <div class="aud__dl-row">
+            <dt>Action</dt>
+            <dd>
+              <code class="aud__code">{{ selected.action }}</code>
+            </dd>
+          </div>
+          <div class="aud__dl-row">
+            <dt>Resource</dt>
+            <dd>
+              <code class="aud__code">{{ selected.resource }}</code>
+            </dd>
+          </div>
+          <div class="aud__dl-row">
+            <dt>Workspace</dt>
+            <dd>{{ selected.workspace }}</dd>
+          </div>
+          <div class="aud__dl-row">
+            <dt>Organization</dt>
+            <dd>{{ selected.org }}</dd>
+          </div>
+          <div class="aud__dl-row">
+            <dt>IP address</dt>
+            <dd>{{ selected.ip }}</dd>
+          </div>
+          <div class="aud__dl-row">
+            <dt>Timestamp</dt>
+            <dd>{{ formatDateTime(selected.ts) }}</dd>
+          </div>
           <div class="aud__dl-row">
             <dt>Correlation ID</dt>
-            <dd><code class="aud__code">{{ selected.correlationId }}</code></dd>
+            <dd>
+              <code class="aud__code">{{ selected.correlationId }}</code>
+            </dd>
           </div>
         </dl>
 
@@ -215,30 +237,85 @@ function pretty(value: Record<string, unknown> | undefined): string {
 </template>
 
 <style scoped>
-.aud { max-width: 1280px; margin: 0 auto; }
+.aud {
+  max-width: 1280px;
+  margin: 0 auto;
+}
 .aud__toolbar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--vip-sp-5); flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-5);
+  flex-wrap: wrap;
   padding: var(--vip-sp-5) var(--vip-sp-6);
   border-bottom: 1px solid var(--vip-border-subtle);
 }
-.aud__search { width: min(360px, 100%); }
-.aud__filters { display: flex; gap: var(--vip-sp-4); flex-wrap: wrap; }
-.aud__actor { font-size: var(--vip-fs-sm); color: var(--vip-text-primary); }
-.aud__code { font-family: var(--vip-font-mono); font-size: var(--vip-fs-xs); color: var(--vip-text-secondary); }
-.aud__ip { font-family: var(--vip-font-mono); font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.aud__muted { color: var(--vip-text-muted); }
-.aud__detail { display: flex; flex-direction: column; gap: var(--vip-sp-6); }
-.aud__dl { display: flex; flex-direction: column; gap: 0; margin: 0; }
+.aud__search {
+  width: min(360px, 100%);
+}
+.aud__filters {
+  display: flex;
+  gap: var(--vip-sp-4);
+  flex-wrap: wrap;
+}
+.aud__actor {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-primary);
+}
+.aud__code {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-secondary);
+}
+.aud__ip {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.aud__muted {
+  color: var(--vip-text-muted);
+}
+.aud__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-6);
+}
+.aud__dl {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+}
 .aud__dl-row {
-  display: flex; align-items: center; gap: var(--vip-sp-5);
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
   padding: var(--vip-sp-4) 0;
   border-bottom: 1px solid var(--vip-border-subtle);
 }
-.aud__dl-row dt { flex: none; width: 120px; font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
-.aud__dl-row dd { margin: 0; font-size: var(--vip-fs-sm); color: var(--vip-text-primary); }
-.aud__diff { display: grid; grid-template-columns: 1fr 1fr; gap: var(--vip-sp-4); }
-.aud__diff-title { font-size: var(--vip-fs-xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-muted); margin-bottom: var(--vip-sp-3); }
+.aud__dl-row dt {
+  flex: none;
+  width: 120px;
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
+.aud__dl-row dd {
+  margin: 0;
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-primary);
+}
+.aud__diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--vip-sp-4);
+}
+.aud__diff-title {
+  font-size: var(--vip-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-muted);
+  margin-bottom: var(--vip-sp-3);
+}
 .aud__json {
   font-family: var(--vip-font-mono);
   font-size: var(--vip-fs-2xs);

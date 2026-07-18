@@ -27,7 +27,9 @@ import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 const ui = useUiStore()
 
 const { data: rules, isLoading: rulesLoading } = useQuery('quality:rules', () => datasetService.listQualityRules())
-const { data: incidents, isLoading: incidentsLoading } = useQuery('quality:incidents', () => datasetService.listIncidents())
+const { data: incidents, isLoading: incidentsLoading } = useQuery('quality:incidents', () =>
+  datasetService.listIncidents(),
+)
 
 /* ---- severity / status tone maps ---- */
 const RULE_TONE: Record<QualityRuleStatus, 'success' | 'warning' | 'danger'> = {
@@ -56,7 +58,12 @@ const ruleColumns: Column<QualityRule>[] = [
 
 /* ---- create rule dialog ---- */
 const dialogOpen = ref(false)
-interface RuleForm { name: string; dimension: QualityDimension; severity: QualitySeverity; threshold: number }
+interface RuleForm {
+  name: string
+  dimension: QualityDimension
+  severity: QualitySeverity
+  threshold: number
+}
 const ruleForm = reactive<RuleForm>({ name: '', dimension: 'completeness', severity: 'medium', threshold: 95 })
 const formError = ref('')
 
@@ -82,17 +89,14 @@ function openDialog() {
   dialogOpen.value = true
 }
 
-const createRule = useMutation<CreateRulePayload, QualityRule>(
-  (payload) => datasetService.createRule(payload),
-  {
-    invalidate: ['quality:rules'],
-    onSuccess: (rule) => {
-      ui.pushToast({ kind: 'success', title: 'Rule created', message: `“${rule.name}” is now monitoring your data.` })
-      dialogOpen.value = false
-    },
-    onError: (err) => ui.pushToast({ kind: 'error', title: 'Could not create rule', message: err.message }),
+const createRule = useMutation<CreateRulePayload, QualityRule>((payload) => datasetService.createRule(payload), {
+  invalidate: ['quality:rules'],
+  onSuccess: (rule) => {
+    ui.pushToast({ kind: 'success', title: 'Rule created', message: `“${rule.name}” is now monitoring your data.` })
+    dialogOpen.value = false
   },
-)
+  onError: (err) => ui.pushToast({ kind: 'error', title: 'Could not create rule', message: err.message }),
+})
 
 async function submitRule() {
   if (!ruleForm.name.trim()) {
@@ -134,7 +138,11 @@ function openIncident(row: QualityIncident) {
 function resolveIncident() {
   if (!activeIncident.value) return
   activeIncident.value.status = 'resolved'
-  ui.pushToast({ kind: 'success', title: 'Incident resolved', message: `${activeIncident.value.rule} marked as resolved.` })
+  ui.pushToast({
+    kind: 'success',
+    title: 'Incident resolved',
+    message: `${activeIncident.value.rule} marked as resolved.`,
+  })
   drawerOpen.value = false
 }
 </script>
@@ -163,12 +171,26 @@ function resolveIncident() {
           empty-title="No rules yet"
           empty-description="Create your first quality rule to start monitoring."
         >
-          <template #cell-name="{ row }"><span class="dq__rule-name">{{ row.name }}</span></template>
-          <template #cell-dimension="{ row }"><VipBadge tone="neutral" variant="soft" size="sm">{{ row.dimension }}</VipBadge></template>
-          <template #cell-severity="{ row }"><VipBadge :tone="severityTone(row.severity)" variant="soft" size="sm">{{ row.severity }}</VipBadge></template>
-          <template #cell-status="{ row }"><VipBadge :tone="RULE_TONE[row.status]" variant="soft" size="sm">{{ row.status }}</VipBadge></template>
-          <template #cell-passRate="{ row }"><span class="dq__num">{{ row.passRate }}%</span></template>
-          <template #cell-lastRun="{ row }"><span class="dq__muted">{{ relativeTime(row.lastRun) }}</span></template>
+          <template #cell-name="{ row }"
+            ><span class="dq__rule-name">{{ row.name }}</span></template
+          >
+          <template #cell-dimension="{ row }"
+            ><VipBadge tone="neutral" variant="soft" size="sm">{{ row.dimension }}</VipBadge></template
+          >
+          <template #cell-severity="{ row }"
+            ><VipBadge :tone="severityTone(row.severity)" variant="soft" size="sm">{{
+              row.severity
+            }}</VipBadge></template
+          >
+          <template #cell-status="{ row }"
+            ><VipBadge :tone="RULE_TONE[row.status]" variant="soft" size="sm">{{ row.status }}</VipBadge></template
+          >
+          <template #cell-passRate="{ row }"
+            ><span class="dq__num">{{ row.passRate }}%</span></template
+          >
+          <template #cell-lastRun="{ row }"
+            ><span class="dq__muted">{{ relativeTime(row.lastRun) }}</span></template
+          >
         </VipTable>
       </VipCard>
     </section>
@@ -188,11 +210,23 @@ function resolveIncident() {
           empty-description="All quality checks are currently passing."
           @row-click="openIncident"
         >
-          <template #cell-rule="{ row }"><span class="dq__rule-name">{{ row.rule }}</span></template>
-          <template #cell-dataset="{ row }"><span class="dq__mono">{{ row.dataset }}</span></template>
-          <template #cell-severity="{ row }"><VipBadge :tone="severityTone(row.severity)" variant="soft" size="sm">{{ row.severity }}</VipBadge></template>
-          <template #cell-status="{ row }"><VipBadge :tone="INCIDENT_TONE[row.status]" variant="soft" size="sm">{{ row.status }}</VipBadge></template>
-          <template #cell-openedAt="{ row }"><span class="dq__muted">{{ relativeTime(row.openedAt) }}</span></template>
+          <template #cell-rule="{ row }"
+            ><span class="dq__rule-name">{{ row.rule }}</span></template
+          >
+          <template #cell-dataset="{ row }"
+            ><span class="dq__mono">{{ row.dataset }}</span></template
+          >
+          <template #cell-severity="{ row }"
+            ><VipBadge :tone="severityTone(row.severity)" variant="soft" size="sm">{{
+              row.severity
+            }}</VipBadge></template
+          >
+          <template #cell-status="{ row }"
+            ><VipBadge :tone="INCIDENT_TONE[row.status]" variant="soft" size="sm">{{ row.status }}</VipBadge></template
+          >
+          <template #cell-openedAt="{ row }"
+            ><span class="dq__muted">{{ relativeTime(row.openedAt) }}</span></template
+          >
         </VipTable>
       </VipCard>
     </section>
@@ -222,7 +256,9 @@ function resolveIncident() {
       </div>
       <template #footer>
         <VipButton variant="tertiary" @click="dialogOpen = false">Cancel</VipButton>
-        <VipButton variant="primary" icon="check" :loading="createRule.isPending.value" @click="submitRule">Create rule</VipButton>
+        <VipButton variant="primary" icon="check" :loading="createRule.isPending.value" @click="submitRule"
+          >Create rule</VipButton
+        >
       </template>
     </VipDialog>
 
@@ -231,15 +267,29 @@ function resolveIncident() {
       <div v-if="activeIncident" class="dq__incident">
         <h3 class="dq__incident-title">{{ activeIncident.rule }}</h3>
         <div class="dq__incident-badges">
-          <VipBadge :tone="severityTone(activeIncident.severity)" variant="soft">{{ activeIncident.severity }} severity</VipBadge>
+          <VipBadge :tone="severityTone(activeIncident.severity)" variant="soft"
+            >{{ activeIncident.severity }} severity</VipBadge
+          >
           <VipBadge :tone="INCIDENT_TONE[activeIncident.status]" variant="soft">{{ activeIncident.status }}</VipBadge>
         </div>
 
         <dl class="dq__incident-facts">
-          <div class="dq__incident-fact"><dt>Dataset</dt><dd class="dq__mono">{{ activeIncident.dataset }}</dd></div>
-          <div class="dq__incident-fact"><dt>Owner</dt><dd>{{ activeIncident.owner }}</dd></div>
-          <div class="dq__incident-fact"><dt>Opened</dt><dd>{{ relativeTime(activeIncident.openedAt) }}</dd></div>
-          <div class="dq__incident-fact"><dt>Incident ID</dt><dd class="dq__mono">{{ activeIncident.id }}</dd></div>
+          <div class="dq__incident-fact">
+            <dt>Dataset</dt>
+            <dd class="dq__mono">{{ activeIncident.dataset }}</dd>
+          </div>
+          <div class="dq__incident-fact">
+            <dt>Owner</dt>
+            <dd>{{ activeIncident.owner }}</dd>
+          </div>
+          <div class="dq__incident-fact">
+            <dt>Opened</dt>
+            <dd>{{ relativeTime(activeIncident.openedAt) }}</dd>
+          </div>
+          <div class="dq__incident-fact">
+            <dt>Incident ID</dt>
+            <dd class="dq__mono">{{ activeIncident.id }}</dd>
+          </div>
         </dl>
 
         <div class="dq__workflow">
@@ -274,32 +324,109 @@ function resolveIncident() {
 </template>
 
 <style scoped>
-.dq { max-width: 1280px; margin: 0 auto; }
-.dq__section { margin-bottom: var(--vip-sp-8); }
-.dq__section-title { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); margin-bottom: var(--vip-sp-5); }
-.dq__rule-name { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.dq__mono { font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
-.dq__muted { color: var(--vip-text-muted); }
-.dq__num { font-variant-numeric: tabular-nums; }
+.dq {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.dq__section {
+  margin-bottom: var(--vip-sp-8);
+}
+.dq__section-title {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+  margin-bottom: var(--vip-sp-5);
+}
+.dq__rule-name {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.dq__mono {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
+.dq__muted {
+  color: var(--vip-text-muted);
+}
+.dq__num {
+  font-variant-numeric: tabular-nums;
+}
 
-.dq__form { display: flex; flex-direction: column; gap: var(--vip-sp-6); }
-.dq__form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--vip-sp-6); }
-.dq__form-error { font-size: var(--vip-fs-sm); color: var(--vip-danger-text); }
+.dq__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-6);
+}
+.dq__form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--vip-sp-6);
+}
+.dq__form-error {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-danger-text);
+}
 
-.dq__incident { display: flex; flex-direction: column; gap: var(--vip-sp-6); }
-.dq__incident-title { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); }
-.dq__incident-badges { display: flex; gap: var(--vip-sp-3); }
-.dq__incident-facts { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md); overflow: hidden; }
-.dq__incident-fact { display: flex; justify-content: space-between; gap: var(--vip-sp-5); padding: var(--vip-sp-4) var(--vip-sp-5); }
-.dq__incident-fact:not(:last-child) { border-bottom: 1px solid var(--vip-border-subtle); }
-.dq__incident-fact dt { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
-.dq__incident-fact dd { font-size: var(--vip-fs-md); color: var(--vip-text-primary); font-weight: var(--vip-fw-medium); }
+.dq__incident {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-6);
+}
+.dq__incident-title {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+}
+.dq__incident-badges {
+  display: flex;
+  gap: var(--vip-sp-3);
+}
+.dq__incident-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+  overflow: hidden;
+}
+.dq__incident-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--vip-sp-5);
+  padding: var(--vip-sp-4) var(--vip-sp-5);
+}
+.dq__incident-fact:not(:last-child) {
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.dq__incident-fact dt {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
+.dq__incident-fact dd {
+  font-size: var(--vip-fs-md);
+  color: var(--vip-text-primary);
+  font-weight: var(--vip-fw-medium);
+}
 
-.dq__workflow { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.dq__workflow-title { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); }
-.dq__workflow-steps { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--vip-sp-3); }
+.dq__workflow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.dq__workflow-title {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+}
+.dq__workflow-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--vip-sp-3);
+}
 .dq__workflow-steps li {
-  flex: 1; text-align: center;
+  flex: 1;
+  text-align: center;
   padding: var(--vip-sp-3) var(--vip-sp-4);
   font-size: var(--vip-fs-xs);
   background: var(--vip-surface-2);
@@ -307,7 +434,16 @@ function resolveIncident() {
   border-radius: var(--vip-radius-sm);
   color: var(--vip-text-muted);
 }
-.dq__workflow-steps li.is-active { background: var(--vip-brand-soft); border-color: var(--vip-brand-500); color: var(--vip-brand-text); font-weight: var(--vip-fw-medium); }
+.dq__workflow-steps li.is-active {
+  background: var(--vip-brand-soft);
+  border-color: var(--vip-brand-500);
+  color: var(--vip-brand-text);
+  font-weight: var(--vip-fw-medium);
+}
 
-@media (max-width: 640px) { .dq__form-row { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .dq__form-row {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

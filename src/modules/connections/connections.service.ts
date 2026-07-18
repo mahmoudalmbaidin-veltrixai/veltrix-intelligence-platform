@@ -18,14 +18,7 @@ import type { ListParams } from '@/shared/types/api'
 import { apiClient } from '@/shared/lib/apiClient'
 import { defineService } from '@/shared/services/serviceFactory'
 
-export type ConnectorKind =
-  | 'postgres'
-  | 'mysql'
-  | 'sqlserver'
-  | 'csv'
-  | 'excel'
-  | 'rest'
-  | 's3'
+export type ConnectorKind = 'postgres' | 'mysql' | 'sqlserver' | 'csv' | 'excel' | 'rest' | 's3'
 
 export type ConnectionStatus = 'healthy' | 'degraded' | 'error' | 'configuring'
 
@@ -53,12 +46,7 @@ export interface CreateConnectionPayload {
   owner: string
 }
 
-export type ConnectorCategory =
-  | 'Databases'
-  | 'Files'
-  | 'APIs'
-  | 'Cloud Storage'
-  | 'Business Apps'
+export type ConnectorCategory = 'Databases' | 'Files' | 'APIs' | 'Cloud Storage' | 'Business Apps'
 
 export type ConnectorAvailability = 'available' | 'beta' | 'coming-soon' | 'restricted'
 
@@ -194,15 +182,94 @@ export const CONNECTORS: Connector[] = [
 ]
 
 const SEED: Connection[] = [
-  { id: 'conn_pg_core', name: 'Core Warehouse (Postgres)', connector: 'postgres', status: 'healthy', owner: 'Data Platform', host: 'wh-core.veltrix.internal:5432', lastTested: isoAgo(18), createdAt: isoAgo(60 * 24 * 210) },
-  { id: 'conn_pg_replica', name: 'Analytics Replica', connector: 'postgres', status: 'healthy', owner: 'Data Platform', host: 'wh-replica.veltrix.internal:5432', lastTested: isoAgo(42), createdAt: isoAgo(60 * 24 * 150) },
-  { id: 'conn_mysql_billing', name: 'Billing MySQL', connector: 'mysql', status: 'degraded', owner: 'Revenue Ops', host: 'billing-db.veltrix.internal:3306', lastTested: isoAgo(6), createdAt: isoAgo(60 * 24 * 320) },
-  { id: 'conn_mssql_erp', name: 'ERP (SQL Server)', connector: 'sqlserver', status: 'healthy', owner: 'Finance', host: 'erp-sql.veltrix.internal:1433', lastTested: isoAgo(120), createdAt: isoAgo(60 * 24 * 400) },
-  { id: 'conn_rest_marketing', name: 'Marketing Events API', connector: 'rest', status: 'healthy', owner: 'Growth', host: 'https://api.marketing.veltrix.com', lastTested: isoAgo(35), createdAt: isoAgo(60 * 24 * 95) },
-  { id: 'conn_s3_lake', name: 'Data Lake (S3)', connector: 's3', status: 'healthy', owner: 'Data Platform', host: 's3://veltrix-datalake-prod', lastTested: isoAgo(78), createdAt: isoAgo(60 * 24 * 260) },
-  { id: 'conn_csv_finance', name: 'Finance Uploads (CSV)', connector: 'csv', status: 'configuring', owner: 'Finance', lastTested: isoAgo(2), createdAt: isoAgo(60 * 24 * 3) },
-  { id: 'conn_excel_planning', name: 'Planning Workbooks', connector: 'excel', status: 'healthy', owner: 'FP&A', lastTested: isoAgo(240), createdAt: isoAgo(60 * 24 * 40) },
-  { id: 'conn_rest_support', name: 'Support Desk API', connector: 'rest', status: 'error', owner: 'Customer Success', host: 'https://api.support.veltrix.com', lastTested: isoAgo(15), createdAt: isoAgo(60 * 24 * 70) },
+  {
+    id: 'conn_pg_core',
+    name: 'Core Warehouse (Postgres)',
+    connector: 'postgres',
+    status: 'healthy',
+    owner: 'Data Platform',
+    host: 'wh-core.veltrix.internal:5432',
+    lastTested: isoAgo(18),
+    createdAt: isoAgo(60 * 24 * 210),
+  },
+  {
+    id: 'conn_pg_replica',
+    name: 'Analytics Replica',
+    connector: 'postgres',
+    status: 'healthy',
+    owner: 'Data Platform',
+    host: 'wh-replica.veltrix.internal:5432',
+    lastTested: isoAgo(42),
+    createdAt: isoAgo(60 * 24 * 150),
+  },
+  {
+    id: 'conn_mysql_billing',
+    name: 'Billing MySQL',
+    connector: 'mysql',
+    status: 'degraded',
+    owner: 'Revenue Ops',
+    host: 'billing-db.veltrix.internal:3306',
+    lastTested: isoAgo(6),
+    createdAt: isoAgo(60 * 24 * 320),
+  },
+  {
+    id: 'conn_mssql_erp',
+    name: 'ERP (SQL Server)',
+    connector: 'sqlserver',
+    status: 'healthy',
+    owner: 'Finance',
+    host: 'erp-sql.veltrix.internal:1433',
+    lastTested: isoAgo(120),
+    createdAt: isoAgo(60 * 24 * 400),
+  },
+  {
+    id: 'conn_rest_marketing',
+    name: 'Marketing Events API',
+    connector: 'rest',
+    status: 'healthy',
+    owner: 'Growth',
+    host: 'https://api.marketing.veltrix.com',
+    lastTested: isoAgo(35),
+    createdAt: isoAgo(60 * 24 * 95),
+  },
+  {
+    id: 'conn_s3_lake',
+    name: 'Data Lake (S3)',
+    connector: 's3',
+    status: 'healthy',
+    owner: 'Data Platform',
+    host: 's3://veltrix-datalake-prod',
+    lastTested: isoAgo(78),
+    createdAt: isoAgo(60 * 24 * 260),
+  },
+  {
+    id: 'conn_csv_finance',
+    name: 'Finance Uploads (CSV)',
+    connector: 'csv',
+    status: 'configuring',
+    owner: 'Finance',
+    lastTested: isoAgo(2),
+    createdAt: isoAgo(60 * 24 * 3),
+  },
+  {
+    id: 'conn_excel_planning',
+    name: 'Planning Workbooks',
+    connector: 'excel',
+    status: 'healthy',
+    owner: 'FP&A',
+    lastTested: isoAgo(240),
+    createdAt: isoAgo(60 * 24 * 40),
+  },
+  {
+    id: 'conn_rest_support',
+    name: 'Support Desk API',
+    connector: 'rest',
+    status: 'error',
+    owner: 'Customer Success',
+    host: 'https://api.support.veltrix.com',
+    lastTested: isoAgo(15),
+    createdAt: isoAgo(60 * 24 * 70),
+  },
 ]
 
 let created: Connection[] = []
@@ -274,7 +341,4 @@ const apiConnectionService: ConnectionService = {
   create: (payload) => apiClient.post<Connection>('/connections', payload),
 }
 
-export const connectionService: ConnectionService = defineService(
-  mockConnectionService,
-  () => apiConnectionService,
-)
+export const connectionService: ConnectionService = defineService(mockConnectionService, () => apiConnectionService)

@@ -62,10 +62,7 @@ export function useQuery<T>(
   let controller: AbortController | undefined
   let currentKey = ''
 
-  const enabled = () =>
-    typeof options.enabled === 'boolean'
-      ? options.enabled
-      : options.enabled?.value ?? true
+  const enabled = () => (typeof options.enabled === 'boolean' ? options.enabled : (options.enabled?.value ?? true))
 
   async function run(force = false) {
     if (!enabled()) {

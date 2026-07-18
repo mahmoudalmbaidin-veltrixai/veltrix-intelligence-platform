@@ -7,31 +7,58 @@
  *   Swap `semanticService` for a live adapter; the contract is identical.
  */
 import type {
-  CellValue, QueryColumn, QueryResult, SemanticField, SemanticModel, SemanticQuery,
+  CellValue,
+  QueryColumn,
+  QueryResult,
+  SemanticField,
+  SemanticModel,
+  SemanticQuery,
 } from '@/shared/types/semantic'
 import { latency, nowIso } from '@/shared/lib/mock'
 
 function f(
-  id: string, label: string, role: SemanticField['role'], dataType: SemanticField['dataType'],
+  id: string,
+  label: string,
+  role: SemanticField['role'],
+  dataType: SemanticField['dataType'],
   extra: Partial<SemanticField> = {},
 ): SemanticField {
   return { id, name: id, label, role, dataType, ...extra }
 }
 
 const salesFields: SemanticField[] = [
-  f('order_date', 'Order Date', 'time', 'date', { grains: ['day', 'week', 'month', 'quarter', 'year'], folder: 'Time' }),
+  f('order_date', 'Order Date', 'time', 'date', {
+    grains: ['day', 'week', 'month', 'quarter', 'year'],
+    folder: 'Time',
+  }),
   f('region', 'Region', 'dimension', 'string', { folder: 'Geography', hierarchyId: 'geo', hierarchyLevel: 0 }),
   f('country', 'Country', 'dimension', 'string', { folder: 'Geography', hierarchyId: 'geo', hierarchyLevel: 1 }),
   f('city', 'City', 'dimension', 'string', { folder: 'Geography', hierarchyId: 'geo', hierarchyLevel: 2 }),
   f('category', 'Product Category', 'dimension', 'string', { folder: 'Product' }),
   f('segment', 'Customer Segment', 'dimension', 'string', { folder: 'Customer' }),
   f('channel', 'Sales Channel', 'dimension', 'string', { folder: 'Sales' }),
-  f('revenue', 'Revenue', 'measure', 'currency', { defaultAggregation: 'sum', format: { style: 'currency', currency: 'USD', decimals: 0 }, folder: 'Sales' }),
-  f('profit', 'Profit', 'measure', 'currency', { defaultAggregation: 'sum', format: { style: 'currency', currency: 'USD', decimals: 0 }, folder: 'Sales' }),
+  f('revenue', 'Revenue', 'measure', 'currency', {
+    defaultAggregation: 'sum',
+    format: { style: 'currency', currency: 'USD', decimals: 0 },
+    folder: 'Sales',
+  }),
+  f('profit', 'Profit', 'measure', 'currency', {
+    defaultAggregation: 'sum',
+    format: { style: 'currency', currency: 'USD', decimals: 0 },
+    folder: 'Sales',
+  }),
   f('orders', 'Orders', 'measure', 'integer', { defaultAggregation: 'sum', folder: 'Sales' }),
   f('units', 'Units Sold', 'measure', 'integer', { defaultAggregation: 'sum', folder: 'Sales' }),
-  f('margin', 'Margin %', 'metric', 'percent', { defaultAggregation: 'avg', format: { style: 'percent', decimals: 1 }, folder: 'KPIs' }),
-  f('aov', 'Avg Order Value', 'metric', 'currency', { defaultAggregation: 'avg', format: { style: 'currency', currency: 'USD', decimals: 0 }, folder: 'KPIs' }),
+  f('margin', 'Margin %', 'metric', 'percent', {
+    defaultAggregation: 'avg',
+    format: { style: 'percent', decimals: 1 },
+    folder: 'KPIs',
+  }),
+  f('aov', 'Avg Order Value', 'metric', 'currency', {
+    defaultAggregation: 'avg',
+    format: { style: 'currency', currency: 'USD', decimals: 0 },
+    folder: 'KPIs',
+  }),
 ]
 
 const opsFields: SemanticField[] = [
@@ -40,23 +67,43 @@ const opsFields: SemanticField[] = [
   f('environment', 'Environment', 'dimension', 'string', { folder: 'Platform' }),
   f('requests', 'Requests', 'measure', 'integer', { defaultAggregation: 'sum', folder: 'Traffic' }),
   f('errors', 'Errors', 'measure', 'integer', { defaultAggregation: 'sum', folder: 'Reliability' }),
-  f('latency_ms', 'Latency (p95)', 'measure', 'number', { defaultAggregation: 'avg', format: { style: 'plain', decimals: 0, suffix: 'ms' }, folder: 'Reliability' }),
-  f('error_rate', 'Error Rate', 'metric', 'percent', { defaultAggregation: 'avg', format: { style: 'percent', decimals: 2 }, folder: 'KPIs' }),
-  f('uptime', 'Uptime', 'metric', 'percent', { defaultAggregation: 'avg', format: { style: 'percent', decimals: 2 }, folder: 'KPIs' }),
+  f('latency_ms', 'Latency (p95)', 'measure', 'number', {
+    defaultAggregation: 'avg',
+    format: { style: 'plain', decimals: 0, suffix: 'ms' },
+    folder: 'Reliability',
+  }),
+  f('error_rate', 'Error Rate', 'metric', 'percent', {
+    defaultAggregation: 'avg',
+    format: { style: 'percent', decimals: 2 },
+    folder: 'KPIs',
+  }),
+  f('uptime', 'Uptime', 'metric', 'percent', {
+    defaultAggregation: 'avg',
+    format: { style: 'percent', decimals: 2 },
+    folder: 'KPIs',
+  }),
 ]
 
 export const MODELS: SemanticModel[] = [
   {
-    id: 'sm_sales', name: 'sales', label: 'Sales Analytics',
+    id: 'sm_sales',
+    name: 'sales',
+    label: 'Sales Analytics',
     description: 'Unified orders, revenue and margin across channels and regions.',
-    owner: 'Revenue Ops', certified: true, freshness: nowIso(),
+    owner: 'Revenue Ops',
+    certified: true,
+    freshness: nowIso(),
     entities: [{ id: 'e_sales', name: 'sales', label: 'Sales', fields: salesFields }],
     fields: salesFields,
   },
   {
-    id: 'sm_ops', name: 'ops', label: 'Platform Operations',
+    id: 'sm_ops',
+    name: 'ops',
+    label: 'Platform Operations',
     description: 'Service traffic, reliability and latency telemetry.',
-    owner: 'Platform', certified: true, freshness: nowIso(),
+    owner: 'Platform',
+    certified: true,
+    freshness: nowIso(),
     entities: [{ id: 'e_ops', name: 'ops', label: 'Operations', fields: opsFields }],
     fields: opsFields,
   },
@@ -89,18 +136,30 @@ function fieldById(model: SemanticModel, id: string): SemanticField | undefined 
 
 function measureBase(fieldId: string): number {
   switch (fieldId) {
-    case 'revenue': return 480_000
-    case 'profit': return 128_000
-    case 'orders': return 3200
-    case 'units': return 9400
-    case 'margin': return 0.27
-    case 'aov': return 148
-    case 'requests': return 1_250_000
-    case 'errors': return 4200
-    case 'latency_ms': return 180
-    case 'error_rate': return 0.006
-    case 'uptime': return 0.9993
-    default: return 1000
+    case 'revenue':
+      return 480_000
+    case 'profit':
+      return 128_000
+    case 'orders':
+      return 3200
+    case 'units':
+      return 9400
+    case 'margin':
+      return 0.27
+    case 'aov':
+      return 148
+    case 'requests':
+      return 1_250_000
+    case 'errors':
+      return 4200
+    case 'latency_ms':
+      return 180
+    case 'error_rate':
+      return 0.006
+    case 'uptime':
+      return 0.9993
+    default:
+      return 1000
   }
 }
 
@@ -132,7 +191,13 @@ export function runQuerySync(query: SemanticQuery): QueryResult {
     columns.push({ key: d.alias ?? d.fieldId, label: field!.label, role: field!.role, dataType: field!.dataType })
   })
   measFields.forEach(({ m, field }) => {
-    columns.push({ key: m.alias ?? m.fieldId, label: field!.label, role: field!.role, dataType: field!.dataType, format: field!.format })
+    columns.push({
+      key: m.alias ?? m.fieldId,
+      label: field!.label,
+      role: field!.role,
+      dataType: field!.dataType,
+      format: field!.format,
+    })
   })
 
   // Build category axis from first dimension (time -> series, else categorical values)

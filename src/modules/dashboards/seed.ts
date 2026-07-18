@@ -2,7 +2,14 @@ import type { Dashboard } from '@/shared/types/dashboard'
 import { createWidget } from './widgetFactory'
 import { isoAgo } from '@/shared/lib/mock'
 
-function w(type: Parameters<typeof createWidget>[0], x: number, y: number, wsize: number, h: number, over: Partial<ReturnType<typeof createWidget>> = {}) {
+function w(
+  type: Parameters<typeof createWidget>[0],
+  x: number,
+  y: number,
+  wsize: number,
+  h: number,
+  over: Partial<ReturnType<typeof createWidget>> = {},
+) {
   const widget = createWidget(type, x, y)
   widget.pos.w = wsize
   widget.pos.h = h
@@ -46,7 +53,14 @@ export const SEED_DASHBOARDS: Dashboard[] = [
     version: 3,
     owner: 'Revenue Ops',
     tags: ['revops', 'sales'],
-    pages: [{ id: 'pg_1', name: 'Overview', widgets: [w('stacked-bar', 0, 0, 8, 5), w('kpi', 8, 0, 4, 3), w('area', 0, 5, 12, 5)], filters: [] }],
+    pages: [
+      {
+        id: 'pg_1',
+        name: 'Overview',
+        widgets: [w('stacked-bar', 0, 0, 8, 5), w('kpi', 8, 0, 4, 3), w('area', 0, 5, 12, 5)],
+        filters: [],
+      },
+    ],
     filters: [],
     updatedAt: isoAgo(180),
     favorite: false,

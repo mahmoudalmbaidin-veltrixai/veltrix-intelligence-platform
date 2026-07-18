@@ -28,7 +28,12 @@ const STATUS_TONE: Record<KnowledgeStatus, 'success' | 'info' | 'danger'> = {
 /* ---- Detail drawer ---- */
 const selected = ref<KnowledgeBase | null>(null)
 const searchTest = ref('')
-interface Chunk { id: string; doc: string; score: number; text: string }
+interface Chunk {
+  id: string
+  doc: string
+  score: number
+  text: string
+}
 const chunks = ref<Chunk[]>([])
 const searching = ref(false)
 
@@ -47,7 +52,11 @@ function openDetail(kb: KnowledgeBase): void {
 
 function reindex(): void {
   if (!selected.value) return
-  ui.pushToast({ kind: 'info', title: 'Reindex queued', message: `“${selected.value.name}” will be re-embedded shortly.` })
+  ui.pushToast({
+    kind: 'info',
+    title: 'Reindex queued',
+    message: `“${selected.value.name}” will be re-embedded shortly.`,
+  })
 }
 
 function runSearchTest(): void {
@@ -57,9 +66,24 @@ function runSearchTest(): void {
   chunks.value = []
   setTimeout(() => {
     chunks.value = [
-      { id: 'c1', doc: 'Q3 Financial Plan.pdf', score: 0.92, text: `…the Q3 revenue target of $49.7M assumes enterprise renewal timing holds within the quarter, matching “${q}”…` },
-      { id: 'c2', doc: 'Revenue Recognition Policy.docx', score: 0.81, text: '…recognized ratably over the contract term; multi-year deals are amortized per ASC 606…' },
-      { id: 'c3', doc: 'FY26 Budget Model.xlsx', score: 0.74, text: '…APAC new-logo expansion contributes an incremental 0.6M against plan in the base case…' },
+      {
+        id: 'c1',
+        doc: 'Q3 Financial Plan.pdf',
+        score: 0.92,
+        text: `…the Q3 revenue target of $49.7M assumes enterprise renewal timing holds within the quarter, matching “${q}”…`,
+      },
+      {
+        id: 'c2',
+        doc: 'Revenue Recognition Policy.docx',
+        score: 0.81,
+        text: '…recognized ratably over the contract term; multi-year deals are amortized per ASC 606…',
+      },
+      {
+        id: 'c3',
+        doc: 'FY26 Budget Model.xlsx',
+        score: 0.74,
+        text: '…APAC new-logo expansion contributes an incremental 0.6M against plan in the base case…',
+      },
     ]
     searching.value = false
   }, 600)
@@ -75,7 +99,11 @@ function createKb(): void {
     ui.pushToast({ kind: 'warning', title: 'Name required' })
     return
   }
-  ui.pushToast({ kind: 'success', title: 'Knowledge base created', message: `“${newName.value}” is ready for documents.` })
+  ui.pushToast({
+    kind: 'success',
+    title: 'Knowledge base created',
+    message: `“${newName.value}” is ready for documents.`,
+  })
   createOpen.value = false
   newName.value = ''
 }
@@ -83,7 +111,10 @@ function createKb(): void {
 
 <template>
   <div class="kb">
-    <VipPageHeader title="Knowledge" description="Curated document collections that ground assistant and agent answers.">
+    <VipPageHeader
+      title="Knowledge"
+      description="Curated document collections that ground assistant and agent answers."
+    >
       <template #actions>
         <VipButton variant="primary" icon="plus" @click="createOpen = true">New knowledge base</VipButton>
       </template>
@@ -118,9 +149,18 @@ function createKb(): void {
     <VipDrawer :open="!!selected" :title="selected?.name" :width="560" @close="selected = null">
       <div v-if="selected" class="kb__detail">
         <div class="kb__stats">
-          <div class="kb__stat"><span class="kb__stat-v">{{ selected.documents.toLocaleString() }}</span><span class="kb__stat-l">Documents</span></div>
-          <div class="kb__stat"><span class="kb__stat-v">{{ selected.status }}</span><span class="kb__stat-l">Status</span></div>
-          <div class="kb__stat"><span class="kb__stat-v">{{ relativeTime(selected.lastIndexed) }}</span><span class="kb__stat-l">Last indexed</span></div>
+          <div class="kb__stat">
+            <span class="kb__stat-v">{{ selected.documents.toLocaleString() }}</span
+            ><span class="kb__stat-l">Documents</span>
+          </div>
+          <div class="kb__stat">
+            <span class="kb__stat-v">{{ selected.status }}</span
+            ><span class="kb__stat-l">Status</span>
+          </div>
+          <div class="kb__stat">
+            <span class="kb__stat-v">{{ relativeTime(selected.lastIndexed) }}</span
+            ><span class="kb__stat-l">Last indexed</span>
+          </div>
         </div>
 
         <VipAlert v-if="selected.status === 'error'" tone="danger" title="Indexing failed">
@@ -137,7 +177,9 @@ function createKb(): void {
               <VipIcon name="report" :size="14" class="kb__doc-icon" />
               <span class="kb__doc-name">{{ d.name }}</span>
               <span class="kb__doc-pages">{{ d.pages }}p</span>
-              <VipBadge :tone="d.status === 'ready' ? 'success' : 'info'" variant="soft" size="sm">{{ d.status }}</VipBadge>
+              <VipBadge :tone="d.status === 'ready' ? 'success' : 'info'" variant="soft" size="sm">{{
+                d.status
+              }}</VipBadge>
             </div>
           </div>
         </section>
@@ -178,16 +220,28 @@ function createKb(): void {
     </VipDrawer>
 
     <!-- New KB dialog -->
-    <VipDialog :open="createOpen" title="New knowledge base" description="Name the collection, then add documents." @close="createOpen = false">
+    <VipDialog
+      :open="createOpen"
+      title="New knowledge base"
+      description="Name the collection, then add documents."
+      @close="createOpen = false"
+    >
       <div class="kb__create">
         <VipInput v-model="newName" label="Name" placeholder="e.g. Product Docs" required />
-        <div class="kb__drop" :class="{ 'is-over': dragOver }" @dragover.prevent="dragOver = true" @dragleave="dragOver = false" @drop.prevent="dragOver = false">
+        <div
+          class="kb__drop"
+          :class="{ 'is-over': dragOver }"
+          @dragover.prevent="dragOver = true"
+          @dragleave="dragOver = false"
+          @drop.prevent="dragOver = false"
+        >
           <VipIcon name="upload" :size="24" />
           <p class="kb__drop-title">Drag &amp; drop documents here</p>
           <p class="kb__drop-note">PDF, DOCX, PPTX, XLSX, TXT · up to 100MB each</p>
         </div>
         <VipAlert tone="info" title="Upload requires a backend">
-          Document upload and indexing are handled server-side. This zone is a visual placeholder until the ingestion service is connected.
+          Document upload and indexing are handled server-side. This zone is a visual placeholder until the ingestion
+          service is connected.
         </VipAlert>
       </div>
       <template #footer>
@@ -199,39 +253,195 @@ function createKb(): void {
 </template>
 
 <style scoped>
-.kb { max-width: 1280px; margin: 0 auto; }
-.kb__loading { display: flex; justify-content: center; padding: var(--vip-sp-9); }
-.kb__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--vip-sp-6); }
-.kb__card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--vip-sp-5); }
-.kb__card-icon { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--vip-radius-md); background: var(--vip-brand-soft); color: var(--vip-brand-text); }
-.kb__card-name { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); margin-bottom: var(--vip-sp-4); }
-.kb__card-meta { display: flex; gap: var(--vip-sp-6); font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.kb__card-meta span { display: inline-flex; align-items: center; gap: var(--vip-sp-2); }
+.kb {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.kb__loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--vip-sp-9);
+}
+.kb__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--vip-sp-6);
+}
+.kb__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--vip-sp-5);
+}
+.kb__card-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--vip-radius-md);
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+}
+.kb__card-name {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+  margin-bottom: var(--vip-sp-4);
+}
+.kb__card-meta {
+  display: flex;
+  gap: var(--vip-sp-6);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.kb__card-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+}
 
-.kb__detail { display: flex; flex-direction: column; gap: var(--vip-sp-7); }
-.kb__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--vip-sp-5); }
-.kb__stat { display: flex; flex-direction: column; gap: 2px; padding: var(--vip-sp-5); background: var(--vip-surface-2); border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md); }
-.kb__stat-v { font-size: var(--vip-fs-lg); font-weight: var(--vip-fw-semibold); text-transform: capitalize; }
-.kb__stat-l { font-size: var(--vip-fs-2xs); color: var(--vip-text-muted); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); }
+.kb__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-7);
+}
+.kb__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--vip-sp-5);
+}
+.kb__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--vip-sp-5);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+}
+.kb__stat-v {
+  font-size: var(--vip-fs-lg);
+  font-weight: var(--vip-fw-semibold);
+  text-transform: capitalize;
+}
+.kb__stat-l {
+  font-size: var(--vip-fs-2xs);
+  color: var(--vip-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+}
 
-.kb__section { display: flex; flex-direction: column; gap: var(--vip-sp-5); }
-.kb__section-head { display: flex; align-items: center; justify-content: space-between; }
-.kb__section-title { font-size: var(--vip-fs-sm); font-weight: var(--vip-fw-semibold); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-muted); }
-.kb__docs { display: flex; flex-direction: column; gap: var(--vip-sp-3); }
-.kb__doc { display: flex; align-items: center; gap: var(--vip-sp-4); padding: var(--vip-sp-4) var(--vip-sp-5); background: var(--vip-surface-2); border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md); }
-.kb__doc-icon { color: var(--vip-text-muted); flex: none; }
-.kb__doc-name { flex: 1; font-size: var(--vip-fs-sm); color: var(--vip-text-primary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kb__doc-pages { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); font-family: var(--vip-font-mono); }
-.kb__config { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.kb__chunks { display: flex; flex-direction: column; gap: var(--vip-sp-4); }
-.kb__chunk { padding: var(--vip-sp-5); background: var(--vip-surface-2); border: 1px solid var(--vip-border-subtle); border-radius: var(--vip-radius-md); }
-.kb__chunk-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--vip-sp-3); }
-.kb__chunk-score { font-size: var(--vip-fs-xs); font-family: var(--vip-font-mono); color: var(--vip-success-text); }
-.kb__chunk-text { font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); line-height: var(--vip-lh-snug); }
+.kb__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
+.kb__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.kb__section-title {
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-muted);
+}
+.kb__docs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.kb__doc {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  padding: var(--vip-sp-4) var(--vip-sp-5);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+}
+.kb__doc-icon {
+  color: var(--vip-text-muted);
+  flex: none;
+}
+.kb__doc-name {
+  flex: 1;
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kb__doc-pages {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  font-family: var(--vip-font-mono);
+}
+.kb__config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.kb__chunks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.kb__chunk {
+  padding: var(--vip-sp-5);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+}
+.kb__chunk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--vip-sp-3);
+}
+.kb__chunk-score {
+  font-size: var(--vip-fs-xs);
+  font-family: var(--vip-font-mono);
+  color: var(--vip-success-text);
+}
+.kb__chunk-text {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+  line-height: var(--vip-lh-snug);
+}
 
-.kb__create { display: flex; flex-direction: column; gap: var(--vip-sp-6); }
-.kb__drop { display: flex; flex-direction: column; align-items: center; gap: var(--vip-sp-3); padding: var(--vip-sp-10) var(--vip-sp-7); border: 1.5px dashed var(--vip-border-strong); border-radius: var(--vip-radius-lg); color: var(--vip-text-muted); text-align: center; transition: border-color var(--vip-motion-fast), background var(--vip-motion-fast); }
-.kb__drop.is-over { border-color: var(--vip-brand-500); background: var(--vip-brand-soft); }
-.kb__drop-title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.kb__drop-note { font-size: var(--vip-fs-xs); }
+.kb__create {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-6);
+}
+.kb__drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  padding: var(--vip-sp-10) var(--vip-sp-7);
+  border: 1.5px dashed var(--vip-border-strong);
+  border-radius: var(--vip-radius-lg);
+  color: var(--vip-text-muted);
+  text-align: center;
+  transition:
+    border-color var(--vip-motion-fast),
+    background var(--vip-motion-fast);
+}
+.kb__drop.is-over {
+  border-color: var(--vip-brand-500);
+  background: var(--vip-brand-soft);
+}
+.kb__drop-title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.kb__drop-note {
+  font-size: var(--vip-fs-xs);
+}
 </style>

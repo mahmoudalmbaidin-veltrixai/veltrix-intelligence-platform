@@ -64,7 +64,9 @@ export function buildConfig(raw: Partial<Record<string, string>>): AppConfig {
           'Set VITE_ALLOW_MOCK_FALLBACK=true only for local development.',
       )
     }
-    console.warn('[env] VITE_API_MODE=live but VITE_API_BASE_URL is empty — falling back to mock mode (VITE_ALLOW_MOCK_FALLBACK=true).')
+    console.warn(
+      '[env] VITE_API_MODE=live but VITE_API_BASE_URL is empty — falling back to mock mode (VITE_ALLOW_MOCK_FALLBACK=true).',
+    )
     resolvedMode = 'mock'
   }
 

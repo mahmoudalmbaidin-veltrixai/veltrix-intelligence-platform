@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-const props = withDefaults(
-  defineProps<{ values: number[]; color?: string; area?: boolean; height?: number }>(),
-  { color: 'var(--vip-brand-500)', height: 36 },
-)
+const props = withDefaults(defineProps<{ values: number[]; color?: string; area?: boolean; height?: number }>(), {
+  color: 'var(--vip-brand-500)',
+  height: 36,
+})
 const W = 120
 const max = computed(() => Math.max(...props.values, 1))
 const min = computed(() => Math.min(...props.values, 0))
@@ -23,10 +23,21 @@ const areaPath = computed(() => `M 0,${props.height} L ${pts.value.replace(/ /g,
 <template>
   <svg :viewBox="`0 0 ${W} ${height}`" class="spark" preserveAspectRatio="none" aria-hidden="true">
     <path v-if="area" :d="areaPath" :fill="color" opacity="0.14" />
-    <polyline :points="pts" :stroke="color" fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+    <polyline
+      :points="pts"
+      :stroke="color"
+      fill="none"
+      stroke-width="2"
+      stroke-linejoin="round"
+      stroke-linecap="round"
+    />
   </svg>
 </template>
 
 <style scoped>
-.spark { width: 100%; height: 100%; display: block; }
+.spark {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 </style>

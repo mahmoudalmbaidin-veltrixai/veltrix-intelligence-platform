@@ -10,13 +10,24 @@ withDefaults(defineProps<{ size?: number; label?: string }>(), { size: 18 })
 </template>
 
 <style scoped>
-.vip-spinner-wrap { display: inline-flex; align-items: center; gap: var(--vip-sp-4); color: var(--vip-text-muted); }
+.vip-spinner-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  color: var(--vip-text-muted);
+}
 .vip-spinner {
   border: 2px solid var(--vip-border-strong);
   border-right-color: var(--vip-brand-500);
   border-radius: 50%;
   animation: vip-spin 0.7s linear infinite;
 }
-.vip-spinner-label { font-size: var(--vip-fs-sm); }
-@keyframes vip-spin { to { transform: rotate(360deg); } }
+.vip-spinner-label {
+  font-size: var(--vip-fs-sm);
+}
+@keyframes vip-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 </style>

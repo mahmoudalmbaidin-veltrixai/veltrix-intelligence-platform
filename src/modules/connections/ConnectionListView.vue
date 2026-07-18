@@ -99,16 +99,9 @@ function openConnection(row: Connection) {
     <VipCard :padded="false">
       <div class="conn-list__toolbar">
         <div class="conn-list__search">
-          <VipInput
-            v-model="search"
-            icon="search"
-            size="sm"
-            placeholder="Search by name, owner, connector or host"
-          />
+          <VipInput v-model="search" icon="search" size="sm" placeholder="Search by name, owner, connector or host" />
         </div>
-        <span class="conn-list__count">
-          {{ rows.length }} {{ rows.length === 1 ? 'connection' : 'connections' }}
-        </span>
+        <span class="conn-list__count"> {{ rows.length }} {{ rows.length === 1 ? 'connection' : 'connections' }} </span>
       </div>
 
       <VipTable
@@ -153,7 +146,10 @@ function openConnection(row: Connection) {
 </template>
 
 <style scoped>
-.conn-list { max-width: 1280px; margin: 0 auto; }
+.conn-list {
+  max-width: 1280px;
+  margin: 0 auto;
+}
 .conn-list__toolbar {
   display: flex;
   align-items: center;
@@ -162,19 +158,51 @@ function openConnection(row: Connection) {
   padding: var(--vip-sp-5) var(--vip-sp-6);
   border-bottom: 1px solid var(--vip-border-subtle);
 }
-.conn-list__search { width: min(360px, 100%); }
-.conn-list__count { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); white-space: nowrap; }
-.conn-list__name { display: flex; align-items: center; gap: var(--vip-sp-5); }
+.conn-list__search {
+  width: min(360px, 100%);
+}
+.conn-list__count {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+  white-space: nowrap;
+}
+.conn-list__name {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-5);
+}
 .conn-list__icon {
-  width: 32px; height: 32px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--vip-radius-md);
   background: var(--vip-surface-3);
   color: var(--vip-text-secondary);
 }
-.conn-list__name-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.conn-list__title { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-medium); color: var(--vip-text-primary); }
-.conn-list__connector { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.conn-list__host { font-family: var(--vip-font-mono); font-size: var(--vip-fs-sm); color: var(--vip-text-secondary); }
-.conn-list__muted { color: var(--vip-text-muted); }
+.conn-list__name-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.conn-list__title {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-text-primary);
+}
+.conn-list__connector {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.conn-list__host {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-secondary);
+}
+.conn-list__muted {
+  color: var(--vip-text-muted);
+}
 </style>

@@ -42,12 +42,28 @@ const groups = computed(() =>
 </template>
 
 <style scoped>
-.mnav__group { margin-bottom: var(--vip-sp-6); }
-.mnav__label { font-size: var(--vip-fs-2xs); text-transform: uppercase; letter-spacing: var(--vip-ls-wide); color: var(--vip-text-disabled); margin-bottom: var(--vip-sp-3); }
-.mnav__item {
-  display: flex; align-items: center; gap: var(--vip-sp-4);
-  padding: var(--vip-sp-4); border-radius: var(--vip-radius-md);
-  color: var(--vip-text-secondary); text-decoration: none; font-weight: var(--vip-fw-medium);
+.mnav__group {
+  margin-bottom: var(--vip-sp-6);
 }
-.mnav__item.is-active { background: var(--vip-brand-soft); color: var(--vip-brand-text); }
+.mnav__label {
+  font-size: var(--vip-fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--vip-ls-wide);
+  color: var(--vip-text-disabled);
+  margin-bottom: var(--vip-sp-3);
+}
+.mnav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  padding: var(--vip-sp-4);
+  border-radius: var(--vip-radius-md);
+  color: var(--vip-text-secondary);
+  text-decoration: none;
+  font-weight: var(--vip-fw-medium);
+}
+.mnav__item.is-active {
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+}
 </style>

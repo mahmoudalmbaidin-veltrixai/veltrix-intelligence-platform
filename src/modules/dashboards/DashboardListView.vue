@@ -37,21 +37,46 @@ const items = computed(() => {
     <VipPageHeader title="Dashboards" description="Explore and author interactive analytics dashboards.">
       <template #actions>
         <VipButton variant="tertiary" icon="layers" @click="router.push('/dashboards/templates')">Templates</VipButton>
-        <VipButton variant="tertiary" icon="calendar" @click="router.push('/dashboards/deliveries')">Deliveries</VipButton>
-        <VipButton v-if="platform.can('dashboard:write')" variant="primary" icon="plus" @click="router.push('/dashboards/new')">New dashboard</VipButton>
+        <VipButton variant="tertiary" icon="calendar" @click="router.push('/dashboards/deliveries')"
+          >Deliveries</VipButton
+        >
+        <VipButton
+          v-if="platform.can('dashboard:write')"
+          variant="primary"
+          icon="plus"
+          @click="router.push('/dashboards/new')"
+          >New dashboard</VipButton
+        >
       </template>
     </VipPageHeader>
 
     <div class="dl-toolbar">
       <VipInput v-model="search" icon="search" placeholder="Search dashboards…" size="sm" />
-      <VipSegmented v-model="filter" :options="[{ value: 'all', label: 'All' }, { value: 'favorites', label: 'Favorites' }, { value: 'published', label: 'Published' }]" size="sm" />
+      <VipSegmented
+        v-model="filter"
+        :options="[
+          { value: 'all', label: 'All' },
+          { value: 'favorites', label: 'Favorites' },
+          { value: 'published', label: 'Published' },
+        ]"
+        size="sm"
+      />
     </div>
 
     <div v-if="isLoading" class="dl-grid">
-      <VipCard v-for="n in 6" :key="n"><VipSkeleton height="120px" block /><VipSkeleton width="60%" style="margin-top:12px" /></VipCard>
+      <VipCard v-for="n in 6" :key="n"
+        ><VipSkeleton height="120px" block /><VipSkeleton width="60%" style="margin-top: 12px"
+      /></VipCard>
     </div>
     <div v-else class="dl-grid">
-      <VipCard v-for="d in items" :key="d.id" hoverable :padded="false" class="dl-card" @click="router.push(`/dashboards/${d.id}`)">
+      <VipCard
+        v-for="d in items"
+        :key="d.id"
+        hoverable
+        :padded="false"
+        class="dl-card"
+        @click="router.push(`/dashboards/${d.id}`)"
+      >
         <div class="dl-thumb">
           <VipIcon name="chart" :size="30" />
           <VipIcon v-if="d.favorite" name="star" :size="15" class="dl-fav" />
@@ -70,14 +95,58 @@ const items = computed(() => {
 </template>
 
 <style scoped>
-.dl-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-4); margin-bottom: var(--vip-sp-6); flex-wrap: wrap; }
-.dl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--vip-sp-6); }
-.dl-card { overflow: hidden; }
-.dl-thumb { position: relative; height: 130px; background: linear-gradient(135deg, var(--vip-surface-2), var(--vip-surface-3)); display: flex; align-items: center; justify-content: center; color: var(--vip-text-disabled); border-bottom: 1px solid var(--vip-border-subtle); }
-.dl-fav { position: absolute; top: var(--vip-sp-4); right: var(--vip-sp-4); color: var(--vip-warning); }
-.dl-info { padding: var(--vip-sp-5); }
-.dl-name { font-size: var(--vip-fs-md); font-weight: var(--vip-fw-semibold); }
-.dl-meta { display: flex; align-items: center; gap: var(--vip-sp-3); margin-top: var(--vip-sp-3); }
-.dl-muted { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.dl-foot { font-size: var(--vip-fs-xs); color: var(--vip-text-disabled); margin-top: var(--vip-sp-3); }
+.dl-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-4);
+  margin-bottom: var(--vip-sp-6);
+  flex-wrap: wrap;
+}
+.dl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--vip-sp-6);
+}
+.dl-card {
+  overflow: hidden;
+}
+.dl-thumb {
+  position: relative;
+  height: 130px;
+  background: linear-gradient(135deg, var(--vip-surface-2), var(--vip-surface-3));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vip-text-disabled);
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.dl-fav {
+  position: absolute;
+  top: var(--vip-sp-4);
+  right: var(--vip-sp-4);
+  color: var(--vip-warning);
+}
+.dl-info {
+  padding: var(--vip-sp-5);
+}
+.dl-name {
+  font-size: var(--vip-fs-md);
+  font-weight: var(--vip-fw-semibold);
+}
+.dl-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  margin-top: var(--vip-sp-3);
+}
+.dl-muted {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.dl-foot {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-disabled);
+  margin-top: var(--vip-sp-3);
+}
 </style>

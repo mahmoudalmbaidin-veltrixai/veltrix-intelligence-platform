@@ -18,9 +18,12 @@ const platform = usePlatformStore()
 const ui = useUiStore()
 const tab = ref('profile')
 const tabs = [
-  { value: 'profile', label: 'Profile' }, { value: 'members', label: 'Members' },
-  { value: 'roles', label: 'Roles' }, { value: 'domains', label: 'Domains' },
-  { value: 'retention', label: 'Retention' }, { value: 'danger', label: 'Danger zone' },
+  { value: 'profile', label: 'Profile' },
+  { value: 'members', label: 'Members' },
+  { value: 'roles', label: 'Roles' },
+  { value: 'domains', label: 'Domains' },
+  { value: 'retention', label: 'Retention' },
+  { value: 'danger', label: 'Danger zone' },
 ]
 const orgName = ref(platform.organization.name)
 const legalName = ref('Veltrix Global FZ-LLC')
@@ -28,8 +31,15 @@ const domains = ref(['veltrix.com', 'shabakkatksa.com'])
 const newDomain = ref('')
 const deleteOpen = ref(false)
 
-function save() { ui.pushToast({ kind: 'success', title: 'Organization updated' }) }
-function addDomain() { if (newDomain.value) { domains.value.push(newDomain.value); newDomain.value = '' } }
+function save() {
+  ui.pushToast({ kind: 'success', title: 'Organization updated' })
+}
+function addDomain() {
+  if (newDomain.value) {
+    domains.value.push(newDomain.value)
+    newDomain.value = ''
+  }
+}
 </script>
 
 <template>
@@ -48,8 +58,15 @@ function addDomain() { if (newDomain.value) { domains.value.push(newDomain.value
       <MembersView v-else-if="tab === 'members'" />
       <template v-else-if="tab === 'roles'">
         <div class="oa-roles">
-          <VipCard v-for="key in (Object.keys(ROLES) as RoleKey[])" :key="key">
-            <div class="oa-role-head"><strong>{{ ROLES[key].label }}</strong><VipBadge tone="neutral" size="sm">{{ (ROLES[key].permissions as string[]).includes('*') ? 'full access' : `${(ROLES[key].permissions as string[]).length} permissions` }}</VipBadge></div>
+          <VipCard v-for="key in Object.keys(ROLES) as RoleKey[]" :key="key">
+            <div class="oa-role-head">
+              <strong>{{ ROLES[key].label }}</strong
+              ><VipBadge tone="neutral" size="sm">{{
+                (ROLES[key].permissions as string[]).includes('*')
+                  ? 'full access'
+                  : `${(ROLES[key].permissions as string[]).length} permissions`
+              }}</VipBadge>
+            </div>
             <p class="oa-role-desc">{{ ROLES[key].description }}</p>
           </VipCard>
         </div>
@@ -59,7 +76,14 @@ function addDomain() { if (newDomain.value) { domains.value.push(newDomain.value
           <div class="oa-domains">
             <VipBadge v-for="d in domains" :key="d" tone="brand">{{ d }}</VipBadge>
           </div>
-          <div class="oa-add"><VipInput v-model="newDomain" placeholder="add-domain.com" /><VipButton variant="secondary" icon="plus" @click="addDomain">Add</VipButton></div>
+          <div class="oa-add">
+            <VipInput v-model="newDomain" placeholder="add-domain.com" /><VipButton
+              variant="secondary"
+              icon="plus"
+              @click="addDomain"
+              >Add</VipButton
+            >
+          </div>
           <p class="oa-hint">Members must use an email from an approved domain.</p>
         </VipCard>
       </template>
@@ -71,33 +95,91 @@ function addDomain() { if (newDomain.value) { domains.value.push(newDomain.value
         </VipCard>
       </template>
       <template v-else>
-        <VipAlert tone="danger" title="Danger zone">These actions are irreversible and require backend confirmation.</VipAlert>
+        <VipAlert tone="danger" title="Danger zone"
+          >These actions are irreversible and require backend confirmation.</VipAlert
+        >
         <div class="oa-danger">
-          <VipButton variant="secondary" icon="share" @click="ui.pushToast({ kind: 'info', title: 'Transfer ownership', message: 'Requires owner re-authentication.' })">Transfer ownership</VipButton>
+          <VipButton
+            variant="secondary"
+            icon="share"
+            @click="
+              ui.pushToast({ kind: 'info', title: 'Transfer ownership', message: 'Requires owner re-authentication.' })
+            "
+            >Transfer ownership</VipButton
+          >
           <VipButton variant="danger" icon="trash" @click="deleteOpen = true">Delete organization</VipButton>
         </div>
       </template>
     </div>
 
-    <VipDialog :open="deleteOpen" title="Delete organization" description="This schedules the organization for deletion." size="sm" @close="deleteOpen = false">
-      <VipAlert tone="danger" title="This cannot be undone">All workspaces, datasets, dashboards and members will be permanently removed after the recovery window.</VipAlert>
+    <VipDialog
+      :open="deleteOpen"
+      title="Delete organization"
+      description="This schedules the organization for deletion."
+      size="sm"
+      @close="deleteOpen = false"
+    >
+      <VipAlert tone="danger" title="This cannot be undone"
+        >All workspaces, datasets, dashboards and members will be permanently removed after the recovery
+        window.</VipAlert
+      >
       <template #footer>
         <VipButton variant="tertiary" @click="deleteOpen = false">Cancel</VipButton>
-        <VipButton variant="danger" @click="deleteOpen = false; ui.pushToast({ kind: 'warning', title: 'Deletion scheduled' })">Schedule deletion</VipButton>
+        <VipButton
+          variant="danger"
+          @click="((deleteOpen = false), ui.pushToast({ kind: 'warning', title: 'Deletion scheduled' }))"
+          >Schedule deletion</VipButton
+        >
       </template>
     </VipDialog>
   </div>
 </template>
 
 <style scoped>
-.oa { margin-top: var(--vip-sp-7); }
-.oa-form { display: flex; flex-direction: column; gap: var(--vip-sp-5); max-width: 560px; }
-.oa-roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--vip-sp-5); }
-.oa-role-head { display: flex; align-items: center; justify-content: space-between; }
-.oa-role-desc { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); margin-top: var(--vip-sp-3); }
-.oa-domains { display: flex; flex-wrap: wrap; gap: var(--vip-sp-3); }
-.oa-add { display: flex; gap: var(--vip-sp-3); align-items: flex-end; }
-.oa-add > :first-child { flex: 1; }
-.oa-hint { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.oa-danger { display: flex; gap: var(--vip-sp-4); margin-top: var(--vip-sp-6); }
+.oa {
+  margin-top: var(--vip-sp-7);
+}
+.oa-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+  max-width: 560px;
+}
+.oa-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--vip-sp-5);
+}
+.oa-role-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.oa-role-desc {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+  margin-top: var(--vip-sp-3);
+}
+.oa-domains {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vip-sp-3);
+}
+.oa-add {
+  display: flex;
+  gap: var(--vip-sp-3);
+  align-items: flex-end;
+}
+.oa-add > :first-child {
+  flex: 1;
+}
+.oa-hint {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.oa-danger {
+  display: flex;
+  gap: var(--vip-sp-4);
+  margin-top: var(--vip-sp-6);
+}
 </style>

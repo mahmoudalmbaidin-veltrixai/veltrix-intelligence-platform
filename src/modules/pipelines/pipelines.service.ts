@@ -35,9 +35,17 @@ function db(): Record<string, Pipeline> {
 
 function toListItem(p: Pipeline): PipelineListItem {
   return {
-    id: p.id, name: p.name, status: p.status, owner: p.owner, tags: p.tags,
-    version: p.version, updatedAt: p.updatedAt, lastRunAt: p.lastRunAt,
-    lastRunStatus: p.lastRunStatus, nextSchedule: p.nextSchedule, nodeCount: p.nodes.length,
+    id: p.id,
+    name: p.name,
+    status: p.status,
+    owner: p.owner,
+    tags: p.tags,
+    version: p.version,
+    updatedAt: p.updatedAt,
+    lastRunAt: p.lastRunAt,
+    lastRunStatus: p.lastRunStatus,
+    nextSchedule: p.nextSchedule,
+    nodeCount: p.nodes.length,
   }
 }
 
@@ -51,7 +59,9 @@ export interface PipelineService {
 const mockPipelineService: PipelineService = {
   async list(): Promise<PipelineListItem[]> {
     await latency()
-    return Object.values(db()).map(toListItem).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    return Object.values(db())
+      .map(toListItem)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   },
 
   async get(id: string): Promise<Pipeline> {
@@ -91,10 +101,7 @@ const apiPipelineService: PipelineService = {
   publish: (pipeline) => apiClient.post<Pipeline>(`/pipelines/${pipeline.id}/publish`, pipeline),
 }
 
-export const pipelineService: PipelineService = defineService(
-  mockPipelineService,
-  () => apiPipelineService,
-)
+export const pipelineService: PipelineService = defineService(mockPipelineService, () => apiPipelineService)
 
 export function newDraft(): Pipeline {
   return {
@@ -131,18 +138,47 @@ export function createRun(pipeline: Pipeline, trigger: PipelineRun['trigger'] = 
 
 export const RECENT_RUNS: (pipelineId: string) => PipelineRun[] = (pipelineId) => [
   {
-    id: 'run_a1', pipelineId, status: 'succeeded', startedAt: isoAgo(180), finishedAt: isoAgo(176),
-    durationMs: 242_000, correlationId: 'c-8f21a90b3', trigger: 'schedule', progress: 100,
-    nodeStates: [], logs: [], attempt: 1, rowsProcessed: 2_412_880,
+    id: 'run_a1',
+    pipelineId,
+    status: 'succeeded',
+    startedAt: isoAgo(180),
+    finishedAt: isoAgo(176),
+    durationMs: 242_000,
+    correlationId: 'c-8f21a90b3',
+    trigger: 'schedule',
+    progress: 100,
+    nodeStates: [],
+    logs: [],
+    attempt: 1,
+    rowsProcessed: 2_412_880,
   },
   {
-    id: 'run_a2', pipelineId, status: 'failed', startedAt: isoAgo(60), finishedAt: isoAgo(58),
-    durationMs: 96_000, correlationId: 'c-1b7742de5', trigger: 'schedule', progress: 64,
-    nodeStates: [], logs: [], attempt: 1, rowsProcessed: 1_100_400,
+    id: 'run_a2',
+    pipelineId,
+    status: 'failed',
+    startedAt: isoAgo(60),
+    finishedAt: isoAgo(58),
+    durationMs: 96_000,
+    correlationId: 'c-1b7742de5',
+    trigger: 'schedule',
+    progress: 64,
+    nodeStates: [],
+    logs: [],
+    attempt: 1,
+    rowsProcessed: 1_100_400,
   },
   {
-    id: 'run_a3', pipelineId, status: 'running', startedAt: isoAgo(3), correlationId: 'c-4a09fe112',
-    trigger: 'manual', progress: 42, nodeStates: [], logs: [], attempt: 2, rowsProcessed: 640_200,
+    id: 'run_a3',
+    pipelineId,
+    status: 'running',
+    startedAt: isoAgo(3),
+    correlationId: 'c-4a09fe112',
+    trigger: 'manual',
+    progress: 42,
+    nodeStates: [],
+    logs: [],
+    attempt: 2,
+    rowsProcessed: 640_200,
   },
 ]
 

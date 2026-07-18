@@ -56,7 +56,10 @@ export function currentStorageScope(): string {
  * unscoped so they persist across tenant switches.
  */
 export class LocalStore<T> {
-  constructor(private readonly key: string, private readonly opts: { scoped?: boolean } = {}) {}
+  constructor(
+    private readonly key: string,
+    private readonly opts: { scoped?: boolean } = {},
+  ) {}
 
   private effectiveKey(): string {
     return this.opts.scoped ? `${storageScope}::${this.key}` : this.key

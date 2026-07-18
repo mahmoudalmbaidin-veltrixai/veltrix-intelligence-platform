@@ -12,6 +12,7 @@
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json",
     "lint": "eslint . --ext .ts,.vue",
     "format": "prettier --write \"src/**/*.{ts,vue,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,vue,css}\"",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -23,7 +23,12 @@ const PAD = { top: 16, right: 20, bottom: 40, left: 56 }
 const plotW = W - PAD.left - PAD.right
 const plotH = H - PAD.top - PAD.bottom
 
-const hover = ref<{ x: number; y: number; label: string; rows: { name: string; value: number; color: string }[] } | null>(null)
+const hover = ref<{
+  x: number
+  y: number
+  label: string
+  rows: { name: string; value: number; color: string }[]
+} | null>(null)
 
 const isHorizontal = computed(() => props.kind === 'bar' || props.kind === 'stacked-bar')
 const isStacked = computed(() => props.kind === 'stacked-bar')
@@ -104,7 +109,11 @@ function catX(ci: number): number {
 }
 
 function onMove(ci: number, evt: MouseEvent) {
-  const rows = props.data.series.map((s, si) => ({ name: s.name, value: s.points[ci] ?? 0, color: schemeColor(props.scheme, si) }))
+  const rows = props.data.series.map((s, si) => ({
+    name: s.name,
+    value: s.points[ci] ?? 0,
+    color: schemeColor(props.scheme, si),
+  }))
   hover.value = { x: evt.offsetX, y: evt.offsetY, label: cats.value[ci], rows }
 }
 </script>
@@ -117,17 +126,35 @@ function onMove(ci: number, evt: MouseEvent) {
         <g v-for="(t, i) in ticks" :key="i">
           <line
             v-if="showGridlines"
-            :x1="PAD.left" :x2="W - PAD.right"
-            :y1="PAD.top + plotH - (t / maxValue) * plotH" :y2="PAD.top + plotH - (t / maxValue) * plotH"
+            :x1="PAD.left"
+            :x2="W - PAD.right"
+            :y1="PAD.top + plotH - (t / maxValue) * plotH"
+            :y2="PAD.top + plotH - (t / maxValue) * plotH"
             class="cart__grid"
           />
-          <text :x="PAD.left - 8" :y="PAD.top + plotH - (t / maxValue) * plotH + 4" class="cart__tick" text-anchor="end">{{ fmt(t) }}</text>
+          <text
+            :x="PAD.left - 8"
+            :y="PAD.top + plotH - (t / maxValue) * plotH + 4"
+            class="cart__tick"
+            text-anchor="end"
+          >
+            {{ fmt(t) }}
+          </text>
         </g>
       </g>
       <g v-else>
         <g v-for="(t, i) in ticks" :key="i">
-          <line v-if="showGridlines" :x1="PAD.left + (t / maxValue) * plotW" :x2="PAD.left + (t / maxValue) * plotW" :y1="PAD.top" :y2="PAD.top + plotH" class="cart__grid" />
-          <text :x="PAD.left + (t / maxValue) * plotW" :y="H - PAD.bottom + 16" class="cart__tick" text-anchor="middle">{{ fmt(t) }}</text>
+          <line
+            v-if="showGridlines"
+            :x1="PAD.left + (t / maxValue) * plotW"
+            :x2="PAD.left + (t / maxValue) * plotW"
+            :y1="PAD.top"
+            :y2="PAD.top + plotH"
+            class="cart__grid"
+          />
+          <text :x="PAD.left + (t / maxValue) * plotW" :y="H - PAD.bottom + 16" class="cart__tick" text-anchor="middle">
+            {{ fmt(t) }}
+          </text>
         </g>
       </g>
 
@@ -149,27 +176,78 @@ function onMove(ci: number, evt: MouseEvent) {
 
       <!-- area fill -->
       <template v-if="kind === 'area'">
-        <path v-for="(s, si) in data.series" :key="`a-${s.key}`" :d="areaPath(si)" :fill="schemeColor(scheme, si)" class="cart__area" />
+        <path
+          v-for="(s, si) in data.series"
+          :key="`a-${s.key}`"
+          :d="areaPath(si)"
+          :fill="schemeColor(scheme, si)"
+          class="cart__area"
+        />
       </template>
 
       <!-- lines -->
       <template v-if="kind === 'line' || kind === 'area'">
-        <polyline v-for="(s, si) in data.series" :key="`l-${s.key}`" :points="linePoints(si)" :stroke="schemeColor(scheme, si)" fill="none" stroke-width="2.2" class="cart__line" />
+        <polyline
+          v-for="(s, si) in data.series"
+          :key="`l-${s.key}`"
+          :points="linePoints(si)"
+          :stroke="schemeColor(scheme, si)"
+          fill="none"
+          stroke-width="2.2"
+          class="cart__line"
+        />
         <template v-for="(s, si) in data.series" :key="`d-${s.key}`">
-          <circle v-for="(v, ci) in s.points" :key="ci" :cx="catX(ci)" :cy="PAD.top + plotH - (v / maxValue) * plotH" r="3" :fill="schemeColor(scheme, si)" class="cart__dot" />
+          <circle
+            v-for="(v, ci) in s.points"
+            :key="ci"
+            :cx="catX(ci)"
+            :cy="PAD.top + plotH - (v / maxValue) * plotH"
+            r="3"
+            :fill="schemeColor(scheme, si)"
+            class="cart__dot"
+          />
         </template>
       </template>
 
       <!-- category labels -->
       <g v-if="!isHorizontal">
-        <text v-for="(c, ci) in cats" :key="ci" :x="kind === 'line' || kind === 'area' ? catX(ci) : PAD.left + ci * (plotW / groupCount) + (plotW / groupCount) / 2" :y="H - PAD.bottom + 18" class="cart__cat" text-anchor="middle">{{ c }}</text>
+        <text
+          v-for="(c, ci) in cats"
+          :key="ci"
+          :x="
+            kind === 'line' || kind === 'area'
+              ? catX(ci)
+              : PAD.left + ci * (plotW / groupCount) + plotW / groupCount / 2
+          "
+          :y="H - PAD.bottom + 18"
+          class="cart__cat"
+          text-anchor="middle"
+        >
+          {{ c }}
+        </text>
       </g>
       <g v-else>
-        <text v-for="(c, ci) in cats" :key="ci" :x="PAD.left - 8" :y="PAD.top + ci * (plotH / groupCount) + (plotH / groupCount) / 2 + 4" class="cart__cat" text-anchor="end">{{ c }}</text>
+        <text
+          v-for="(c, ci) in cats"
+          :key="ci"
+          :x="PAD.left - 8"
+          :y="PAD.top + ci * (plotH / groupCount) + plotH / groupCount / 2 + 4"
+          class="cart__cat"
+          text-anchor="end"
+        >
+          {{ c }}
+        </text>
       </g>
 
       <!-- hover guide -->
-      <line v-if="hover && (kind === 'line' || kind === 'area')" :x1="hover.x" :x2="hover.x" :y1="PAD.top" :y2="PAD.top + plotH" class="cart__guide" />
+      <line
+        v-if="hover && (kind === 'line' || kind === 'area')"
+        :x1="hover.x"
+        :x2="hover.x"
+        :y1="PAD.top"
+        :y2="PAD.top + plotH"
+        class="cart__guide"
+      />
     </svg>
 
     <div v-if="hover" class="cart__tip" :style="{ left: `${(hover.x / W) * 100}%`, top: `${(hover.y / H) * 100}%` }">
@@ -190,26 +268,100 @@ function onMove(ci: number, evt: MouseEvent) {
 </template>
 
 <style scoped>
-.cart { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
-.cart__svg { width: 100%; flex: 1; min-height: 0; overflow: visible; }
-.cart__grid { stroke: var(--vip-grid-line); stroke-width: 1; }
-.cart__tick, .cart__cat { fill: var(--vip-text-muted); font-size: 10px; font-family: var(--vip-font-sans); }
-.cart__bar { transition: opacity var(--vip-motion-fast); cursor: pointer; }
-.cart__bar:hover { opacity: 0.82; }
-.cart__area { opacity: 0.14; }
-.cart__line { stroke-linejoin: round; stroke-linecap: round; }
-.cart__guide { stroke: var(--vip-border-strong); stroke-dasharray: 3 3; }
-.cart__legend { display: flex; flex-wrap: wrap; gap: var(--vip-sp-5); justify-content: center; padding-top: var(--vip-sp-4); }
-.cart__legend-item { display: inline-flex; align-items: center; gap: var(--vip-sp-3); font-size: var(--vip-fs-xs); color: var(--vip-text-secondary); }
-.cart__legend-dot { width: 9px; height: 9px; border-radius: 2px; }
-.cart__tip {
-  position: absolute; transform: translate(-50%, -110%); pointer-events: none;
-  background: var(--vip-surface-3); border: 1px solid var(--vip-border); border-radius: var(--vip-radius-sm);
-  padding: var(--vip-sp-3) var(--vip-sp-4); box-shadow: var(--vip-shadow-md); z-index: 5; min-width: 120px;
+.cart {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
-.cart__tip-label { font-size: var(--vip-fs-xs); font-weight: var(--vip-fw-semibold); margin-bottom: var(--vip-sp-2); }
-.cart__tip-row { display: flex; align-items: center; gap: var(--vip-sp-3); font-size: var(--vip-fs-xs); }
-.cart__tip-dot { width: 8px; height: 8px; border-radius: 2px; }
-.cart__tip-name { color: var(--vip-text-muted); }
-.cart__tip-val { margin-left: auto; font-weight: var(--vip-fw-medium); font-variant-numeric: tabular-nums; }
+.cart__svg {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: visible;
+}
+.cart__grid {
+  stroke: var(--vip-grid-line);
+  stroke-width: 1;
+}
+.cart__tick,
+.cart__cat {
+  fill: var(--vip-text-muted);
+  font-size: 10px;
+  font-family: var(--vip-font-sans);
+}
+.cart__bar {
+  transition: opacity var(--vip-motion-fast);
+  cursor: pointer;
+}
+.cart__bar:hover {
+  opacity: 0.82;
+}
+.cart__area {
+  opacity: 0.14;
+}
+.cart__line {
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.cart__guide {
+  stroke: var(--vip-border-strong);
+  stroke-dasharray: 3 3;
+}
+.cart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vip-sp-5);
+  justify-content: center;
+  padding-top: var(--vip-sp-4);
+}
+.cart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-secondary);
+}
+.cart__legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+.cart__tip {
+  position: absolute;
+  transform: translate(-50%, -110%);
+  pointer-events: none;
+  background: var(--vip-surface-3);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-sm);
+  padding: var(--vip-sp-3) var(--vip-sp-4);
+  box-shadow: var(--vip-shadow-md);
+  z-index: 5;
+  min-width: 120px;
+}
+.cart__tip-label {
+  font-size: var(--vip-fs-xs);
+  font-weight: var(--vip-fw-semibold);
+  margin-bottom: var(--vip-sp-2);
+}
+.cart__tip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-xs);
+}
+.cart__tip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.cart__tip-name {
+  color: var(--vip-text-muted);
+}
+.cart__tip-val {
+  margin-left: auto;
+  font-weight: var(--vip-fw-medium);
+  font-variant-numeric: tabular-nums;
+}
 </style>

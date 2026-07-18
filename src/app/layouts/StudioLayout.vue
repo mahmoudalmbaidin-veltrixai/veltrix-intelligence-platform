@@ -14,6 +14,15 @@
 </template>
 
 <style scoped>
-.vip-studio-shell { height: 100vh; overflow: hidden; background: var(--vip-bg-canvas); display: flex; }
-.vip-studio-shell__main { flex: 1; min-width: 0; display: flex; }
+.vip-studio-shell {
+  height: 100vh;
+  overflow: hidden;
+  background: var(--vip-bg-canvas);
+  display: flex;
+}
+.vip-studio-shell__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
 </style>

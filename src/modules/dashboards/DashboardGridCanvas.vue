@@ -55,7 +55,10 @@ function clamp(pos: GridPosition): GridPosition {
 }
 
 function onMoveStart(w: DashboardWidget, e: PointerEvent) {
-  if (!props.editable || w.general.locked) { props.editor.select(w.id); return }
+  if (!props.editable || w.general.locked) {
+    props.editor.select(w.id)
+    return
+  }
   props.editor.select(w.id)
   props.editor.beginChange()
   action = 'move'
@@ -105,7 +108,7 @@ function onEnd() {
     @pointerdown.self="editor.select(null)"
   >
     <!-- grid backdrop -->
-    <div v-if="editable" class="dgrid__lines" :style="{ backgroundSize: `${(100 / GRID_COLS)}% ${rowHeight ?? 76}px` }" />
+    <div v-if="editable" class="dgrid__lines" :style="{ backgroundSize: `${100 / GRID_COLS}% ${rowHeight ?? 76}px` }" />
 
     <div
       v-for="w in widgets"
@@ -115,7 +118,11 @@ function onEnd() {
       :style="styleFor(w.pos)"
       :tabindex="editable ? 0 : -1"
       :role="editable ? 'button' : undefined"
-      :aria-label="editable ? `${w.general.name} widget${selectedId === w.id ? ', selected' : ''}. Enter to select, arrow keys to move, Shift plus arrows to resize, Delete to remove.` : undefined"
+      :aria-label="
+        editable
+          ? `${w.general.name} widget${selectedId === w.id ? ', selected' : ''}. Enter to select, arrow keys to move, Shift plus arrows to resize, Delete to remove.`
+          : undefined
+      "
       :aria-pressed="editable ? selectedId === w.id : undefined"
       @pointerdown="onMoveStart(w, $event)"
       @keydown.enter.prevent="editable && editor.select(w.id)"
@@ -137,22 +144,45 @@ function onEnd() {
 </template>
 
 <style scoped>
-.dgrid { position: relative; width: 100%; min-height: 400px; }
+.dgrid {
+  position: relative;
+  width: 100%;
+  min-height: 400px;
+}
 .dgrid__lines {
-  position: absolute; inset: 0;
+  position: absolute;
+  inset: 0;
   background-image:
     linear-gradient(to right, var(--vip-grid-line) 1px, transparent 1px),
     linear-gradient(to bottom, var(--vip-grid-line) 1px, transparent 1px);
   pointer-events: none;
 }
-.dgrid__item { position: absolute; top: 0; left: 0; transition: box-shadow var(--vip-motion-fast); }
-.dgrid.is-editable .dgrid__item { cursor: grab; }
-.dgrid.is-editable .dgrid__item:active { cursor: grabbing; }
-.dgrid__item.is-selected { z-index: 3; }
-.dgrid__item.is-hidden { opacity: 0.4; }
+.dgrid__item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: box-shadow var(--vip-motion-fast);
+}
+.dgrid.is-editable .dgrid__item {
+  cursor: grab;
+}
+.dgrid.is-editable .dgrid__item:active {
+  cursor: grabbing;
+}
+.dgrid__item.is-selected {
+  z-index: 3;
+}
+.dgrid__item.is-hidden {
+  opacity: 0.4;
+}
 .dgrid__resize {
-  position: absolute; right: 0; bottom: 0; width: 16px; height: 16px;
-  cursor: nwse-resize; z-index: 4;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 4;
   background: linear-gradient(135deg, transparent 50%, var(--vip-border-strong) 50%);
   border-bottom-right-radius: var(--vip-radius-lg);
 }

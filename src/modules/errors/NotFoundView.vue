@@ -17,9 +17,27 @@ const router = useRouter()
 </template>
 
 <style scoped>
-.err { text-align: center; }
-.err__code { font-size: 72px; font-weight: var(--vip-fw-bold); color: var(--vip-brand-text); letter-spacing: -0.03em; }
-.err__title { font-size: var(--vip-fs-2xl); margin-top: var(--vip-sp-4); }
-.err__desc { color: var(--vip-text-muted); margin-top: var(--vip-sp-4); }
-.err__actions { display: flex; gap: var(--vip-sp-4); justify-content: center; margin-top: var(--vip-sp-7); }
+.err {
+  text-align: center;
+}
+.err__code {
+  font-size: 72px;
+  font-weight: var(--vip-fw-bold);
+  color: var(--vip-brand-text);
+  letter-spacing: -0.03em;
+}
+.err__title {
+  font-size: var(--vip-fs-2xl);
+  margin-top: var(--vip-sp-4);
+}
+.err__desc {
+  color: var(--vip-text-muted);
+  margin-top: var(--vip-sp-4);
+}
+.err__actions {
+  display: flex;
+  gap: var(--vip-sp-4);
+  justify-content: center;
+  margin-top: var(--vip-sp-7);
+}
 </style>

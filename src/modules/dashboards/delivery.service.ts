@@ -44,16 +44,30 @@ const snapshotStore = new LocalStore<Snapshot[]>('vip.dashboard.snapshots', { sc
 
 const SEED_DELIVERIES: ScheduledDelivery[] = [
   {
-    id: 'del_seed1', dashboardId: 'db_exec', dashboardName: 'Executive Overview',
-    recipients: ['leadership@veltrix.com'], format: 'pdf', cadence: 'weekly',
-    subject: 'Weekly Executive Overview', nextRun: isoAhead(60 * 24 * 2), createdAt: isoAgo(60 * 24 * 20),
-    active: true, lastStatus: 'sent',
+    id: 'del_seed1',
+    dashboardId: 'db_exec',
+    dashboardName: 'Executive Overview',
+    recipients: ['leadership@veltrix.com'],
+    format: 'pdf',
+    cadence: 'weekly',
+    subject: 'Weekly Executive Overview',
+    nextRun: isoAhead(60 * 24 * 2),
+    createdAt: isoAgo(60 * 24 * 20),
+    active: true,
+    lastStatus: 'sent',
   },
   {
-    id: 'del_seed2', dashboardId: 'db_revops', dashboardName: 'Revenue Operations',
-    recipients: ['revops@veltrix.com', 'finance@veltrix.com'], format: 'excel', cadence: 'daily',
-    subject: 'Daily RevOps snapshot', nextRun: isoAhead(60 * 8), createdAt: isoAgo(60 * 24 * 5),
-    active: true, lastStatus: 'sent',
+    id: 'del_seed2',
+    dashboardId: 'db_revops',
+    dashboardName: 'Revenue Operations',
+    recipients: ['revops@veltrix.com', 'finance@veltrix.com'],
+    format: 'excel',
+    cadence: 'daily',
+    subject: 'Daily RevOps snapshot',
+    nextRun: isoAhead(60 * 8),
+    createdAt: isoAgo(60 * 24 * 5),
+    active: true,
+    lastStatus: 'sent',
   },
 ]
 
@@ -62,10 +76,7 @@ function nextRunFor(cadence: DeliveryCadence): string {
   return isoAhead(map[cadence])
 }
 
-export type CreateDeliveryInput = Omit<
-  ScheduledDelivery,
-  'id' | 'createdAt' | 'nextRun' | 'active' | 'lastStatus'
->
+export type CreateDeliveryInput = Omit<ScheduledDelivery, 'id' | 'createdAt' | 'nextRun' | 'active' | 'lastStatus'>
 
 export interface DeliveryService {
   list(): Promise<ScheduledDelivery[]>
@@ -117,7 +128,13 @@ const mockDeliveryService: DeliveryService = {
 
   async createSnapshot(dashboardId: string, label: string, pageCount: number): Promise<Snapshot> {
     await latency(200, 400)
-    const snap: Snapshot = { id: `snap_${Math.random().toString(36).slice(2, 9)}`, dashboardId, label, createdAt: nowIso(), pageCount }
+    const snap: Snapshot = {
+      id: `snap_${Math.random().toString(36).slice(2, 9)}`,
+      dashboardId,
+      label,
+      createdAt: nowIso(),
+      pageCount,
+    }
     snapshotStore.write([snap, ...snapshotStore.read([])])
     return snap
   },
@@ -128,13 +145,9 @@ const apiDeliveryService: DeliveryService = {
   create: (input) => apiClient.post<ScheduledDelivery>('/deliveries', input),
   toggle: (id) => apiClient.post<void>(`/deliveries/${id}/toggle`),
   remove: (id) => apiClient.delete<void>(`/deliveries/${id}`),
-  listSnapshots: (dashboardId) =>
-    apiClient.get<Snapshot[]>(`/dashboards/${dashboardId}/snapshots`),
+  listSnapshots: (dashboardId) => apiClient.get<Snapshot[]>(`/dashboards/${dashboardId}/snapshots`),
   createSnapshot: (dashboardId, label, pageCount) =>
     apiClient.post<Snapshot>(`/dashboards/${dashboardId}/snapshots`, { label, pageCount }),
 }
 
-export const deliveryService: DeliveryService = defineService(
-  mockDeliveryService,
-  () => apiDeliveryService,
-)
+export const deliveryService: DeliveryService = defineService(mockDeliveryService, () => apiDeliveryService)

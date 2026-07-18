@@ -52,7 +52,8 @@ function onClick(e: MouseEvent) {
   border-radius: var(--vip-radius-md);
   font-weight: var(--vip-fw-medium);
   white-space: nowrap;
-  transition: background var(--vip-motion-fast) var(--vip-ease-standard),
+  transition:
+    background var(--vip-motion-fast) var(--vip-ease-standard),
     border-color var(--vip-motion-fast) var(--vip-ease-standard),
     color var(--vip-motion-fast) var(--vip-ease-standard);
   user-select: none;
@@ -65,45 +66,78 @@ function onClick(e: MouseEvent) {
   width: 100%;
 }
 
-.vip-btn--xs { height: 24px; padding: 0 var(--vip-sp-4); font-size: var(--vip-fs-xs); }
-.vip-btn--sm { height: 28px; padding: 0 var(--vip-sp-5); font-size: var(--vip-fs-sm); }
-.vip-btn--md { height: 32px; padding: 0 var(--vip-sp-6); font-size: var(--vip-fs-md); }
-.vip-btn--lg { height: 40px; padding: 0 var(--vip-sp-7); font-size: var(--vip-fs-lg); }
+.vip-btn--xs {
+  height: 24px;
+  padding: 0 var(--vip-sp-4);
+  font-size: var(--vip-fs-xs);
+}
+.vip-btn--sm {
+  height: 28px;
+  padding: 0 var(--vip-sp-5);
+  font-size: var(--vip-fs-sm);
+}
+.vip-btn--md {
+  height: 32px;
+  padding: 0 var(--vip-sp-6);
+  font-size: var(--vip-fs-md);
+}
+.vip-btn--lg {
+  height: 40px;
+  padding: 0 var(--vip-sp-7);
+  font-size: var(--vip-fs-lg);
+}
 
 .vip-btn--primary {
   background: var(--vip-brand-500);
   color: var(--vip-text-on-brand);
   border-color: var(--vip-brand-500);
 }
-.vip-btn--primary:hover:not(:disabled) { background: var(--vip-brand-600); border-color: var(--vip-brand-600); }
+.vip-btn--primary:hover:not(:disabled) {
+  background: var(--vip-brand-600);
+  border-color: var(--vip-brand-600);
+}
 
 .vip-btn--secondary {
   background: var(--vip-surface-2);
   color: var(--vip-text-primary);
   border-color: var(--vip-border);
 }
-.vip-btn--secondary:hover:not(:disabled) { background: var(--vip-surface-hover); border-color: var(--vip-border-strong); }
+.vip-btn--secondary:hover:not(:disabled) {
+  background: var(--vip-surface-hover);
+  border-color: var(--vip-border-strong);
+}
 
 .vip-btn--tertiary {
   background: transparent;
   color: var(--vip-text-secondary);
   border-color: var(--vip-border);
 }
-.vip-btn--tertiary:hover:not(:disabled) { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
+.vip-btn--tertiary:hover:not(:disabled) {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
 
 .vip-btn--ghost {
   background: transparent;
   color: var(--vip-text-secondary);
 }
-.vip-btn--ghost:hover:not(:disabled) { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
-.vip-btn--ghost.is-active { background: var(--vip-brand-soft); color: var(--vip-brand-text); }
+.vip-btn--ghost:hover:not(:disabled) {
+  background: var(--vip-surface-hover);
+  color: var(--vip-text-primary);
+}
+.vip-btn--ghost.is-active {
+  background: var(--vip-brand-soft);
+  color: var(--vip-brand-text);
+}
 
 .vip-btn--danger {
   background: var(--vip-danger);
   color: #fff;
   border-color: var(--vip-danger);
 }
-.vip-btn--danger:hover:not(:disabled) { filter: brightness(1.08); }
+.vip-btn--danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
 
 .vip-btn__spinner {
   width: 13px;
@@ -114,6 +148,8 @@ function onClick(e: MouseEvent) {
   animation: vip-btn-spin 0.7s linear infinite;
 }
 @keyframes vip-btn-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

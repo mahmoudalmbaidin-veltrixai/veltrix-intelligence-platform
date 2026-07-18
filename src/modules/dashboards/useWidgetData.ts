@@ -29,7 +29,14 @@ export function useWidgetData(widget: Ref<DashboardWidget>, extraFilters: Ref<Qu
   }
 
   watch(
-    () => JSON.stringify([widget.value.wells, widget.value.filters, widget.value.type, widget.value.modelId, extraFilters.value]),
+    () =>
+      JSON.stringify([
+        widget.value.wells,
+        widget.value.filters,
+        widget.value.type,
+        widget.value.modelId,
+        extraFilters.value,
+      ]),
     run,
     { immediate: true },
   )

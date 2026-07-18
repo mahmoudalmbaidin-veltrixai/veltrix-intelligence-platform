@@ -42,9 +42,7 @@ const emit = defineEmits<{
 const allSelected = computed(
   () => props.rows.length > 0 && props.rows.every((r) => props.selected?.includes(props.rowKey(r))),
 )
-const someSelected = computed(
-  () => !!props.selected?.length && !allSelected.value,
-)
+const someSelected = computed(() => !!props.selected?.length && !allSelected.value)
 
 function toggleAll() {
   if (allSelected.value) emit('update:selected', [])
@@ -120,13 +118,25 @@ function cellValue(col: Column<T>, row: T): unknown {
         </tr>
       </tbody>
     </table>
-    <VipEmptyState v-if="!loading && rows.length === 0" :title="emptyTitle" :description="emptyDescription" icon="table" />
+    <VipEmptyState
+      v-if="!loading && rows.length === 0"
+      :title="emptyTitle"
+      :description="emptyDescription"
+      icon="table"
+    />
   </div>
 </template>
 
 <style scoped>
-.vip-table-wrap { width: 100%; overflow-x: auto; }
-.vip-table { width: 100%; border-collapse: collapse; font-size: var(--vip-fs-md); }
+.vip-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+.vip-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--vip-fs-md);
+}
 .vip-table thead th {
   text-align: left;
   font-size: var(--vip-fs-xs);
@@ -141,20 +151,45 @@ function cellValue(col: Column<T>, row: T): unknown {
   background: var(--vip-surface-1);
   z-index: 1;
 }
-.is-comfortable thead th { padding: var(--vip-sp-4) var(--vip-sp-5); }
-.is-compact thead th { padding: var(--vip-sp-3) var(--vip-sp-5); }
-.vip-table th.is-sortable { cursor: pointer; user-select: none; }
-.vip-table th.is-sortable:hover { color: var(--vip-text-primary); }
-.vip-table__th { display: inline-flex; align-items: center; gap: var(--vip-sp-2); }
+.is-comfortable thead th {
+  padding: var(--vip-sp-4) var(--vip-sp-5);
+}
+.is-compact thead th {
+  padding: var(--vip-sp-3) var(--vip-sp-5);
+}
+.vip-table th.is-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.vip-table th.is-sortable:hover {
+  color: var(--vip-text-primary);
+}
+.vip-table__th {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+}
 .vip-table tbody td {
   border-bottom: 1px solid var(--vip-border-subtle);
   color: var(--vip-text-secondary);
   vertical-align: middle;
 }
-.is-comfortable tbody td { padding: var(--vip-sp-5); }
-.is-compact tbody td { padding: var(--vip-sp-3) var(--vip-sp-5); }
-.vip-table tbody tr.is-clickable { cursor: pointer; }
-.vip-table tbody tr.is-clickable:hover { background: var(--vip-surface-hover); }
-.vip-table tbody tr.is-selected { background: var(--vip-brand-soft); }
-.vip-table__check { width: 40px; }
+.is-comfortable tbody td {
+  padding: var(--vip-sp-5);
+}
+.is-compact tbody td {
+  padding: var(--vip-sp-3) var(--vip-sp-5);
+}
+.vip-table tbody tr.is-clickable {
+  cursor: pointer;
+}
+.vip-table tbody tr.is-clickable:hover {
+  background: var(--vip-surface-hover);
+}
+.vip-table tbody tr.is-selected {
+  background: var(--vip-brand-soft);
+}
+.vip-table__check {
+  width: 40px;
+}
 </style>

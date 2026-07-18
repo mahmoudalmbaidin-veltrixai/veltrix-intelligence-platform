@@ -43,7 +43,10 @@ function onInput(e: Event) {
     <p v-if="description" class="vip-field__desc">{{ description }}</p>
     <div
       class="vip-input"
-      :class="[`vip-input--${size}`, { 'is-error': error, 'is-warning': warning, 'is-disabled': disabled, 'is-readonly': readonly }]"
+      :class="[
+        `vip-input--${size}`,
+        { 'is-error': error, 'is-warning': warning, 'is-disabled': disabled, 'is-readonly': readonly },
+      ]"
     >
       <VipIcon v-if="icon" :name="icon" :size="15" class="vip-input__icon" />
       <span v-if="prefix" class="vip-input__affix">{{ prefix }}</span>
@@ -71,7 +74,11 @@ function onInput(e: Event) {
 </template>
 
 <style scoped>
-.vip-field { display: flex; flex-direction: column; gap: var(--vip-sp-3); }
+.vip-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
 .vip-field__label {
   font-size: var(--vip-fs-sm);
   font-weight: var(--vip-fw-medium);
@@ -80,9 +87,19 @@ function onInput(e: Event) {
   align-items: center;
   gap: var(--vip-sp-3);
 }
-.vip-field__req { color: var(--vip-danger); }
-.vip-field__opt { color: var(--vip-text-muted); font-weight: var(--vip-fw-regular); font-size: var(--vip-fs-xs); }
-.vip-field__desc { font-size: var(--vip-fs-sm); color: var(--vip-text-muted); margin-top: -2px; }
+.vip-field__req {
+  color: var(--vip-danger);
+}
+.vip-field__opt {
+  color: var(--vip-text-muted);
+  font-weight: var(--vip-fw-regular);
+  font-size: var(--vip-fs-xs);
+}
+.vip-field__desc {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
+  margin-top: -2px;
+}
 
 .vip-input {
   display: flex;
@@ -92,18 +109,45 @@ function onInput(e: Event) {
   border: 1px solid var(--vip-border);
   border-radius: var(--vip-radius-md);
   padding: 0 var(--vip-sp-5);
-  transition: border-color var(--vip-motion-fast), box-shadow var(--vip-motion-fast);
+  transition:
+    border-color var(--vip-motion-fast),
+    box-shadow var(--vip-motion-fast);
 }
-.vip-input--sm { height: 28px; }
-.vip-input--md { height: 34px; }
-.vip-input:focus-within { border-color: var(--vip-brand-500); box-shadow: 0 0 0 3px var(--vip-brand-soft); }
-.vip-input.is-error { border-color: var(--vip-danger); }
-.vip-input.is-error:focus-within { box-shadow: 0 0 0 3px var(--vip-danger-soft); }
-.vip-input.is-warning { border-color: var(--vip-warning); }
-.vip-input.is-disabled { opacity: 0.55; pointer-events: none; }
-.vip-input.is-readonly { background: var(--vip-surface-inset); }
-.vip-input__icon { color: var(--vip-text-muted); flex: none; }
-.vip-input__affix { color: var(--vip-text-muted); font-size: var(--vip-fs-sm); flex: none; }
+.vip-input--sm {
+  height: 28px;
+}
+.vip-input--md {
+  height: 34px;
+}
+.vip-input:focus-within {
+  border-color: var(--vip-brand-500);
+  box-shadow: 0 0 0 3px var(--vip-brand-soft);
+}
+.vip-input.is-error {
+  border-color: var(--vip-danger);
+}
+.vip-input.is-error:focus-within {
+  box-shadow: 0 0 0 3px var(--vip-danger-soft);
+}
+.vip-input.is-warning {
+  border-color: var(--vip-warning);
+}
+.vip-input.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.vip-input.is-readonly {
+  background: var(--vip-surface-inset);
+}
+.vip-input__icon {
+  color: var(--vip-text-muted);
+  flex: none;
+}
+.vip-input__affix {
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-sm);
+  flex: none;
+}
 .vip-input__el {
   flex: 1;
   min-width: 0;
@@ -113,9 +157,18 @@ function onInput(e: Event) {
   color: var(--vip-text-primary);
   font-size: var(--vip-fs-md);
 }
-.vip-input__el::placeholder { color: var(--vip-text-disabled); }
+.vip-input__el::placeholder {
+  color: var(--vip-text-disabled);
+}
 
-.vip-field__msg { font-size: var(--vip-fs-xs); color: var(--vip-text-muted); }
-.vip-field__msg.is-error { color: var(--vip-danger-text); }
-.vip-field__msg.is-warning { color: var(--vip-warning-text); }
+.vip-field__msg {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.vip-field__msg.is-error {
+  color: var(--vip-danger-text);
+}
+.vip-field__msg.is-warning {
+  color: var(--vip-warning-text);
+}
 </style>
