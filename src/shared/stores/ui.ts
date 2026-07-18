@@ -2,6 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { LocalStore } from '@/shared/lib/mock'
+import { announce } from '@/shared/composables/useAnnouncer'
 
 export interface Toast {
   id: string
@@ -36,6 +37,8 @@ export const useUiStore = defineStore('ui', () => {
   function pushToast(t: Omit<Toast, 'id'>) {
     const id = crypto.randomUUID()
     toasts.value.push({ ...t, id })
+    // Announce to screen readers — errors/warnings assertively.
+    announce(`${t.title}${t.message ? `. ${t.message}` : ''}`, t.kind === 'error' || t.kind === 'warning' ? 'assertive' : 'polite')
     setTimeout(() => dismissToast(id), 5200)
     return id
   }

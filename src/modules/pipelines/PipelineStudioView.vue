@@ -5,6 +5,8 @@ import { pipelineService, newDraft } from './pipelines.service'
 import { usePipelineEditor } from './usePipelineEditor'
 import { usePipelineRunner } from './usePipelineRunner'
 import { useResizable } from '@/shared/composables/useResizable'
+import { useIsCompact } from '@/shared/composables/useMediaQuery'
+import { announce } from '@/shared/composables/useAnnouncer'
 import { useUiStore } from '@/shared/stores/ui'
 import { usePlatformStore } from '@/shared/stores/platform'
 import type { NodeExecStatus, Pipeline, ValidationReport } from '@/shared/types/pipeline'
@@ -42,12 +44,31 @@ const bottomPanel = useResizable({ key: 'pipeline.bottom', initial: 200, min: 12
 const bottomOpen = ref(true)
 const fullscreen = ref(false)
 
+// Compact (tablet/phone) mode: palette + inspector become overlay panels.
+const compact = useIsCompact()
+const paletteOpen = ref(false)
+const inspectorOpen = ref(false)
+
 const canEdit = computed(() => platform.can('pipeline:write'))
 
 // Unwrapped accessors for template use (composable exposes refs).
 const dirty = computed(() => editor.value?.dirty.value ?? false)
 const canUndo = computed(() => editor.value?.canUndo.value ?? false)
 const canRedo = computed(() => editor.value?.canRedo.value ?? false)
+
+// Reveal the inspector when a single node is selected (compact) and announce
+// the selection to screen readers.
+watch(
+  () => (editor.value ? editor.value.selection.value.size : 0),
+  (size) => {
+    if (size === 1 && editor.value) {
+      if (compact.value) { inspectorOpen.value = true; paletteOpen.value = false }
+      announce(`Selected node ${editor.value.selectedNode.value?.title ?? ''}`)
+    } else if (size > 1) {
+      announce(`${size} nodes selected`)
+    }
+  },
+)
 
 async function load() {
   loading.value = true
@@ -232,6 +253,10 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="pstudio__tb-right">
+        <div v-if="compact" class="pstudio__group">
+          <VipButton variant="ghost" size="sm" icon="panelRight" title="Node palette" :active="paletteOpen" :aria-expanded="paletteOpen" aria-controls="pstudio-palette" @click="paletteOpen = !paletteOpen; inspectorOpen = false" />
+          <VipButton variant="ghost" size="sm" icon="settings" title="Inspector" :active="inspectorOpen" :aria-expanded="inspectorOpen" aria-controls="pstudio-inspector" @click="inspectorOpen = !inspectorOpen; paletteOpen = false" />
+        </div>
         <div class="pstudio__group">
           <VipButton variant="ghost" size="sm" icon="undo" title="Undo (⌘Z)" :disabled="!canUndo" @click="editor?.undo()" />
           <VipButton variant="ghost" size="sm" icon="redo" title="Redo (⌘⇧Z)" :disabled="!canRedo" @click="editor?.redo()" />
@@ -253,12 +278,23 @@ onBeforeUnmount(() => {
     <div v-if="loading" class="pstudio__loading"><VipSpinner :size="24" label="Loading pipeline…" /></div>
 
     <div v-else-if="editor" class="pstudio__body">
-      <div class="pstudio__main">
+      <div class="pstudio__main" :class="{ 'is-compact': compact }">
+        <!-- scrim for overlay panels -->
+        <div v-if="compact && (paletteOpen || inspectorOpen)" class="pstudio__scrim" @click="paletteOpen = false; inspectorOpen = false" />
+
         <!-- palette -->
-        <div class="pstudio__left" :style="{ width: `${leftPanel.size.value}px` }">
-          <NodePalette @add="(k) => canvasRef && editor!.addNode(k, 200, 160)" />
+        <div
+          id="pstudio-palette"
+          class="pstudio__left"
+          role="region"
+          aria-label="Node palette"
+          :aria-hidden="compact && !paletteOpen"
+          :class="{ 'is-overlay': compact, 'is-open': paletteOpen }"
+          :style="compact ? {} : { width: `${leftPanel.size.value}px` }"
+        >
+          <NodePalette @add="(k) => { editor!.addNode(k, 200, 160); if (compact) paletteOpen = false }" />
         </div>
-        <div class="pstudio__resizer" @pointerdown="leftPanel.startResize" />
+        <div v-if="!compact" class="pstudio__resizer" @pointerdown="leftPanel.startResize" />
 
         <!-- canvas -->
         <div class="pstudio__center">
@@ -271,8 +307,16 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- inspector -->
-        <div class="pstudio__resizer" @pointerdown="rightPanel.startResize" />
-        <div class="pstudio__right" :style="{ width: `${rightPanel.size.value}px` }">
+        <div v-if="!compact" class="pstudio__resizer" @pointerdown="rightPanel.startResize" />
+        <div
+          id="pstudio-inspector"
+          class="pstudio__right"
+          role="region"
+          aria-label="Node inspector"
+          :aria-hidden="compact && !inspectorOpen"
+          :class="{ 'is-overlay': compact, 'is-open': inspectorOpen }"
+          :style="compact ? {} : { width: `${rightPanel.size.value}px` }"
+        >
           <NodeInspector :editor="editor" />
         </div>
       </div>
@@ -423,4 +467,30 @@ onBeforeUnmount(() => {
 .pstudio__node-result .is-ok { color: var(--vip-success-text); }
 .pstudio__nr-name { flex: 1; }
 .pstudio__nr-rows, .pstudio__nr-dur { color: var(--vip-text-muted); font-variant-numeric: tabular-nums; }
+
+/* ---- compact / responsive (tablet + phone) ---- */
+.pstudio__scrim { position: absolute; inset: 0; background: var(--vip-scrim); z-index: 8; }
+.pstudio__main.is-compact { position: relative; }
+.pstudio__main.is-compact .pstudio__left,
+.pstudio__main.is-compact .pstudio__right {
+  position: absolute; top: 0; bottom: 0; z-index: 9;
+  width: min(84vw, 320px);
+  box-shadow: var(--vip-shadow-lg);
+  transition: transform var(--vip-motion-base) var(--vip-ease-emphasized);
+}
+.pstudio__main.is-compact .pstudio__left { left: 0; transform: translateX(-101%); }
+.pstudio__main.is-compact .pstudio__right { right: 0; transform: translateX(101%); }
+.pstudio__main.is-compact .pstudio__left.is-open { transform: translateX(0); }
+.pstudio__main.is-compact .pstudio__right.is-open { transform: translateX(0); }
+
+@media (max-width: 899px) {
+  .pstudio__toolbar { flex-wrap: wrap; height: auto; min-height: 52px; padding: var(--vip-sp-3) var(--vip-sp-4); gap: var(--vip-sp-3); }
+  .pstudio__tb-right { flex-wrap: wrap; gap: var(--vip-sp-2); }
+  .pstudio__group { padding-right: var(--vip-sp-2); }
+  .pstudio__name { max-width: 40vw; }
+}
+@media (max-width: 599px) {
+  .pstudio__tb-left { min-width: 0; flex: 1; }
+  .pstudio__meta { display: none; }
+}
 </style>

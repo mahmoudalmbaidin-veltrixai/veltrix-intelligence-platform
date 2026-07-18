@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlatformStore } from '@/shared/stores/platform'
+import { useAuthStore } from '@/shared/stores/auth'
 import { useUiStore } from '@/shared/stores/ui'
 import { useThemeStore } from '@/shared/stores/theme'
 import { QUICK_CREATE } from '@/app/navigation'
@@ -13,6 +14,7 @@ import VipAvatar from '@/shared/ui/VipAvatar.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
 
 const platform = usePlatformStore()
+const auth = useAuthStore()
 const ui = useUiStore()
 const theme = useThemeStore()
 const route = useRoute()
@@ -45,10 +47,13 @@ const userItems = [
   { key: 'signout', label: 'Sign out', icon: 'logout', danger: true },
 ]
 
-function onUserSelect(key: string) {
+async function onUserSelect(key: string) {
   if (key === 'appearance') theme.cycle()
-  else if (key === 'signout') ui.pushToast({ kind: 'info', title: 'Sign out', message: 'Authentication is a backend dependency (mock mode).' })
-  else router.push(key)
+  else if (key === 'signout') {
+    await auth.logout()
+    ui.pushToast({ kind: 'success', title: 'Signed out' })
+    router.replace('/login')
+  } else router.push(key)
 }
 </script>
 

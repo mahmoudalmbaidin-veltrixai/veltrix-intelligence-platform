@@ -1,11 +1,15 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { usePlatformStore } from '@/shared/stores/platform'
+import { useAuthStore } from '@/shared/stores/auth'
 import { hasPermission } from '@/shared/permissions/roles'
 import './meta'
 
 /* Lazy module chunks — route-level code splitting. */
 const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/home' },
+
+  // Auth (guest-only)
+  { path: '/login', name: 'login', component: () => import('@/modules/auth/LoginView.vue'), meta: { title: 'Sign in', layout: 'blank', publicOnly: true } },
 
   // Core
   { path: '/home', name: 'home', component: () => import('@/modules/home/HomeView.vue'), meta: { title: 'Home', layout: 'app', requiresAuth: true } },
@@ -103,6 +107,18 @@ export const router = createRouter({
 
 router.beforeEach((to) => {
   const platform = usePlatformStore()
+  const auth = useAuthStore()
+
+  // Guest-only routes (login): send authenticated users home.
+  if (to.meta.publicOnly) {
+    return auth.isAuthenticated ? { name: 'home' } : true
+  }
+
+  // Authentication gate: unauthenticated users go to login, preserving intent.
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    auth.setIntended(to.fullPath)
+    return { name: 'login' }
+  }
 
   if (to.meta.permission && !hasPermission(platform.permissions, to.meta.permission)) {
     return { name: 'forbidden', query: { from: to.fullPath } }

@@ -11,6 +11,8 @@
 import type { Dashboard, DashboardListItem } from '@/shared/types/dashboard'
 import { LocalStore, latency, isoAgo, nowIso, clone } from '@/shared/lib/mock'
 import { ApiError } from '@/shared/types/api'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 import { SEED_DASHBOARDS } from './seed'
 
 const store = new LocalStore<Record<string, Dashboard>>('vip.dashboards')
@@ -43,7 +45,19 @@ export function newDashboard(): Dashboard {
   }
 }
 
-export const dashboardService = {
+/**
+ * Domain service contract. Views/composables depend on this interface via the
+ * `dashboardService` factory export — never on a concrete implementation.
+ */
+export interface DashboardService {
+  list(): Promise<DashboardListItem[]>
+  get(id: string): Promise<Dashboard>
+  save(dashboard: Dashboard): Promise<Dashboard>
+  publish(dashboard: Dashboard): Promise<Dashboard>
+  toggleFavorite(id: string): Promise<void>
+}
+
+const mockDashboardService: DashboardService = {
   async list(): Promise<DashboardListItem[]> {
     await latency()
     return Object.values(db())
@@ -83,5 +97,20 @@ export const dashboardService = {
     if (current[id]) { current[id].favorite = !current[id].favorite; store.write(current) }
   },
 }
+
+/**
+ * Live adapter — routes through the centralized API client. Endpoint paths
+ * reflect the expected backend contract (see BACKEND_INTEGRATION.md).
+ */
+const apiDashboardService: DashboardService = {
+  list: () => apiClient.get<DashboardListItem[]>('/dashboards'),
+  get: (id) => apiClient.get<Dashboard>(`/dashboards/${id}`),
+  save: (dashboard) => apiClient.put<Dashboard>(`/dashboards/${dashboard.id}`, dashboard),
+  publish: (dashboard) => apiClient.post<Dashboard>(`/dashboards/${dashboard.id}/publish`),
+  toggleFavorite: (id) => apiClient.post<void>(`/dashboards/${id}/favorite`),
+}
+
+/** Selected by VITE_API_MODE. Views import this, not a concrete class. */
+export const dashboardService: DashboardService = defineService(mockDashboardService, () => apiDashboardService)
 
 export const LAST_REFRESH = isoAgo(35)

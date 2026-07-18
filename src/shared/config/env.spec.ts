@@ -1,0 +1,42 @@
+import { describe, it, expect } from 'vitest'
+import { buildConfig, EnvConfigError } from './env'
+
+describe('env config', () => {
+  it('defaults to mock mode with sane values', () => {
+    const c = buildConfig({})
+    expect(c.apiMode).toBe('mock')
+    expect(c.apiTimeoutMs).toBe(20_000)
+    expect(c.appEnv).toBe('development')
+    expect(c.enableMockLatency).toBe(true)
+  })
+
+  it('parses live mode with a base url', () => {
+    const c = buildConfig({ VITE_API_MODE: 'live', VITE_API_BASE_URL: 'https://api.x.com', VITE_APP_ENV: 'production' })
+    expect(c.apiMode).toBe('live')
+    expect(c.apiBaseUrl).toBe('https://api.x.com')
+    expect(c.isProd).toBe(true)
+  })
+
+  it('falls back to mock in dev when live has no base url', () => {
+    const c = buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'development' })
+    expect(c.apiMode).toBe('mock')
+  })
+
+  it('throws in production when live has no base url (no silent fallback)', () => {
+    expect(() => buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'production' })).toThrow(EnvConfigError)
+  })
+
+  it('rejects an invalid API mode', () => {
+    expect(() => buildConfig({ VITE_API_MODE: 'bogus' })).toThrow(EnvConfigError)
+  })
+
+  it('rejects an invalid app env', () => {
+    expect(() => buildConfig({ VITE_APP_ENV: 'nope' })).toThrow(EnvConfigError)
+  })
+
+  it('parses numeric timeout and boolean flags', () => {
+    const c = buildConfig({ VITE_API_TIMEOUT_MS: '5000', VITE_ENABLE_MOCK_LATENCY: 'false' })
+    expect(c.apiTimeoutMs).toBe(5000)
+    expect(c.enableMockLatency).toBe(false)
+  })
+})

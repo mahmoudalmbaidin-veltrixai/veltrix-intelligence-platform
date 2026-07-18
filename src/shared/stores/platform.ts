@@ -11,6 +11,7 @@ import type {
 } from '@/shared/types/identity'
 import { hasPermission, permissionsFor } from '@/shared/permissions/roles'
 import { LocalStore } from '@/shared/lib/mock'
+import { invalidateQueries } from '@/shared/lib/query'
 
 const USER: UserProfile = {
   id: 'usr_veltrix_01',
@@ -125,16 +126,23 @@ export const usePlatformStore = defineStore('platform', () => {
     persist()
   }
 
+  /**
+   * Tenant scoping: switching org/workspace invalidates all cached server
+   * state so no data leaks across tenants. Live adapters also re-issue requests
+   * with the new X-Organization-Id / X-Workspace-Id headers.
+   */
   function switchOrg(id: string) {
     orgId.value = id
     const firstWs = WORKSPACES.find((w) => w.orgId === id)
     if (firstWs) workspaceId.value = firstWs.id
     persist()
+    invalidateQueries('')
   }
 
   function switchWorkspace(id: string) {
     workspaceId.value = id
     persist()
+    invalidateQueries('')
   }
 
   function toggleFlag(key: FeatureFlagKey, value?: boolean) {

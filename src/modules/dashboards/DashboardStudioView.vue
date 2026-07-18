@@ -4,6 +4,8 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { dashboardService, newDashboard } from './dashboards.service'
 import { useDashboardEditor } from './useDashboardEditor'
 import { useResizable } from '@/shared/composables/useResizable'
+import { useIsCompact } from '@/shared/composables/useMediaQuery'
+import { announce } from '@/shared/composables/useAnnouncer'
 import { useUiStore } from '@/shared/stores/ui'
 import { usePlatformStore } from '@/shared/stores/platform'
 import type { Dashboard, WidgetType } from '@/shared/types/dashboard'
@@ -39,6 +41,11 @@ const shareOpen = ref(false)
 const left = useResizable({ key: 'dash.left', initial: 256, min: 200, max: 380 })
 const right = useResizable({ key: 'dash.right', initial: 320, min: 260, max: 460, invert: true })
 
+// Compact (tablet/phone): fields + inspector become overlay panels.
+const compact = useIsCompact()
+const fieldsOpen = ref(false)
+const inspectorOpen = ref(false)
+
 const canEdit = computed(() => platform.can('dashboard:write'))
 
 // Unwrapped accessors for template use (composable exposes refs).
@@ -49,6 +56,16 @@ const activePageId = computed<string>({
   get: () => editor.value?.activePageId.value ?? '',
   set: (v: string) => { if (editor.value) editor.value.activePageId.value = v },
 })
+
+// Reveal the inspector when a widget is selected (compact) + announce it.
+watch(
+  () => editor.value?.selectedId.value ?? null,
+  (id) => {
+    if (!id) return
+    if (compact.value) { inspectorOpen.value = true; fieldsOpen.value = false }
+    announce(`Selected ${editor.value?.selectedWidget.value?.general.name ?? 'widget'}`)
+  },
+)
 
 async function load() {
   loading.value = true
@@ -157,6 +174,10 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="dstudio__tb-right">
+        <div v-if="compact && mode === 'edit'" class="dstudio__group">
+          <VipButton variant="ghost" size="sm" icon="panelRight" title="Fields & visuals" :active="fieldsOpen" :aria-expanded="fieldsOpen" aria-controls="dstudio-fields" @click="fieldsOpen = !fieldsOpen; inspectorOpen = false" />
+          <VipButton variant="ghost" size="sm" icon="settings" title="Inspector" :active="inspectorOpen" :aria-expanded="inspectorOpen" aria-controls="dstudio-inspector" @click="inspectorOpen = !inspectorOpen; fieldsOpen = false" />
+        </div>
         <VipSegmented v-model="mode" :options="[{ value: 'edit', label: 'Edit', icon: 'settings' }, { value: 'preview', label: 'Preview', icon: 'eye' }]" size="sm" />
         <div class="dstudio__group">
           <VipButton variant="ghost" size="sm" icon="undo" title="Undo" :disabled="!canUndo" @click="editor?.undo()" />
@@ -171,11 +192,21 @@ onBeforeUnmount(() => {
 
     <div v-if="loading" class="dstudio__loading"><VipSpinner :size="24" label="Loading dashboard…" /></div>
 
-    <div v-else-if="editor" class="dstudio__body">
-      <div v-if="mode === 'edit'" class="dstudio__left" :style="{ width: `${left.size.value}px` }">
-        <FieldsPanel v-model:model-id="modelId" @add-widget="editor.addWidget($event)" />
+    <div v-else-if="editor" class="dstudio__body" :class="{ 'is-compact': compact }">
+      <div v-if="compact && (fieldsOpen || inspectorOpen)" class="dstudio__scrim" @click="fieldsOpen = false; inspectorOpen = false" />
+      <div
+        v-if="mode === 'edit'"
+        id="dstudio-fields"
+        class="dstudio__left"
+        role="region"
+        aria-label="Fields and visuals"
+        :aria-hidden="compact && !fieldsOpen"
+        :class="{ 'is-overlay': compact, 'is-open': fieldsOpen }"
+        :style="compact ? {} : { width: `${left.size.value}px` }"
+      >
+        <FieldsPanel v-model:model-id="modelId" @add-widget="(t) => { editor!.addWidget(t); if (compact) fieldsOpen = false }" />
       </div>
-      <div v-if="mode === 'edit'" class="dstudio__resizer" @pointerdown="left.startResize" />
+      <div v-if="mode === 'edit' && !compact" class="dstudio__resizer" @pointerdown="left.startResize" />
 
       <div class="dstudio__center">
         <!-- page tabs + filter bar -->
@@ -207,8 +238,17 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="mode === 'edit'" class="dstudio__resizer" @pointerdown="right.startResize" />
-      <div v-if="mode === 'edit'" class="dstudio__right" :style="{ width: `${right.size.value}px` }">
+      <div v-if="mode === 'edit' && !compact" class="dstudio__resizer" @pointerdown="right.startResize" />
+      <div
+        v-if="mode === 'edit'"
+        id="dstudio-inspector"
+        class="dstudio__right"
+        role="region"
+        aria-label="Visual inspector"
+        :aria-hidden="compact && !inspectorOpen"
+        :class="{ 'is-overlay': compact, 'is-open': inspectorOpen }"
+        :style="compact ? {} : { width: `${right.size.value}px` }"
+      >
         <WidgetInspector :editor="editor" />
       </div>
     </div>
@@ -250,4 +290,30 @@ onBeforeUnmount(() => {
 .dstudio__page-add:hover { background: var(--vip-surface-hover); color: var(--vip-text-primary); }
 
 .dstudio__canvas { flex: 1; overflow: auto; padding: var(--vip-sp-6); }
+
+/* ---- compact / responsive ---- */
+.dstudio__scrim { position: absolute; inset: 0; background: var(--vip-scrim); z-index: 8; }
+.dstudio__body.is-compact { position: relative; }
+.dstudio__body.is-compact .dstudio__left,
+.dstudio__body.is-compact .dstudio__right {
+  position: absolute; top: 0; bottom: 0; z-index: 9;
+  width: min(88vw, 340px);
+  box-shadow: var(--vip-shadow-lg);
+  transition: transform var(--vip-motion-base) var(--vip-ease-emphasized);
+}
+.dstudio__body.is-compact .dstudio__left { left: 0; transform: translateX(-101%); }
+.dstudio__body.is-compact .dstudio__right { right: 0; transform: translateX(101%); }
+.dstudio__body.is-compact .dstudio__left.is-open { transform: translateX(0); }
+.dstudio__body.is-compact .dstudio__right.is-open { transform: translateX(0); }
+
+@media (max-width: 899px) {
+  .dstudio__toolbar { flex-wrap: wrap; height: auto; min-height: 52px; padding: var(--vip-sp-3) var(--vip-sp-4); gap: var(--vip-sp-3); }
+  .dstudio__tb-right { flex-wrap: wrap; gap: var(--vip-sp-2); }
+  .dstudio__name { max-width: 40vw; }
+  .dstudio__canvas { padding: var(--vip-sp-4); }
+}
+@media (max-width: 599px) {
+  .dstudio__tb-left { min-width: 0; flex: 1; }
+  .dstudio__meta { display: none; }
+}
 </style>

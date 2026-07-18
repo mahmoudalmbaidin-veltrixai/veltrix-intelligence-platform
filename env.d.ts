@@ -7,8 +7,12 @@ declare module '*.vue' {
 }
 
 interface ImportMetaEnv {
-  readonly VITE_API_MODE: 'mock' | 'live'
+  readonly VITE_API_MODE?: 'mock' | 'live'
   readonly VITE_API_BASE_URL?: string
+  readonly VITE_API_TIMEOUT_MS?: string
+  readonly VITE_APP_ENV?: 'development' | 'staging' | 'production'
+  readonly VITE_ENABLE_DEVTOOLS?: string
+  readonly VITE_ENABLE_MOCK_LATENCY?: string
 }
 
 interface ImportMeta {
