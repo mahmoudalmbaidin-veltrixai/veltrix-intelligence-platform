@@ -114,6 +114,13 @@ async function once<T>(path: string, opts: RequestOptions, controller: AbortCont
   return { data: (text ? JSON.parse(text) : undefined) as T, res }
 }
 
+/** Registry of in-flight controllers so a 401/session-expiry can cancel all. */
+const inflight = new Set<AbortController>()
+export function cancelAllRequests(): void {
+  for (const c of inflight) c.abort()
+  inflight.clear()
+}
+
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const maxRetry = opts.retry ?? (opts.method && opts.method !== 'GET' ? 0 : 2)
   const timeout = opts.timeoutMs ?? config.apiTimeoutMs
@@ -121,14 +128,20 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   let attempt = 0
   for (;;) {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeout)
-    // propagate external cancellation
+    inflight.add(controller)
+    // Distinguish a timeout abort from a user/external cancellation.
+    let timedOut = false
+    const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeout)
     const onAbort = () => controller.abort()
     opts.signal?.addEventListener('abort', onAbort)
     try {
       const { data } = await once<T>(path, opts, controller)
       return data
     } catch (raw) {
+      // Classify aborts precisely: timeout vs user cancellation.
+      if (raw instanceof DOMException && raw.name === 'AbortError') {
+        throw new ApiError(timedOut ? 'timeout' : 'cancelled', timedOut ? 'The request timed out.' : 'The request was cancelled.')
+      }
       const err = ApiError.from(raw)
       if (attempt < maxRetry && err.retryable && !opts.signal?.aborted) {
         attempt++
@@ -138,6 +151,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
       throw err
     } finally {
       clearTimeout(timer)
+      inflight.delete(controller)
       opts.signal?.removeEventListener('abort', onAbort)
     }
   }

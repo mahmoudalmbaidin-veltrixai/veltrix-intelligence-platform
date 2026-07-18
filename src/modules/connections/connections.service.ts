@@ -15,6 +15,8 @@
  */
 import { latency, isoAgo } from '@/shared/lib/mock'
 import type { ListParams } from '@/shared/types/api'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export type ConnectorKind =
   | 'postgres'
@@ -216,7 +218,14 @@ function matchesSearch(c: Connection, search?: string): boolean {
   )
 }
 
-export const connectionService = {
+export interface ConnectionService {
+  list(params?: ListParams): Promise<Connection[]>
+  get(id: string): Promise<Connection | undefined>
+  test(id: string): Promise<ConnectionTestResult>
+  create(payload: CreateConnectionPayload): Promise<Connection>
+}
+
+const mockConnectionService: ConnectionService = {
   async list(params?: ListParams): Promise<Connection[]> {
     await latency()
     const all = [...created, ...SEED]
@@ -257,3 +266,15 @@ export const connectionService = {
     return conn
   },
 }
+
+const apiConnectionService: ConnectionService = {
+  list: (params) => apiClient.get<Connection[]>('/connections', { query: { search: params?.search } }),
+  get: (id) => apiClient.get<Connection | undefined>(`/connections/${id}`),
+  test: (id) => apiClient.post<ConnectionTestResult>(`/connections/${id}/test`),
+  create: (payload) => apiClient.post<Connection>('/connections', payload),
+}
+
+export const connectionService: ConnectionService = defineService(
+  mockConnectionService,
+  () => apiConnectionService,
+)

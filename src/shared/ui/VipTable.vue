@@ -76,7 +76,12 @@ function cellValue(col: Column<T>, row: T): unknown {
             :style="{ width: col.width, textAlign: col.align ?? 'left' }"
             :class="{ 'is-sortable': col.sortable }"
             :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"
+            :tabindex="col.sortable ? 0 : undefined"
+            :role="col.sortable ? 'columnheader button' : undefined"
+            :aria-label="col.sortable ? `Sort by ${col.label}` : undefined"
             @click="col.sortable && emit('sort', col.key)"
+            @keydown.enter.prevent="col.sortable && emit('sort', col.key)"
+            @keydown.space.prevent="col.sortable && emit('sort', col.key)"
           >
             <span class="vip-table__th">
               {{ col.label }}
@@ -100,7 +105,9 @@ function cellValue(col: Column<T>, row: T): unknown {
           v-for="row in rows"
           :key="rowKey(row)"
           :class="{ 'is-clickable': clickable, 'is-selected': selected?.includes(rowKey(row)) }"
+          :tabindex="clickable ? 0 : undefined"
           @click="clickable && emit('rowClick', row)"
+          @keydown.enter="clickable && emit('rowClick', row)"
         >
           <td v-if="selectable" class="vip-table__check" @click.stop>
             <VipCheckbox :model-value="selected?.includes(rowKey(row))" @update:model-value="toggleRow(row)" />

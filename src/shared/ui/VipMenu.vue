@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount } from 'vue'
+import { ref, nextTick, onBeforeUnmount } from 'vue'
 import VipIcon from './VipIcon.vue'
 
 export interface MenuItem {
@@ -20,12 +20,36 @@ const emit = defineEmits<{ select: [string] }>()
 
 const open = ref(false)
 const root = ref<HTMLElement>()
+const panel = ref<HTMLElement>()
 
-function toggle() {
+async function toggle() {
   open.value = !open.value
+  if (open.value) {
+    await nextTick()
+    focusItem(0)
+  }
 }
 function close() {
   open.value = false
+}
+
+function menuItems(): HTMLElement[] {
+  return panel.value ? [...panel.value.querySelectorAll<HTMLElement>('.vip-menu__item:not(:disabled)')] : []
+}
+function focusItem(index: number) {
+  const items = menuItems()
+  if (!items.length) return
+  const i = (index + items.length) % items.length
+  items[i]?.focus()
+}
+function onMenuKeydown(e: KeyboardEvent) {
+  const items = menuItems()
+  const current = items.indexOf(document.activeElement as HTMLElement)
+  if (e.key === 'ArrowDown') { e.preventDefault(); focusItem(current + 1) }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); focusItem(current - 1) }
+  else if (e.key === 'Home') { e.preventDefault(); focusItem(0) }
+  else if (e.key === 'End') { e.preventDefault(); focusItem(items.length - 1) }
+  else if (e.key === 'Escape' || e.key === 'Tab') { close() }
 }
 function choose(item: MenuItem) {
   if (item.disabled || item.divider) return
@@ -49,7 +73,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       </slot>
     </div>
     <Transition name="vip-menu-pop">
-      <div v-if="open" class="vip-menu__panel" :class="`is-${align}`" role="menu" @keydown.esc="close">
+      <div v-if="open" ref="panel" class="vip-menu__panel" :class="`is-${align}`" role="menu" @keydown="onMenuKeydown">
         <template v-for="item in items" :key="item.key">
           <div v-if="item.divider" class="vip-menu__divider" role="separator" />
           <button

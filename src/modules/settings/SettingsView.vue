@@ -73,7 +73,7 @@ const notifPrefs = [
       </div>
     </aside>
 
-    <main class="settings__content">
+    <div class="settings__content">
       <!-- Profile -->
       <template v-if="section === 'personal'">
         <h2 class="settings__h">Profile</h2>
@@ -149,7 +149,7 @@ const notifPrefs = [
           <VipButton variant="primary" @click="save">Save</VipButton>
         </VipCard>
       </template>
-    </main>
+    </div>
   </div>
 </template>
 

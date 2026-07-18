@@ -10,7 +10,7 @@ import type {
   Organization, Permission, RoleKey, UserProfile, Workspace,
 } from '@/shared/types/identity'
 import { hasPermission, permissionsFor } from '@/shared/permissions/roles'
-import { LocalStore } from '@/shared/lib/mock'
+import { LocalStore, setStorageScope } from '@/shared/lib/mock'
 import { invalidateQueries } from '@/shared/lib/query'
 
 const USER: UserProfile = {
@@ -80,6 +80,12 @@ export const usePlatformStore = defineStore('platform', () => {
   const workspaceId = ref<string>(saved.wsId)
   const featureFlags = ref<Record<FeatureFlagKey, boolean>>({ ...DEFAULT_FLAGS })
 
+  // Partition all scoped local storage by tenant + workspace (QA VIP-FE-C002).
+  function applyScope() {
+    setStorageScope(`${orgId.value}:${workspaceId.value}`)
+  }
+  applyScope()
+
   const organizations = computed(() => ORGS)
   const organization = computed(() => ORGS.find((o) => o.id === orgId.value) ?? ORGS[0])
   const workspaces = computed(() => WORKSPACES.filter((w) => w.orgId === orgId.value))
@@ -136,12 +142,35 @@ export const usePlatformStore = defineStore('platform', () => {
     const firstWs = WORKSPACES.find((w) => w.orgId === id)
     if (firstWs) workspaceId.value = firstWs.id
     persist()
+    applyScope()
     invalidateQueries('')
   }
 
   function switchWorkspace(id: string) {
     workspaceId.value = id
     persist()
+    applyScope()
+    invalidateQueries('')
+  }
+
+  /**
+   * Hydrate platform context from the authoritative authenticated session
+   * (QA VIP-FE-H001). Called by the auth store on bootstrap/login. The session
+   * — not persisted defaults — is the source of truth for user/org/workspace.
+   */
+  function hydrate(context: AuthContext) {
+    user.value = context.user
+    orgId.value = context.organization.id
+    workspaceId.value = context.workspace.id
+    role.value = context.role
+    featureFlags.value = { ...context.featureFlags }
+    persist()
+    applyScope()
+    invalidateQueries('')
+  }
+
+  /** Clear context on logout / session expiry so no stale tenant data remains. */
+  function clearContext() {
     invalidateQueries('')
   }
 
@@ -155,5 +184,6 @@ export const usePlatformStore = defineStore('platform', () => {
     permissions, entitlements, authContext,
     can, entitled, entitlement, flagEnabled,
     setRole, switchOrg, switchWorkspace, toggleFlag,
+    hydrate, clearContext, applyScope,
   }
 })

@@ -60,8 +60,8 @@ const routes: RouteRecordRaw[] = [
   { path: '/ai/assistant', name: 'ai-assistant', component: () => import('@/modules/ai/AssistantView.vue'), meta: { title: 'AI Assistant', layout: 'app', requiresAuth: true, permission: 'ai:use', entitlement: 'ai-assistant', fullBleed: true } },
   { path: '/ai/studio', name: 'ai-studio', component: () => import('@/modules/ai/AiStudioView.vue'), meta: { title: 'AI Studio', layout: 'app', requiresAuth: true, permission: 'ai:configure' } },
   { path: '/ai/knowledge', name: 'ai-knowledge', component: () => import('@/modules/ai/KnowledgeView.vue'), meta: { title: 'Knowledge Bases', layout: 'app', requiresAuth: true, permission: 'ai:configure' } },
-  { path: '/ai/agents', name: 'ai-agents', component: () => import('@/modules/ai/AgentsView.vue'), meta: { title: 'AI Agents', layout: 'app', requiresAuth: true, permission: 'ai:configure', entitlement: 'ai-agents' } },
-  { path: '/ai/agent-runs', name: 'agent-runs', component: () => import('@/modules/ai/AgentRunsView.vue'), meta: { title: 'Agent Runs', layout: 'app', requiresAuth: true, permission: 'ai:configure', entitlement: 'ai-agents' } },
+  { path: '/ai/agents', name: 'ai-agents', component: () => import('@/modules/ai/AgentsView.vue'), meta: { title: 'AI Agents', layout: 'app', requiresAuth: true, permission: 'ai:configure', entitlement: 'ai-agents', featureFlag: 'ai-agents-beta' } },
+  { path: '/ai/agent-runs', name: 'agent-runs', component: () => import('@/modules/ai/AgentRunsView.vue'), meta: { title: 'Agent Runs', layout: 'app', requiresAuth: true, permission: 'ai:configure', entitlement: 'ai-agents', featureFlag: 'ai-agents-beta' } },
 
   // Automation
   { path: '/automation', name: 'automation', component: () => import('@/modules/automation/AutomationListView.vue'), meta: { title: 'Automations', layout: 'app', requiresAuth: true, permission: 'automation:read', entitlement: 'automation' } },

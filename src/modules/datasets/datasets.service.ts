@@ -11,6 +11,8 @@
  *   Swap `datasetService` for a live adapter; the contract is identical.
  */
 import { latency, isoAgo } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export type DatasetStatus = 'active' | 'deprecated' | 'building'
 
@@ -105,7 +107,15 @@ const INCIDENTS: QualityIncident[] = [
 
 let createdRules: QualityRule[] = []
 
-export const datasetService = {
+export interface DatasetService {
+  list(search?: string): Promise<Dataset[]>
+  get(id: string): Promise<Dataset | undefined>
+  listQualityRules(): Promise<QualityRule[]>
+  listIncidents(): Promise<QualityIncident[]>
+  createRule(payload: CreateRulePayload): Promise<QualityRule>
+}
+
+const mockDatasetService: DatasetService = {
   async list(search?: string): Promise<Dataset[]> {
     await latency()
     if (!search) return DATASETS
@@ -149,3 +159,16 @@ export const datasetService = {
     return rule
   },
 }
+
+const apiDatasetService: DatasetService = {
+  list: (search) => apiClient.get<Dataset[]>('/datasets', { query: { search } }),
+  get: (id) => apiClient.get<Dataset | undefined>(`/datasets/${id}`),
+  listQualityRules: () => apiClient.get<QualityRule[]>('/quality/rules'),
+  listIncidents: () => apiClient.get<QualityIncident[]>('/quality/incidents'),
+  createRule: (payload) => apiClient.post<QualityRule>('/quality/rules', payload),
+}
+
+export const datasetService: DatasetService = defineService(
+  mockDatasetService,
+  () => apiDatasetService,
+)

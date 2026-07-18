@@ -102,6 +102,23 @@ describe('usePipelineEditor', () => {
     expect(report.issues.some((i) => i.code === 'REQ')).toBe(true)
   })
 
+  it('makes edge and node selection mutually exclusive (VIP-FE-H006)', () => {
+    const a = editor.addNode('source-database', 0, 0)
+    const b = editor.addNode('filter', 300, 0)
+    const ok = editor.connect(a.id, 'out', b.id, 'in')
+    expect(ok).toBe(true)
+    const edgeId = editor.pipeline.edges[0].id
+    editor.selectNode(a.id)
+    expect(editor.selection.value.size).toBe(1)
+    // Selecting an edge must clear the node selection so Delete is unambiguous.
+    editor.selectEdge(edgeId)
+    expect(editor.selection.value.size).toBe(0)
+    expect(editor.selectedEdge.value).toBe(edgeId)
+    // And re-selecting a node clears the edge.
+    editor.selectNode(b.id)
+    expect(editor.selectedEdge.value).toBeNull()
+  })
+
   it('tracks dirty state and clears it on markSaved', () => {
     editor.addNode('filter', 0, 0)
     expect(editor.dirty.value).toBe(true)

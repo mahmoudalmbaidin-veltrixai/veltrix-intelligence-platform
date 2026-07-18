@@ -14,6 +14,8 @@
  *   POST /api/v1/automation/approvals/:id/decide (approve/reject)
  */
 import { latency, isoAgo } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export type TriggerType =
   | 'schedule'
@@ -177,7 +179,19 @@ const APPROVALS: Approval[] = [
   { id: 'ap_5', title: 'Delete deprecated dashboard "Legacy KPIs"', requestedBy: 'Cleanup', requestedAt: isoAgo(2880), status: 'rejected', context: 'Rejected — dashboard still referenced by an active subscription.' },
 ]
 
-export const automationService = {
+/**
+ * Domain service contract. Views/composables depend on this interface via the
+ * `automationService` factory export — never on a concrete implementation.
+ */
+export interface AutomationService {
+  list(): Promise<Automation[]>
+  get(id: string): Promise<Automation | undefined>
+  listRuns(): Promise<AutomationRun[]>
+  getRun(id: string): Promise<AutomationRun | undefined>
+  listApprovals(): Promise<Approval[]>
+}
+
+const mockAutomationService: AutomationService = {
   async list(): Promise<Automation[]> {
     await latency()
     return AUTOMATIONS
@@ -203,3 +217,21 @@ export const automationService = {
     return APPROVALS
   },
 }
+
+/**
+ * Live adapter — routes through the centralized API client. Endpoint paths
+ * reflect the expected backend contract (see BACKEND_INTEGRATION.md).
+ */
+const apiAutomationService: AutomationService = {
+  list: () => apiClient.get<Automation[]>('/automations'),
+  get: (id) => apiClient.get<Automation | undefined>(`/automations/${id}`),
+  listRuns: () => apiClient.get<AutomationRun[]>('/automations/runs'),
+  getRun: (id) => apiClient.get<AutomationRun | undefined>(`/automations/runs/${id}`),
+  listApprovals: () => apiClient.get<Approval[]>('/automations/approvals'),
+}
+
+/** Selected by VITE_API_MODE. Views import this, not a concrete class. */
+export const automationService: AutomationService = defineService(
+  mockAutomationService,
+  () => apiAutomationService,
+)

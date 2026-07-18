@@ -24,6 +24,8 @@ describe('normalized error model', () => {
     expect(new ApiError('server', 'x').retryable).toBe(true)
     expect(new ApiError('validation', 'x').retryable).toBe(false)
     expect(new ApiError('forbidden', 'x').retryable).toBe(false)
+    // A user cancellation is distinct from a timeout and must not be retried.
+    expect(new ApiError('cancelled', 'x').retryable).toBe(false)
   })
 
   it('normalizes arbitrary throwables via from()', () => {

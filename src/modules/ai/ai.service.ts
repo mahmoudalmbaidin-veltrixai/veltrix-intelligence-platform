@@ -15,6 +15,9 @@
  *   POST /api/v1/ai/chat            (SSE / streamed tokens)  -> replace streamReply()
  */
 import { latency, isoAgo } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
+import { ApiError } from '@/shared/types/api'
 
 export interface Conversation {
   id: string
@@ -285,7 +288,26 @@ const CANNED_SOURCES: ChatSource[] = [
   { title: 'fct_revenue_daily', ref: 'dataset:ds_revenue_daily' },
 ]
 
-export const aiService = {
+/**
+ * Domain service contract. Views/composables depend on this interface via the
+ * `aiService` factory export — never on a concrete implementation.
+ */
+export interface AiService {
+  listConversations(): Promise<Conversation[]>
+  getMessages(convId: string): Promise<ChatMessage[]>
+  listAssistants(): Promise<Assistant[]>
+  listKnowledge(): Promise<KnowledgeBase[]>
+  listAgents(): Promise<Agent[]>
+  listAgentRuns(): Promise<AgentRun[]>
+  getAgentRun(id: string): Promise<AgentRun | undefined>
+  streamReply(
+    prompt: string,
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<{ sources: ChatSource[] }>
+}
+
+const mockAiService: AiService = {
   async listConversations(): Promise<Conversation[]> {
     await latency()
     return CONVERSATIONS
@@ -360,3 +382,28 @@ export const aiService = {
     })
   },
 }
+
+/**
+ * Live adapter — routes through the centralized API client. Endpoint paths
+ * reflect the expected backend contract (see BACKEND_INTEGRATION.md).
+ */
+const apiAiService: AiService = {
+  listConversations: () => apiClient.get<Conversation[]>('/ai/conversations'),
+  getMessages: (convId) => apiClient.get<ChatMessage[]>(`/ai/conversations/${convId}/messages`),
+  listAssistants: () => apiClient.get<Assistant[]>('/ai/assistants'),
+  listKnowledge: () => apiClient.get<KnowledgeBase[]>('/ai/knowledge'),
+  listAgents: () => apiClient.get<Agent[]>('/ai/agents'),
+  listAgentRuns: () => apiClient.get<AgentRun[]>('/ai/agent-runs'),
+  getAgentRun: (id) => apiClient.get<AgentRun | undefined>(`/ai/agent-runs/${id}`),
+  /**
+   * INTEGRATION POINT: replace with an SSE/fetch stream reader against
+   * POST /api/v1/ai/chat, forwarding decoded tokens to `onChunk`. The token
+   * streaming transport is not yet wired into the live adapter.
+   */
+  streamReply: () => {
+    throw new ApiError('server', 'AI streaming is not implemented in the live adapter yet.')
+  },
+}
+
+/** Selected by VITE_API_MODE. Views import this, not a concrete class. */
+export const aiService: AiService = defineService(mockAiService, () => apiAiService)

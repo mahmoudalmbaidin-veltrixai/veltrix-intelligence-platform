@@ -5,6 +5,8 @@
  */
 import { latency, isoAgo } from '@/shared/lib/mock'
 import type { TenantStatus } from '@/shared/types/identity'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export interface OrgRow { id: string; name: string; status: TenantStatus; plan: string; members: number; createdAt: string }
 export interface Member { id: string; name: string; email: string; role: string; status: 'active' | 'invited' | 'suspended'; lastActive: string }
@@ -46,12 +48,28 @@ const POLICIES: Policy[] = [
   { key: 'apikeys', label: 'API-key usage', description: 'Allow members to create API keys.', value: true },
 ]
 
-export const adminService = {
+export interface AdminService {
+  listOrgs(): Promise<OrgRow[]>
+  listMembers(): Promise<Member[]>
+  listWorkspaces(): Promise<WorkspaceRow[]>
+  listPolicies(): Promise<Policy[]>
+}
+
+const mockAdminService: AdminService = {
   async listOrgs() { await latency(); return ORGS.map((o) => ({ ...o })) },
   async listMembers() { await latency(); return MEMBERS.map((m) => ({ ...m })) },
   async listWorkspaces() { await latency(); return WORKSPACES.map((w) => ({ ...w })) },
   async listPolicies() { await latency(); return POLICIES.map((p) => ({ ...p })) },
 }
+
+const apiAdminService: AdminService = {
+  listOrgs: () => apiClient.get<OrgRow[]>('/admin/organizations'),
+  listMembers: () => apiClient.get<Member[]>('/admin/members'),
+  listWorkspaces: () => apiClient.get<WorkspaceRow[]>('/admin/workspaces'),
+  listPolicies: () => apiClient.get<Policy[]>('/admin/policies'),
+}
+
+export const adminService: AdminService = defineService(mockAdminService, () => apiAdminService)
 
 export const ASSIGNABLE_ROLES = [
   'Organization Owner', 'Organization Administrator', 'Workspace Administrator',

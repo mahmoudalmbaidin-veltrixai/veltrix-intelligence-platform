@@ -13,6 +13,8 @@
  *   is NEVER persisted or retrievable afterwards (only the prefix is stored).
  */
 import { latency, isoAgo, nowIso } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export type ApiKeyStatus = 'active' | 'revoked'
 
@@ -99,7 +101,14 @@ const DELIVERIES: WebhookDelivery[] = [
 
 let created: ApiKey[] = []
 
-export const developerService = {
+export interface DeveloperService {
+  listKeys(): Promise<ApiKey[]>
+  listWebhooks(): Promise<Webhook[]>
+  listDeliveries(): Promise<WebhookDelivery[]>
+  createKey(payload: CreateKeyPayload): Promise<{ key: ApiKey; secret: string }>
+}
+
+const mockDeveloperService: DeveloperService = {
   async listKeys(): Promise<ApiKey[]> {
     await latency()
     return [...created, ...KEYS].map((k) => ({ ...k }))
@@ -132,3 +141,12 @@ export const developerService = {
     return { key, secret: `${key.prefix}_${secretBody}` }
   },
 }
+
+const apiDeveloperService: DeveloperService = {
+  listKeys: () => apiClient.get<ApiKey[]>('/developer/keys'),
+  listWebhooks: () => apiClient.get<Webhook[]>('/developer/webhooks'),
+  listDeliveries: () => apiClient.get<WebhookDelivery[]>('/developer/webhooks/deliveries'),
+  createKey: (payload) => apiClient.post<{ key: ApiKey; secret: string }>('/developer/keys', payload),
+}
+
+export const developerService: DeveloperService = defineService(mockDeveloperService, () => apiDeveloperService)

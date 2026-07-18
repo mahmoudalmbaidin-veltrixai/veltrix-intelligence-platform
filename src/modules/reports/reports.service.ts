@@ -15,6 +15,8 @@
  * Swap the mock bodies for a live adapter; the return contracts are identical.
  */
 import { latency, isoAgo, isoAhead } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export type ReportStatus = 'draft' | 'in-review' | 'approved' | 'rejected' | 'published'
 
@@ -95,7 +97,20 @@ const EXPORTS: ExportJob[] = [
   { id: 'ex_5', report: 'Monthly Financial Statements', format: 'pdf', status: 'expired', createdAt: isoAgo(60 * 24 * 8) },
 ]
 
-export const reportService = {
+/**
+ * Domain service contract. Views/composables depend on this interface via the
+ * `reportService` factory export — never on a concrete implementation.
+ */
+export interface ReportService {
+  list(): Promise<Report[]>
+  get(id: string): Promise<Report | undefined>
+  listTemplates(): Promise<ReportTemplate[]>
+  listDeliveries(): Promise<Delivery[]>
+  listExports(): Promise<ExportJob[]>
+  createDelivery(input: Omit<Delivery, 'id'>): Promise<Delivery>
+}
+
+const mockReportService: ReportService = {
   async list(): Promise<Report[]> {
     await latency(140, 320)
     return REPORTS
@@ -124,3 +139,19 @@ export const reportService = {
     return delivery
   },
 }
+
+/**
+ * Live adapter — routes through the centralized API client. Endpoint paths
+ * reflect the expected backend contract (see BACKEND_INTEGRATION.md).
+ */
+const apiReportService: ReportService = {
+  list: () => apiClient.get<Report[]>('/reports'),
+  get: (id) => apiClient.get<Report | undefined>(`/reports/${id}`),
+  listTemplates: () => apiClient.get<ReportTemplate[]>('/reports/templates'),
+  listDeliveries: () => apiClient.get<Delivery[]>('/reports/deliveries'),
+  listExports: () => apiClient.get<ExportJob[]>('/reports/exports'),
+  createDelivery: (input) => apiClient.post<Delivery>('/reports/deliveries', input),
+}
+
+/** Selected by VITE_API_MODE. Views import this, not a concrete class. */
+export const reportService: ReportService = defineService(mockReportService, () => apiReportService)

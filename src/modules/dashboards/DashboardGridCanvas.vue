@@ -113,7 +113,13 @@ function onEnd() {
       class="dgrid__item"
       :class="{ 'is-selected': selectedId === w.id && editable, 'is-hidden': !w.general.visible }"
       :style="styleFor(w.pos)"
+      :tabindex="editable ? 0 : -1"
+      :role="editable ? 'button' : undefined"
+      :aria-label="editable ? `${w.general.name} widget${selectedId === w.id ? ', selected' : ''}. Enter to select, arrow keys to move, Shift plus arrows to resize, Delete to remove.` : undefined"
+      :aria-pressed="editable ? selectedId === w.id : undefined"
       @pointerdown="onMoveStart(w, $event)"
+      @keydown.enter.prevent="editable && editor.select(w.id)"
+      @keydown.space.prevent="editable && editor.select(w.id)"
     >
       <WidgetFrame
         :widget="w"

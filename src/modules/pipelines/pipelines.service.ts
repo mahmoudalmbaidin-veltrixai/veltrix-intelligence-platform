@@ -13,15 +13,18 @@
  * Secrets are never stored here.
  */
 import type { Pipeline, PipelineListItem, PipelineRun } from '@/shared/types/pipeline'
-import { LocalStore, latency, isoAgo, isoAhead, nowIso, clone } from '@/shared/lib/mock'
+import { LocalStore, latency, isoAgo, isoAhead, nowIso, clone, currentStorageScope } from '@/shared/lib/mock'
 import { ApiError } from '@/shared/types/api'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 import { SEED_PIPELINES } from './seed'
 
-const store = new LocalStore<Record<string, Pipeline>>('vip.pipelines')
+// Tenant/workspace-partitioned so pipelines never leak across tenants (C002).
+const store = new LocalStore<Record<string, Pipeline>>('vip.pipelines', { scoped: true })
 
 function db(): Record<string, Pipeline> {
   const existing = store.read({})
-  if (Object.keys(existing).length === 0) {
+  if (Object.keys(existing).length === 0 && currentStorageScope().startsWith('org_veltrix')) {
     const seeded: Record<string, Pipeline> = {}
     SEED_PIPELINES.forEach((p) => (seeded[p.id] = p))
     store.write(seeded)
@@ -38,7 +41,14 @@ function toListItem(p: Pipeline): PipelineListItem {
   }
 }
 
-export const pipelineService = {
+export interface PipelineService {
+  list(): Promise<PipelineListItem[]>
+  get(id: string): Promise<Pipeline>
+  save(pipeline: Pipeline): Promise<Pipeline>
+  publish(pipeline: Pipeline): Promise<Pipeline>
+}
+
+const mockPipelineService: PipelineService = {
   async list(): Promise<PipelineListItem[]> {
     await latency()
     return Object.values(db()).map(toListItem).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -73,6 +83,18 @@ export const pipelineService = {
     return clone(published)
   },
 }
+
+const apiPipelineService: PipelineService = {
+  list: () => apiClient.get<PipelineListItem[]>('/pipelines'),
+  get: (id) => apiClient.get<Pipeline>(`/pipelines/${id}`),
+  save: (pipeline) => apiClient.put<Pipeline>(`/pipelines/${pipeline.id}`, pipeline),
+  publish: (pipeline) => apiClient.post<Pipeline>(`/pipelines/${pipeline.id}/publish`, pipeline),
+}
+
+export const pipelineService: PipelineService = defineService(
+  mockPipelineService,
+  () => apiPipelineService,
+)
 
 export function newDraft(): Pipeline {
   return {

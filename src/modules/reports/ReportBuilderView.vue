@@ -257,7 +257,7 @@ function exit() {
       </aside>
 
       <!-- CENTER: document canvas -->
-      <main class="canvas" :class="{ 'is-print': mode === 'print' }">
+      <div class="canvas" :class="{ 'is-print': mode === 'print' }">
         <div class="page">
           <div v-if="!blocks.length" class="page__empty">
             <VipEmptyState icon="report" title="Empty document" description="Add blocks from the palette to build your report." />
@@ -317,7 +317,7 @@ function exit() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
 
       <!-- RIGHT: inspector -->
       <aside class="inspector">

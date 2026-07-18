@@ -3,6 +3,8 @@
  * INTEGRATION POINT: GET /api/v1/home/summary?workspaceId=...
  */
 import { latency, isoAgo } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export interface HealthMetric { label: string; value: string; delta?: number; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral'; icon: string; spark: number[] }
 export interface RecentResource { id: string; name: string; type: string; icon: string; to: string; when: string }
@@ -17,7 +19,11 @@ export interface HomeSummary {
   pendingApprovals: number
 }
 
-export const homeService = {
+export interface HomeService {
+  summary(): Promise<HomeSummary>
+}
+
+const mockHomeService: HomeService = {
   async summary(): Promise<HomeSummary> {
     await latency(150, 380)
     return {
@@ -52,3 +58,9 @@ export const homeService = {
     }
   },
 }
+
+const apiHomeService: HomeService = {
+  summary: () => apiClient.get<HomeSummary>('/home/summary'),
+}
+
+export const homeService: HomeService = defineService(mockHomeService, () => apiHomeService)

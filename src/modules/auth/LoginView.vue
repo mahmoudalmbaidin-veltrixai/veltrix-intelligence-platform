@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/shared/stores/auth'
 import { config } from '@/shared/config/env'
 import VipInput from '@/shared/ui/VipInput.vue'
@@ -8,10 +8,14 @@ import VipButton from '@/shared/ui/VipButton.vue'
 import VipAlert from '@/shared/ui/VipAlert.vue'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
+const expired = computed(() => route.query.expired === '1')
 
-const email = ref('mahmoud.almbaidin@shabakkatksa.com')
-const password = ref('demo-password')
+// Prefill demo credentials ONLY in local mock mode — never in live/staging (M012).
+const isDemo = config.apiMode === 'mock' && !config.isProd && config.appEnv !== 'staging'
+const email = ref(isDemo ? 'mahmoud.almbaidin@shabakkatksa.com' : '')
+const password = ref(isDemo ? 'demo-password' : '')
 const submitting = ref(false)
 
 const fieldError = (field: string) => auth.error?.fieldErrors?.find((f) => f.field === field)?.message
@@ -26,7 +30,7 @@ const generalError = computed(() => (auth.error && !auth.error.fieldErrors?.leng
 </script>
 
 <template>
-  <main id="vip-main" class="login">
+  <div class="login">
     <div class="login__card">
       <div class="login__brand">
         <span class="login__mark">
@@ -37,6 +41,7 @@ const generalError = computed(() => (auth.error && !auth.error.fieldErrors?.leng
       <h1 class="login__title">Sign in to Veltrix Intelligence</h1>
       <p class="login__sub">Enterprise analytics, pipelines and AI in one platform.</p>
 
+      <VipAlert v-if="expired" tone="warning" title="Session expired">Your session ended. Please sign in again to continue.</VipAlert>
       <VipAlert v-if="generalError" tone="danger" title="Sign-in failed">{{ generalError }}</VipAlert>
 
       <form class="login__form" @submit.prevent="submit">
@@ -49,7 +54,7 @@ const generalError = computed(() => (auth.error && !auth.error.fieldErrors?.leng
         Mock mode — any non-empty credentials sign you in. Set <code>VITE_API_MODE=live</code> to use the real backend.
       </p>
     </div>
-  </main>
+  </div>
 </template>
 
 <style scoped>

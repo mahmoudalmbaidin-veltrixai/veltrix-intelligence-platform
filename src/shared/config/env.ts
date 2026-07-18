@@ -52,14 +52,19 @@ export function buildConfig(raw: Partial<Record<string, string>>): AppConfig {
   }
 
   const baseUrl = (raw.VITE_API_BASE_URL ?? '').trim()
+  const allowMockFallback = raw.VITE_ALLOW_MOCK_FALLBACK === 'true'
   let resolvedMode: ApiMode = mode
   if (mode === 'live' && !baseUrl) {
-    if (isProd) {
-      // Never silently use mock in production when live was intended.
-      throw new EnvConfigError('VITE_API_MODE=live requires VITE_API_BASE_URL in production.')
+    // Fail closed for staging/production (and CI) so live mode never silently
+    // degrades to mock (QA VIP-FE-M008). Only local development with an explicit
+    // opt-in flag may fall back.
+    if (isProd || appEnv === 'staging' || !allowMockFallback) {
+      throw new EnvConfigError(
+        `VITE_API_MODE=live requires VITE_API_BASE_URL (env: ${appEnv}). ` +
+          'Set VITE_ALLOW_MOCK_FALLBACK=true only for local development.',
+      )
     }
-    // Dev/staging: fall back to mock loudly so the app still boots locally.
-    console.warn('[env] VITE_API_MODE=live but VITE_API_BASE_URL is empty — falling back to mock mode for local development.')
+    console.warn('[env] VITE_API_MODE=live but VITE_API_BASE_URL is empty — falling back to mock mode (VITE_ALLOW_MOCK_FALLBACK=true).')
     resolvedMode = 'mock'
   }
 

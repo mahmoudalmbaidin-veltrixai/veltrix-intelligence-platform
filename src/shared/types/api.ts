@@ -30,6 +30,7 @@ export type ApiErrorKind =
   | 'server'
   | 'network'
   | 'timeout'
+  | 'cancelled'
   | 'maintenance'
   | 'unknown'
 
@@ -49,6 +50,7 @@ const FRIENDLY: Record<ApiErrorKind, string> = {
   server: 'Something went wrong on our side. Please try again.',
   network: 'Network error — check your connection and retry.',
   timeout: 'The request took too long. Please try again.',
+  cancelled: 'The request was cancelled.',
   maintenance: 'The service is temporarily unavailable for maintenance.',
   unknown: 'An unexpected error occurred.',
 }

@@ -5,7 +5,7 @@ import { router } from './app/router'
 import { useThemeStore } from './shared/stores/theme'
 import { usePlatformStore } from './shared/stores/platform'
 import { useAuthStore } from './shared/stores/auth'
-import { setRequestContextProvider, setUnauthorizedHandler } from './shared/lib/apiClient'
+import { setRequestContextProvider, setUnauthorizedHandler, cancelAllRequests } from './shared/lib/apiClient'
 
 import './styles/tokens.css'
 import './styles/base.css'
@@ -26,7 +26,17 @@ setRequestContextProvider(() => ({
   locale: platform.user?.locale,
   timezone: platform.user?.timezone,
 }))
-setUnauthorizedHandler(() => auth.onUnauthorized())
+// On a 401: cancel in-flight requests, clear session/context, and route to
+// login preserving the destination (QA VIP-FE-H002).
+setUnauthorizedHandler(() => {
+  cancelAllRequests()
+  auth.onUnauthorized()
+  const current = router.currentRoute.value
+  if (current.meta.requiresAuth && current.name !== 'login') {
+    auth.setIntended(current.fullPath)
+    router.replace({ name: 'login', query: { expired: '1' } })
+  }
+})
 
 // Restore the session before mounting so guards see a settled auth state.
 auth.bootstrap().finally(() => {

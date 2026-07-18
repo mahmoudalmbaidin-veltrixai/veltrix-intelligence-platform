@@ -17,12 +17,20 @@ describe('env config', () => {
     expect(c.isProd).toBe(true)
   })
 
-  it('falls back to mock in dev when live has no base url', () => {
-    const c = buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'development' })
+  it('falls back to mock in dev ONLY with the explicit opt-in flag', () => {
+    const c = buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'development', VITE_ALLOW_MOCK_FALLBACK: 'true' })
     expect(c.apiMode).toBe('mock')
   })
 
-  it('throws in production when live has no base url (no silent fallback)', () => {
+  it('fails closed in dev without the opt-in flag', () => {
+    expect(() => buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'development' })).toThrow(EnvConfigError)
+  })
+
+  it('fails closed in staging even with the opt-in flag (no silent mock)', () => {
+    expect(() => buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'staging', VITE_ALLOW_MOCK_FALLBACK: 'true' })).toThrow(EnvConfigError)
+  })
+
+  it('throws in production when live has no base url', () => {
     expect(() => buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'production' })).toThrow(EnvConfigError)
   })
 

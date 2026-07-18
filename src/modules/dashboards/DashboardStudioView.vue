@@ -83,6 +83,11 @@ async function save() {
   savedAt.value = saved.updatedAt
   saving.value = false
   ui.pushToast({ kind: 'success', title: 'Dashboard saved' })
+  // First save from /dashboards/new: adopt the stable ID URL so the dashboard
+  // can be deep-linked and reloaded (QA VIP-FE-H004).
+  if (!route.params.id) {
+    router.replace(`/dashboards/${saved.id}/edit`)
+  }
 }
 async function publish() {
   if (!editor.value) return
@@ -129,7 +134,27 @@ function onKeydown(e: KeyboardEvent) {
   else if (mod && e.key.toLowerCase() === 'd' && sel) { e.preventDefault(); editor.value.duplicateWidget(sel) }
   else if (mod && e.key.toLowerCase() === 'c' && sel) { editor.value.copyWidget(sel) }
   else if (mod && e.key.toLowerCase() === 'v') { editor.value.paste() }
-  else if (e.key === 'Escape') { editor.value.select(null) }
+  else if (e.key.startsWith('Arrow') && sel) {
+    // Keyboard move (arrows) and resize (Shift+arrows) of the selected widget
+    // on the 12-column grid (QA VIP-FE-C004).
+    e.preventDefault()
+    const w = editor.value.selectedWidget.value
+    if (!w) return
+    editor.value.beginChange()
+    const dx = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0
+    const dy = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0
+    if (e.shiftKey) {
+      editor.value.updatePosition(w.id, { ...w.pos, w: Math.max(2, w.pos.w + dx), h: Math.max(2, w.pos.h + dy) })
+      announce(`Resized to ${Math.max(2, w.pos.w + dx)} by ${Math.max(2, w.pos.h + dy)}`)
+    } else {
+      editor.value.updatePosition(w.id, { ...w.pos, x: Math.max(0, Math.min(11, w.pos.x + dx)), y: Math.max(0, w.pos.y + dy) })
+    }
+  }
+  else if (e.key === 'Escape') {
+    fieldsOpen.value = false
+    inspectorOpen.value = false
+    editor.value.select(null)
+  }
 }
 
 function beforeUnload(e: BeforeUnloadEvent) { if (editor.value?.dirty) { e.preventDefault(); e.returnValue = '' } }

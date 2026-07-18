@@ -68,7 +68,7 @@ const selectedTitle = computed(() =>
     </header>
 
     <div class="abuilder__body">
-      <main class="abuilder__flow">
+      <div class="abuilder__flow">
         <!-- trigger -->
         <div class="aflow__block is-trigger" :class="{ 'is-selected': selected === 'trigger' }" @click="selected = 'trigger'">
           <div class="aflow__block-head"><VipIcon :name="TRIGGER_META[trigger].icon" :size="15" /> When</div>
@@ -97,7 +97,7 @@ const selectedTitle = computed(() =>
         <VipMenu :items="actionMenu" align="start" @select="addAction">
           <template #trigger><button class="aflow__add"><VipIcon name="plus" :size="15" /> Add action</button></template>
         </VipMenu>
-      </main>
+      </div>
 
       <aside class="abuilder__inspector">
         <div class="ainsp__title">{{ selectedTitle }}</div>

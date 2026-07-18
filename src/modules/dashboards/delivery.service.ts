@@ -11,6 +11,8 @@
  * captures configuration and shows history. No email is actually sent here.
  */
 import { LocalStore, latency, nowIso, isoAhead, isoAgo } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export type DeliveryFormat = 'pdf' | 'png' | 'csv' | 'excel'
 export type DeliveryCadence = 'once' | 'daily' | 'weekly' | 'monthly'
@@ -37,8 +39,8 @@ export interface Snapshot {
   pageCount: number
 }
 
-const deliveryStore = new LocalStore<ScheduledDelivery[]>('vip.dashboard.deliveries')
-const snapshotStore = new LocalStore<Snapshot[]>('vip.dashboard.snapshots')
+const deliveryStore = new LocalStore<ScheduledDelivery[]>('vip.dashboard.deliveries', { scoped: true })
+const snapshotStore = new LocalStore<Snapshot[]>('vip.dashboard.snapshots', { scoped: true })
 
 const SEED_DELIVERIES: ScheduledDelivery[] = [
   {
@@ -60,14 +62,28 @@ function nextRunFor(cadence: DeliveryCadence): string {
   return isoAhead(map[cadence])
 }
 
-export const deliveryService = {
+export type CreateDeliveryInput = Omit<
+  ScheduledDelivery,
+  'id' | 'createdAt' | 'nextRun' | 'active' | 'lastStatus'
+>
+
+export interface DeliveryService {
+  list(): Promise<ScheduledDelivery[]>
+  create(input: CreateDeliveryInput): Promise<ScheduledDelivery>
+  toggle(id: string): Promise<void>
+  remove(id: string): Promise<void>
+  listSnapshots(dashboardId: string): Promise<Snapshot[]>
+  createSnapshot(dashboardId: string, label: string, pageCount: number): Promise<Snapshot>
+}
+
+const mockDeliveryService: DeliveryService = {
   async list(): Promise<ScheduledDelivery[]> {
     await latency()
     const stored = deliveryStore.read([])
     return stored.length ? stored : SEED_DELIVERIES
   },
 
-  async create(input: Omit<ScheduledDelivery, 'id' | 'createdAt' | 'nextRun' | 'active' | 'lastStatus'>): Promise<ScheduledDelivery> {
+  async create(input: CreateDeliveryInput): Promise<ScheduledDelivery> {
     await latency(200, 420)
     const current = deliveryStore.read(SEED_DELIVERIES.slice())
     const delivery: ScheduledDelivery = {
@@ -106,3 +122,19 @@ export const deliveryService = {
     return snap
   },
 }
+
+const apiDeliveryService: DeliveryService = {
+  list: () => apiClient.get<ScheduledDelivery[]>('/deliveries'),
+  create: (input) => apiClient.post<ScheduledDelivery>('/deliveries', input),
+  toggle: (id) => apiClient.post<void>(`/deliveries/${id}/toggle`),
+  remove: (id) => apiClient.delete<void>(`/deliveries/${id}`),
+  listSnapshots: (dashboardId) =>
+    apiClient.get<Snapshot[]>(`/dashboards/${dashboardId}/snapshots`),
+  createSnapshot: (dashboardId, label, pageCount) =>
+    apiClient.post<Snapshot>(`/dashboards/${dashboardId}/snapshots`, { label, pageCount }),
+}
+
+export const deliveryService: DeliveryService = defineService(
+  mockDeliveryService,
+  () => apiDeliveryService,
+)

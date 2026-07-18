@@ -35,15 +35,36 @@ export function fail(kind: ApiErrorKind, message: string, detail?: string): neve
 }
 
 /**
+ * Active tenant/workspace/user scope for partitioned storage. Set by the
+ * platform store from the authenticated session so persisted editor + list
+ * state never leaks across tenants (QA VIP-FE-C002).
+ */
+let storageScope = 'global'
+export function setStorageScope(scope: string): void {
+  storageScope = scope || 'global'
+}
+export function currentStorageScope(): string {
+  return storageScope
+}
+
+/**
  * Typed namespaced localStorage adapter. Used only for non-sensitive editor
  * state and UI preferences. Do not persist credentials/secrets here.
+ *
+ * Pass `{ scoped: true }` for tenant/workspace-partitioned data (pipelines,
+ * dashboards, deliveries). Global user preferences (theme, sidebar) stay
+ * unscoped so they persist across tenant switches.
  */
 export class LocalStore<T> {
-  constructor(private readonly key: string) {}
+  constructor(private readonly key: string, private readonly opts: { scoped?: boolean } = {}) {}
+
+  private effectiveKey(): string {
+    return this.opts.scoped ? `${storageScope}::${this.key}` : this.key
+  }
 
   read(fallback: T): T {
     try {
-      const raw = localStorage.getItem(this.key)
+      const raw = localStorage.getItem(this.effectiveKey())
       if (raw == null) return fallback
       return JSON.parse(raw) as T
     } catch {
@@ -53,14 +74,14 @@ export class LocalStore<T> {
 
   write(value: T): void {
     try {
-      localStorage.setItem(this.key, JSON.stringify(value))
+      localStorage.setItem(this.effectiveKey(), JSON.stringify(value))
     } catch {
       /* quota / unavailable — non-fatal for mock persistence */
     }
   }
 
   clear(): void {
-    localStorage.removeItem(this.key)
+    localStorage.removeItem(this.effectiveKey())
   }
 }
 

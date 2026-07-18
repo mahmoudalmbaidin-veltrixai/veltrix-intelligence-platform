@@ -16,6 +16,8 @@
  *   backend — secrets/credentials are never included in the diff summaries.
  */
 import { latency, isoAgo } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export type Severity = 'info' | 'success' | 'warning' | 'danger'
 
@@ -153,7 +155,18 @@ function matches(a: AuditEvent, q?: AuditQuery): boolean {
   return true
 }
 
-export const operationsService = {
+/**
+ * Domain service contract. Views/composables depend on this interface via the
+ * `operationsService` factory export — never on a concrete implementation.
+ */
+export interface OperationsService {
+  listNotifications(): Promise<Notification[]>
+  listActivity(): Promise<ActivityEvent[]>
+  listAudit(params?: AuditQuery): Promise<AuditEvent[]>
+  listUsage(): Promise<UsageMetric[]>
+}
+
+const mockOperationsService: OperationsService = {
   async listNotifications(): Promise<Notification[]> {
     await latency()
     return NOTIFICATIONS.map((n) => ({ ...n }))
@@ -174,3 +187,29 @@ export const operationsService = {
     return USAGE.map((u) => ({ ...u }))
   },
 }
+
+/**
+ * Live adapter — routes through the centralized API client. Endpoint paths
+ * reflect the expected backend contract (see BACKEND_INTEGRATION.md).
+ */
+const apiOperationsService: OperationsService = {
+  listNotifications: () => apiClient.get<Notification[]>('/notifications'),
+  listActivity: () => apiClient.get<ActivityEvent[]>('/activity'),
+  listAudit: (params) =>
+    apiClient.get<AuditEvent[]>('/audit', {
+      query: {
+        search: params?.search,
+        actor: params?.actor,
+        result: params?.result,
+        from: params?.from,
+        to: params?.to,
+      },
+    }),
+  listUsage: () => apiClient.get<UsageMetric[]>('/usage'),
+}
+
+/** Selected by VITE_API_MODE. Views import this, not a concrete class. */
+export const operationsService: OperationsService = defineService(
+  mockOperationsService,
+  () => apiOperationsService,
+)

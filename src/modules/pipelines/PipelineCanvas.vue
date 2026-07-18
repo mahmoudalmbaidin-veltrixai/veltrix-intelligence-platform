@@ -5,6 +5,7 @@ import type { NodeExecStatus, PipelineNodeKind } from '@/shared/types/pipeline'
 import { NODE_TYPES } from './nodeTypes'
 import PipelineNode from './PipelineNode.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
+import { announce } from '@/shared/composables/useAnnouncer'
 
 const props = defineProps<{
   editor: PipelineEditor
@@ -55,8 +56,37 @@ const edges = computed(() =>
    auto-unwrapped when read through a prop object). */
 const selectionSet = computed(() => props.editor.selection.value)
 function pickEdge(id: string) {
-  props.editor.selectedEdge.value = id
+  props.editor.selectEdge(id)
 }
+
+/* ---- keyboard authoring (QA VIP-FE-C003) ---- */
+const keyboardConnect = ref<{ nodeId: string; port: string } | null>(null)
+function onNodeSelect(id: string) {
+  props.editor.selectNode(id)
+  const n = props.editor.pipeline.nodes.find((x) => x.id === id)
+  announce(`Selected node ${n?.title ?? ''}. Use arrow keys to move, Delete to remove.`)
+}
+function onPortActivate({ nodeId, port, kind }: { nodeId: string; port: string; kind: 'in' | 'out' }) {
+  const title = (id: string) => props.editor.pipeline.nodes.find((n) => n.id === id)?.title ?? id
+  if (kind === 'out') {
+    keyboardConnect.value = { nodeId, port }
+    announce(`Connection started from ${title(nodeId)}. Activate a target input port to connect, or press Escape to cancel.`)
+  } else {
+    if (!keyboardConnect.value) {
+      announce('Activate an output port first to start a connection.')
+      return
+    }
+    const from = keyboardConnect.value
+    const ok = props.editor.connect(from.nodeId, from.port, nodeId, port)
+    announce(ok ? `Connected ${title(from.nodeId)} to ${title(nodeId)}.` : 'Could not create that connection.')
+    keyboardConnect.value = null
+  }
+}
+/** Called by the studio when Escape is pressed. */
+function cancelKeyboardConnect() {
+  if (keyboardConnect.value) { keyboardConnect.value = null; announce('Connection cancelled.') }
+}
+defineExpose({ fitToScreen, zoomBy, cancelKeyboardConnect })
 
 /* ---- pending connection ---- */
 const pending = ref<{ nodeId: string; port: string; sx: number; sy: number; mx: number; my: number } | null>(null)
@@ -219,8 +249,6 @@ const bounds = computed(() => {
   return { minX, minY, w: Math.max(400, maxX - minX), h: Math.max(300, maxY - minY) }
 })
 
-defineExpose({ fitToScreen, zoomBy })
-
 onMounted(() => setTimeout(fitToScreen, 60))
 onBeforeUnmount(() => {
   window.removeEventListener('pointermove', onPointerMove)
@@ -271,6 +299,8 @@ onBeforeUnmount(() => {
         @node-pointer-down="onNodePointerDown"
         @port-pointer-down="onPortPointerDown"
         @port-pointer-up="onPortPointerUp"
+        @node-select="onNodeSelect"
+        @port-activate="onPortActivate"
       />
     </div>
 

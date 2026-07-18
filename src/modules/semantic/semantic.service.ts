@@ -17,6 +17,8 @@
 import { MODELS } from '@/shared/services/semanticModels'
 import type { Aggregation, NumberFormat, SemanticModel } from '@/shared/types/semantic'
 import { latency } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export type MetricStatus = 'draft' | 'published'
 export type MetricFormat = NumberFormat['style']
@@ -144,7 +146,17 @@ const TERMS: GlossaryTerm[] = [
   },
 ]
 
-export const semanticStudioService = {
+export interface SemanticStudioService {
+  listModels(): Promise<SemanticModel[]>
+  getModel(id: string): Promise<SemanticModel | undefined>
+  listMetrics(): Promise<Metric[]>
+  listTerms(): Promise<GlossaryTerm[]>
+  createMetric(input: Omit<Metric, 'id'>): Promise<Metric>
+  createTerm(input: Omit<GlossaryTerm, 'id'>): Promise<GlossaryTerm>
+  modelForMeasure(measureId: string): SemanticModel | undefined
+}
+
+const mockSemanticStudioService: SemanticStudioService = {
   async listModels(): Promise<SemanticModel[]> {
     await latency(120, 300)
     return MODELS
@@ -180,3 +192,19 @@ export const semanticStudioService = {
     return MODELS.find((m) => m.fields.some((f) => f.id === measureId))
   },
 }
+
+const apiSemanticStudioService: SemanticStudioService = {
+  listModels: () => apiClient.get<SemanticModel[]>('/semantic/models'),
+  getModel: (id) => apiClient.get<SemanticModel | undefined>(`/semantic/models/${id}`),
+  listMetrics: () => apiClient.get<Metric[]>('/semantic/metrics'),
+  listTerms: () => apiClient.get<GlossaryTerm[]>('/semantic/glossary'),
+  createMetric: (input) => apiClient.post<Metric>('/semantic/metrics', input),
+  createTerm: (input) => apiClient.post<GlossaryTerm>('/semantic/glossary', input),
+  // Client-side resolution against the loaded semantic models — no round-trip.
+  modelForMeasure: (measureId) => MODELS.find((m) => m.fields.some((f) => f.id === measureId)),
+}
+
+export const semanticStudioService: SemanticStudioService = defineService(
+  mockSemanticStudioService,
+  () => apiSemanticStudioService,
+)

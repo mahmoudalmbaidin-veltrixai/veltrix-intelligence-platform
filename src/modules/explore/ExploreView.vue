@@ -129,7 +129,7 @@ function roleIcon(role: SemanticField['role']): string {
       </aside>
 
       <!-- canvas -->
-      <main class="explore__main">
+      <div class="explore__main">
         <div class="explore__chart-types">
           <button
             v-for="t in chartTypes"
@@ -155,7 +155,7 @@ function roleIcon(role: SemanticField['role']): string {
             </tbody>
           </table>
         </div>
-      </main>
+      </div>
     </div>
   </div>
 </template>

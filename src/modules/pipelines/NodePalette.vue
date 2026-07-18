@@ -36,9 +36,12 @@ function onDragStart(e: DragEvent, kind: PipelineNodeKind) {
           class="palette__node"
           :class="`is-${NODE_TYPES[kind].category}`"
           draggable="true"
-          :title="NODE_TYPES[kind].description"
+          :title="`${NODE_TYPES[kind].description} — press Enter to add`"
+          :aria-label="`Add ${NODE_TYPES[kind].label} node`"
           @dragstart="onDragStart($event, kind)"
           @dblclick="emit('add', kind)"
+          @keydown.enter.prevent="emit('add', kind)"
+          @keydown.space.prevent="emit('add', kind)"
         >
           <span class="palette__node-icon"><VipIcon :name="NODE_TYPES[kind].icon" :size="15" /></span>
           <span class="palette__node-text">

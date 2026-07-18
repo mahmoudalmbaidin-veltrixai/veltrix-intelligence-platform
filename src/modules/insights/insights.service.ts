@@ -12,6 +12,8 @@
  */
 import type { Insight, InsightKind, SuggestedQuestion } from '@/shared/types/insight'
 import { latency, isoAgo, rng } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 function series(n: number, up = true): { label: string; value: number }[] {
   const out: { label: string; value: number }[] = []
@@ -82,7 +84,12 @@ export const SUGGESTED_QUESTIONS: SuggestedQuestion[] = [
   { id: 'q5', text: 'Compare Partner vs Direct channel this year' },
 ]
 
-export const insightsService = {
+export interface InsightsService {
+  list(modelId?: string): Promise<Insight[]>
+  explain(question: string): Promise<Insight>
+}
+
+const mockInsightsService: InsightsService = {
   async list(modelId?: string): Promise<Insight[]> {
     await latency(200, 500)
     return SEED.filter((i) => !modelId || i.modelId === modelId).map((i) => ({ ...i }))
@@ -106,3 +113,10 @@ export const insightsService = {
     }
   },
 }
+
+const apiInsightsService: InsightsService = {
+  list: (modelId) => apiClient.get<Insight[]>('/insights', { query: { modelId } }),
+  explain: (question) => apiClient.post<Insight>('/insights/explain', { question }),
+}
+
+export const insightsService: InsightsService = defineService(mockInsightsService, () => apiInsightsService)

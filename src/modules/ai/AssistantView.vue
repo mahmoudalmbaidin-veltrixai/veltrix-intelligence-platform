@@ -154,7 +154,7 @@ function onKeydown(e: KeyboardEvent): void {
     </aside>
 
     <!-- Chat main -->
-    <main class="asst__main">
+    <div class="asst__main">
       <header class="asst__top">
         <div class="asst__top-info">
           <h1 class="asst__top-title">{{ activeConvId ? 'Conversation' : 'New conversation' }}</h1>
@@ -242,7 +242,7 @@ function onKeydown(e: KeyboardEvent): void {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   </div>
 </template>
 

@@ -9,6 +9,8 @@
  *   Swap `marketplaceService` for a live adapter; the contract is identical.
  */
 import { latency } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export type ExtensionCategory =
   | 'Connectors'
@@ -81,7 +83,12 @@ export interface MarketplaceQuery {
   category?: ExtensionCategory | 'all'
 }
 
-export const marketplaceService = {
+export interface MarketplaceService {
+  list(params?: MarketplaceQuery): Promise<Extension[]>
+  get(id: string): Promise<Extension | undefined>
+}
+
+const mockMarketplaceService: MarketplaceService = {
   async list(params?: MarketplaceQuery): Promise<Extension[]> {
     await latency()
     return EXTENSIONS.filter((e) => {
@@ -104,3 +111,10 @@ export const marketplaceService = {
     return found ? { ...found } : undefined
   },
 }
+
+const apiMarketplaceService: MarketplaceService = {
+  list: (params) => apiClient.get<Extension[]>('/marketplace/extensions', { query: { ...params } }),
+  get: (id) => apiClient.get<Extension | undefined>(`/marketplace/extensions/${id}`),
+}
+
+export const marketplaceService: MarketplaceService = defineService(mockMarketplaceService, () => apiMarketplaceService)

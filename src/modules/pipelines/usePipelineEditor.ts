@@ -190,7 +190,16 @@ export function usePipelineEditor(initial: Pipeline) {
     }
   }
   function selectMany(ids: string[]) {
+    selectedEdge.value = null
     selection.value = new Set(ids)
+  }
+  /**
+   * Selecting an edge clears node selection so edge/node selection is mutually
+   * exclusive — Delete then removes exactly the focused element (QA VIP-FE-H006).
+   */
+  function selectEdge(id: string) {
+    selection.value = new Set()
+    selectedEdge.value = id
   }
   function clearSelection() {
     selection.value = new Set()
@@ -267,7 +276,7 @@ export function usePipelineEditor(initial: Pipeline) {
     addNode, moveNodes, updateNodeConfig, renameNode, deleteNodes, duplicateNodes,
     copySelection, paste,
     connect, deleteEdge,
-    selectNode, selectMany, clearSelection,
+    selectNode, selectMany, selectEdge, clearSelection,
     undo, redo, commit, markSaved,
     validate, nodeIssues,
   }

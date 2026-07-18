@@ -15,6 +15,8 @@ const emit = defineEmits<{
   nodePointerDown: [{ id: string; event: PointerEvent }]
   portPointerDown: [{ nodeId: string; port: string; kind: 'in' | 'out'; event: PointerEvent }]
   portPointerUp: [{ nodeId: string; port: string; kind: 'in' | 'out'; event: PointerEvent }]
+  nodeSelect: [string]
+  portActivate: [{ nodeId: string; port: string; kind: 'in' | 'out' }]
 }>()
 
 const spec = computed(() => NODE_TYPES[props.node.kind])
@@ -28,9 +30,12 @@ const warnCount = computed(() => props.issues?.filter((i) => i.level === 'warnin
     :class="[`is-${spec.category}`, { 'is-selected': selected, 'is-error': errorCount, [`exec-${execStatus}`]: execStatus && execStatus !== 'idle' }]"
     :style="{ left: `${node.x}px`, top: `${node.y}px` }"
     role="button"
-    :aria-label="`${spec.label} node: ${node.title}`"
+    :aria-label="`${spec.label} node: ${node.title}${selected ? ', selected' : ''}`"
+    :aria-pressed="selected"
     tabindex="0"
     @pointerdown.stop="emit('nodePointerDown', { id: node.id, event: $event })"
+    @keydown.enter.prevent="emit('nodeSelect', node.id)"
+    @keydown.space.prevent="emit('nodeSelect', node.id)"
   >
     <!-- input ports -->
     <div class="pnode__ports pnode__ports--in">
@@ -39,9 +44,10 @@ const warnCount = computed(() => props.issues?.filter((i) => i.level === 'warnin
         :key="p.id"
         class="pnode__port"
         :title="p.label"
-        :aria-label="`${p.label} input port`"
+        :aria-label="`${p.label} input port — activate to complete a connection`"
         @pointerdown.stop="emit('portPointerDown', { nodeId: node.id, port: p.id, kind: 'in', event: $event })"
         @pointerup.stop="emit('portPointerUp', { nodeId: node.id, port: p.id, kind: 'in', event: $event })"
+        @keydown.enter.prevent="emit('portActivate', { nodeId: node.id, port: p.id, kind: 'in' })"
       />
     </div>
 
@@ -67,9 +73,10 @@ const warnCount = computed(() => props.issues?.filter((i) => i.level === 'warnin
         :key="p.id"
         class="pnode__port is-out"
         :title="p.label"
-        :aria-label="`${p.label} output port`"
+        :aria-label="`${p.label} output port — activate to start a connection`"
         @pointerdown.stop="emit('portPointerDown', { nodeId: node.id, port: p.id, kind: 'out', event: $event })"
         @pointerup.stop="emit('portPointerUp', { nodeId: node.id, port: p.id, kind: 'out', event: $event })"
+        @keydown.enter.prevent="emit('portActivate', { nodeId: node.id, port: p.id, kind: 'out' })"
       />
     </div>
   </div>

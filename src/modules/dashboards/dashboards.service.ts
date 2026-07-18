@@ -9,17 +9,20 @@
  *   permission: dashboard:read / dashboard:write / dashboard:publish
  */
 import type { Dashboard, DashboardListItem } from '@/shared/types/dashboard'
-import { LocalStore, latency, isoAgo, nowIso, clone } from '@/shared/lib/mock'
+import { LocalStore, latency, isoAgo, nowIso, clone, currentStorageScope } from '@/shared/lib/mock'
 import { ApiError } from '@/shared/types/api'
 import { apiClient } from '@/shared/lib/apiClient'
 import { defineService } from '@/shared/services/serviceFactory'
 import { SEED_DASHBOARDS } from './seed'
 
-const store = new LocalStore<Record<string, Dashboard>>('vip.dashboards')
+// Tenant/workspace-partitioned so dashboards never leak across tenants (C002).
+const store = new LocalStore<Record<string, Dashboard>>('vip.dashboards', { scoped: true })
 
 function db(): Record<string, Dashboard> {
   const existing = store.read({})
-  if (Object.keys(existing).length === 0) {
+  if (Object.keys(existing).length === 0 && currentStorageScope().startsWith('org_veltrix')) {
+    // Seed demo content only in the primary tenant; other tenants start empty
+    // to demonstrate isolation.
     const seeded: Record<string, Dashboard> = {}
     SEED_DASHBOARDS.forEach((d) => (seeded[d.id] = d))
     store.write(seeded)

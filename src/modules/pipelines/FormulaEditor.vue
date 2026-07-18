@@ -92,15 +92,23 @@ function insertColumn(name: string) {
           >{{ c }}</button>
         </div>
       </div>
-      <div class="fx__list">
-        <div v-for="fn in fns" :key="fn.name" class="fx__fn" @click="insertFn(fn)">
+      <div class="fx__list" role="listbox" aria-label="Formula functions">
+        <button
+          v-for="fn in fns"
+          :key="fn.name"
+          type="button"
+          class="fx__fn"
+          role="option"
+          :aria-label="`Insert ${fn.name} — ${fn.description}`"
+          @click="insertFn(fn)"
+        >
           <div class="fx__fn-top">
             <code class="fx__fn-name">{{ fn.signature }}</code>
             <VipBadge tone="neutral" size="sm">{{ fn.category }}</VipBadge>
           </div>
           <div class="fx__fn-desc">{{ fn.description }}</div>
           <code class="fx__fn-ex">{{ fn.example }}</code>
-        </div>
+        </button>
         <div v-if="!fns.length" class="fx__empty">No functions match “{{ search }}”.</div>
       </div>
     </div>
@@ -128,7 +136,7 @@ function insertColumn(name: string) {
 .fx__cat { padding: 2px 8px; background: none; border: 1px solid var(--vip-border); border-radius: var(--vip-radius-full); color: var(--vip-text-muted); font-size: var(--vip-fs-2xs); }
 .fx__cat.is-active { background: var(--vip-brand-soft); border-color: var(--vip-brand-500); color: var(--vip-brand-text); }
 .fx__list { max-height: 240px; overflow-y: auto; padding: var(--vip-sp-3); }
-.fx__fn { padding: var(--vip-sp-3) var(--vip-sp-4); border-radius: var(--vip-radius-sm); cursor: pointer; }
+.fx__fn { display: block; width: 100%; text-align: left; background: none; border: none; padding: var(--vip-sp-3) var(--vip-sp-4); border-radius: var(--vip-radius-sm); cursor: pointer; color: inherit; }
 .fx__fn:hover { background: var(--vip-surface-hover); }
 .fx__fn-top { display: flex; align-items: center; justify-content: space-between; gap: var(--vip-sp-3); }
 .fx__fn-name { font-family: var(--vip-font-mono); font-size: var(--vip-fs-xs); color: var(--vip-brand-text); }

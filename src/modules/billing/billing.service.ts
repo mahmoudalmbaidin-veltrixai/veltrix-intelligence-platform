@@ -4,6 +4,8 @@
  * permission: billing:read / billing:manage
  */
 import { latency, isoAgo } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 export interface Plan { key: string; name: string; price: number; features: string[]; current: boolean }
 export interface Invoice { id: string; number: string; date: string; amount: number; status: 'paid' | 'due' | 'overdue' }
@@ -29,9 +31,25 @@ const USAGE: UsageLine[] = [
   { label: 'Storage', used: 780, limit: 1000, unit: 'GB' },
 ]
 
-export const billingService = {
+export interface BillingService {
+  listPlans(): Promise<Plan[]>
+  listInvoices(): Promise<Invoice[]>
+  getPaymentMethod(): Promise<PaymentMethod>
+  getUsage(): Promise<UsageLine[]>
+}
+
+const mockBillingService: BillingService = {
   async listPlans() { await latency(); return PLANS.map((p) => ({ ...p })) },
   async listInvoices() { await latency(); return INVOICES.map((i) => ({ ...i })) },
   async getPaymentMethod(): Promise<PaymentMethod> { await latency(); return { brand: 'Visa', last4: '6411', expiry: '08/28' } },
   async getUsage() { await latency(); return USAGE.map((u) => ({ ...u })) },
 }
+
+const apiBillingService: BillingService = {
+  listPlans: () => apiClient.get<Plan[]>('/billing/plans'),
+  listInvoices: () => apiClient.get<Invoice[]>('/billing/invoices'),
+  getPaymentMethod: () => apiClient.get<PaymentMethod>('/billing/payment-method'),
+  getUsage: () => apiClient.get<UsageLine[]>('/billing/usage'),
+}
+
+export const billingService: BillingService = defineService(mockBillingService, () => apiBillingService)

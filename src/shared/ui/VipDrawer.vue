@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, onBeforeUnmount } from 'vue'
+import { watch, onBeforeUnmount, ref, nextTick } from 'vue'
 import VipIcon from './VipIcon.vue'
 
 const props = withDefaults(
@@ -8,10 +8,33 @@ const props = withDefaults(
 )
 const emit = defineEmits<{ close: [] }>()
 
+const panel = ref<HTMLElement>()
+let lastFocused: HTMLElement | null = null
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') { emit('close'); return }
+  if (e.key !== 'Tab' || !panel.value) return
+  const focusables = panel.value.querySelectorAll<HTMLElement>(
+    'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
+  )
+  if (!focusables.length) return
+  const first = focusables[0]
+  const last = focusables[focusables.length - 1]
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+}
+
 watch(
   () => props.open,
-  (v) => {
+  async (v) => {
     document.body.style.overflow = v ? 'hidden' : ''
+    if (v) {
+      lastFocused = document.activeElement as HTMLElement
+      await nextTick()
+      panel.value?.querySelector<HTMLElement>('[data-autofocus], button, input, textarea, select, a[href]')?.focus()
+    } else {
+      lastFocused?.focus()
+    }
   },
 )
 onBeforeUnmount(() => {
@@ -22,8 +45,9 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <Transition name="vip-drawer">
-      <div v-if="open" class="vip-drawer__scrim" @click.self="emit('close')" @keydown.esc="emit('close')">
+      <div v-if="open" class="vip-drawer__scrim" @click.self="emit('close')" @keydown="onKeydown">
         <aside
+          ref="panel"
           class="vip-drawer"
           :class="`is-${side}`"
           :style="{ width: `${width}px` }"

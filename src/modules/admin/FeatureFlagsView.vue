@@ -35,7 +35,7 @@ function scopeTone(s: string) { return s === 'plan' ? 'warning' : s === 'organiz
           <div class="ff-head"><span class="ff-name">{{ meta[k].label }}</span><VipBadge :tone="scopeTone(meta[k].scope)" size="sm">{{ meta[k].scope }}</VipBadge></div>
           <p class="ff-desc">{{ meta[k].description }}</p>
         </div>
-        <VipSwitch :model-value="platform.flagEnabled(k)" @update:model-value="toggle(k)" />
+        <VipSwitch :model-value="platform.flagEnabled(k)" :aria-label="`Toggle ${meta[k].label}`" @update:model-value="toggle(k)" />
       </VipCard>
     </div>
     <p class="ff-foot">Percentage rollout and change history are backend-managed; overrides here apply to your active org/workspace.</p>

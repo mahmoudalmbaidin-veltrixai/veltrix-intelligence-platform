@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{ modelValue?: boolean; label?: string; disabled?: boolean; size?: 'sm' | 'md' }>()
+const props = defineProps<{ modelValue?: boolean; label?: string; ariaLabel?: string; disabled?: boolean; size?: 'sm' | 'md' }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
 </script>
 
@@ -9,6 +9,7 @@ const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
       type="button"
       role="switch"
       :aria-checked="!!modelValue"
+      :aria-label="ariaLabel ?? label"
       class="vip-switch__track"
       :class="{ 'is-on': modelValue }"
       :disabled="disabled"

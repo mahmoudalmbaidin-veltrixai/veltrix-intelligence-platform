@@ -103,6 +103,11 @@ async function save() {
   autosaveAt.value = saved.updatedAt
   saving.value = false
   ui.pushToast({ kind: 'success', title: 'Pipeline saved' })
+  // First save from /pipelines/new: adopt the created ID URL for deep-link /
+  // reload stability (QA VIP-FE-H005).
+  if (!route.params.id) {
+    router.replace(`/pipelines/${saved.id}`)
+  }
 }
 
 function runValidation() {
@@ -183,7 +188,21 @@ function onKeydown(e: KeyboardEvent) {
   else if (mod && e.key.toLowerCase() === 'v') { editor.value.paste() }
   else if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); editor.value.duplicateNodes([...editor.value.selection.value]) }
   else if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); editor.value.selectMany(editor.value.pipeline.nodes.map((n) => n.id)) }
-  else if (e.key === 'Escape') { editor.value.clearSelection() }
+  else if (e.key.startsWith('Arrow') && editor.value.selection.value.size) {
+    // Keyboard move of the selected node(s) (QA VIP-FE-C003).
+    e.preventDefault()
+    const step = e.shiftKey ? 1 : 16
+    const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0
+    const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0
+    editor.value.moveNodes([...editor.value.selection.value], dx, dy)
+    editor.value.commit()
+  }
+  else if (e.key === 'Escape') {
+    canvasRef.value?.cancelKeyboardConnect()
+    paletteOpen.value = false
+    inspectorOpen.value = false
+    editor.value.clearSelection()
+  }
 }
 
 /* ---- autosave (debounced on dirty) ---- */
