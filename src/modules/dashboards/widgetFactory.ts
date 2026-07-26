@@ -50,7 +50,7 @@ export function defaultFormat(): WidgetFormat {
 }
 
 let wid = 0
-export function createWidget(type: WidgetType, x: number, y: number, modelId = 'sm_sales'): DashboardWidget {
+export function createWidget(type: WidgetType, x: number, y: number, modelId = ''): DashboardWidget {
   const cat = WIDGET_CATALOG.find((c) => c.type === type)!
   wid += 1
   const id = `w_${Date.now().toString(36)}${wid}`
@@ -86,7 +86,7 @@ export function createWidget(type: WidgetType, x: number, y: number, modelId = '
   return {
     id,
     type,
-    modelId: ['text', 'rich-text', 'image'].includes(type) ? undefined : modelId,
+    modelId: ['text', 'rich-text', 'image'].includes(type) || !modelId ? undefined : modelId,
     pos: { x, y, w: cat.defaultW, h: cat.defaultH },
     wells,
     filters: [],

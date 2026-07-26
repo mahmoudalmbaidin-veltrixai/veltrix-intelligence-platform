@@ -87,6 +87,8 @@ export const ICONS: Record<string, string> = {
   upload: '<path d="M12 20V9M8 13l4-4 4 4M5 4h14"/>',
   drag: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
   pin: '<path d="M15 3l6 6-4 1-3.5 3.5L13 20l-2 2-3-6-4 1z"/>',
+  pinOff: '<path d="M15 3l6 6-4 1-3.5 3.5L13 20l-2 2-3-6-4 1z"/><path d="M3 3l18 18"/>',
+  panelLeft: '<rect x="3" y="4" width="18" height="16" rx="1.6"/><path d="M9 4v16"/>',
   share:
     '<circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8 11l8-4M8 13l8 4"/>',
   link: '<path d="M9 15l6-6M8 12l-2 2a3.5 3.5 0 0 0 5 5l2-2M16 12l2-2a3.5 3.5 0 0 0-5-5l-2 2"/>',

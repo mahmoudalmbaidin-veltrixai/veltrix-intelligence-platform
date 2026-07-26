@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useQuery } from '@/shared/lib/query'
+import { useMutation, useQuery } from '@/shared/lib/query'
 import { relativeTime } from '@/shared/lib/format'
 import { useUiStore } from '@/shared/stores/ui'
 import { usePlatformStore } from '@/shared/stores/platform'
 import { semanticStudioService } from './semantic.service'
+import { datasetService } from '@/modules/datasets/datasets.service'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
@@ -13,16 +14,65 @@ import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipSkeleton from '@/shared/ui/VipSkeleton.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
+import VipDialog from '@/shared/ui/VipDialog.vue'
+import VipInput from '@/shared/ui/VipInput.vue'
+import VipSelect from '@/shared/ui/VipSelect.vue'
+import VipTextarea from '@/shared/ui/VipTextarea.vue'
 
 const router = useRouter()
 const ui = useUiStore()
 const platform = usePlatformStore()
-const canWrite = computed(() => platform.can('semantic:write'))
+const canWrite = computed(() => platform.can('semantic_model.create'))
 
-const { data, isLoading } = useQuery(
+const { data, isLoading, refetch } = useQuery(
   () => 'semantic:models',
   () => semanticStudioService.listModels(),
 )
+const { data: datasets } = useQuery('semantic:datasets', () => datasetService.list())
+const search = ref('')
+const statusFilter = ref<'all' | 'published' | 'draft'>('all')
+const page = ref(1)
+const pageSize = 9
+const filtered = computed(() => {
+  const query = search.value.trim().toLowerCase()
+  return (data.value ?? []).filter(
+    (model) =>
+      (!query || model.label.toLowerCase().includes(query) || model.description.toLowerCase().includes(query)) &&
+      (statusFilter.value === 'all' || (statusFilter.value === 'published' ? model.certified : !model.certified)),
+  )
+})
+const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
+const visible = computed(() => {
+  const current = Math.min(page.value, pageCount.value)
+  return filtered.value.slice((current - 1) * pageSize, current * pageSize)
+})
+watch([search, statusFilter], () => {
+  page.value = 1
+})
+
+const dialogOpen = ref(false)
+const formError = ref('')
+const draft = reactive({
+  name: '',
+  key: '',
+  description: '',
+  datasetId: '',
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  currency: 'USD',
+})
+const datasetOptions = computed(() => (datasets.value ?? []).map((item) => ({ value: item.id, label: item.name })))
+const statusOptions = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'published', label: 'Published' },
+  { value: 'draft', label: 'Draft' },
+]
+function slug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
 
 function open(id: string) {
   router.push(`/semantic/${id}`)
@@ -36,7 +86,50 @@ function newModel() {
     })
     return
   }
-  ui.pushToast({ kind: 'info', title: 'New model', message: 'Model scaffolding is not available in this preview.' })
+  draft.name = ''
+  draft.key = ''
+  draft.description = ''
+  draft.datasetId = datasetOptions.value[0]?.value ?? ''
+  draft.currency = 'USD'
+  formError.value = ''
+  dialogOpen.value = true
+}
+
+const createModel = useMutation(
+  () =>
+    semanticStudioService.createModel({
+      key: draft.key || slug(draft.name),
+      name: draft.name.trim(),
+      description: draft.description.trim(),
+      primary_dataset_id: draft.datasetId,
+      timezone: draft.timezone,
+      currency: draft.currency.toUpperCase(),
+    }),
+  {
+    onSuccess: async (created) => {
+      dialogOpen.value = false
+      await refetch()
+      ui.pushToast({ kind: 'success', title: 'Semantic model created', message: draft.name })
+      open(created.id)
+    },
+    onError: (error) => {
+      formError.value = error.message
+    },
+  },
+)
+
+async function submit(): Promise<void> {
+  draft.key = draft.key || slug(draft.name)
+  if (!draft.name.trim() || draft.key.length < 2 || !draft.datasetId) {
+    formError.value = 'Name, valid key, and primary dataset are required.'
+    return
+  }
+  if (!/^[a-z][a-z0-9_]{1,99}$/.test(draft.key)) {
+    formError.value = 'Key must start with a letter and contain lowercase letters, numbers, or underscores.'
+    return
+  }
+  formError.value = ''
+  await createModel.mutate(undefined)
 }
 
 function counts(dimensions: number, measures: number): string {
@@ -54,6 +147,11 @@ function counts(dimensions: number, measures: number): string {
         <VipButton variant="primary" icon="plus" :disabled="!canWrite" @click="newModel">New model</VipButton>
       </template>
     </VipPageHeader>
+
+    <div class="toolbar">
+      <VipInput v-model="search" icon="search" placeholder="Search semantic models" />
+      <VipSelect v-model="statusFilter" :options="statusOptions" aria-label="Model status" />
+    </div>
 
     <div v-if="isLoading" class="grid">
       <VipCard v-for="n in 4" :key="n">
@@ -73,7 +171,7 @@ function counts(dimensions: number, measures: number): string {
     </VipEmptyState>
 
     <div v-else class="grid">
-      <VipCard v-for="m in data" :key="m.id" hoverable @click="open(m.id)">
+      <VipCard v-for="m in visible" :key="m.id" hoverable @click="open(m.id)">
         <div class="card-head">
           <span class="card-icon"><VipIcon name="layers" :size="18" /></span>
           <div class="card-titles">
@@ -105,6 +203,34 @@ function counts(dimensions: number, measures: number): string {
         </div>
       </VipCard>
     </div>
+    <div v-if="pageCount > 1" class="pagination" aria-label="Semantic model pages">
+      <VipButton variant="tertiary" :disabled="page === 1" @click="page--">Previous</VipButton>
+      <span>Page {{ page }} of {{ pageCount }}</span>
+      <VipButton variant="tertiary" :disabled="page === pageCount" @click="page++">Next</VipButton>
+    </div>
+
+    <VipDialog
+      :open="dialogOpen"
+      title="Create semantic model"
+      description="Choose the governed dataset that anchors this semantic model."
+      @close="dialogOpen = false"
+    >
+      <div class="form">
+        <VipInput v-model="draft.name" label="Model name" required @blur="draft.key ||= slug(draft.name)" />
+        <VipInput v-model="draft.key" label="Model key" required help="Stable query identifier." />
+        <VipSelect v-model="draft.datasetId" :options="datasetOptions" label="Primary dataset" required />
+        <VipTextarea v-model="draft.description" label="Description" />
+        <div class="form-row">
+          <VipInput v-model="draft.timezone" label="Timezone" required />
+          <VipInput v-model="draft.currency" label="Currency" maxlength="3" required />
+        </div>
+        <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
+      </div>
+      <template #footer>
+        <VipButton variant="tertiary" @click="dialogOpen = false">Cancel</VipButton>
+        <VipButton variant="primary" :loading="createModel.isPending.value" @click="submit"> Create model </VipButton>
+      </template>
+    </VipDialog>
   </div>
 </template>
 
@@ -116,6 +242,34 @@ function counts(dimensions: number, measures: number): string {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--vip-sp-6);
+}
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 200px;
+  gap: var(--vip-sp-4);
+  margin-bottom: var(--vip-sp-6);
+}
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  margin-top: var(--vip-sp-6);
+  color: var(--vip-text-muted);
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-5);
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: var(--vip-sp-4);
+}
+.form-error {
+  color: var(--vip-danger-text);
+  font-size: var(--vip-fs-sm);
 }
 .card-head {
   display: flex;

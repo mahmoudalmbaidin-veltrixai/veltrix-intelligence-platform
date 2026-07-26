@@ -81,8 +81,8 @@
   --vip-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
 
   /* ---- Brand (tenant-overridable) ---- */
-  --vip-brand-500: #6d5efc;
-  --vip-brand-600: #5b4de0;
+  --vip-brand-500: #6252e6;
+  --vip-brand-600: #5143ca;
   --vip-brand-400: #8a7dff;
   --vip-brand-accent: #22c1a6;
 
@@ -119,8 +119,8 @@
 
   --vip-text-primary: #e9ecf2;
   --vip-text-secondary: #b3b9c6;
-  --vip-text-muted: #7d8494;
-  --vip-text-disabled: #565c69;
+  --vip-text-muted: #a2a9b7;
+  --vip-text-disabled: #929aaa;
   --vip-text-inverse: #0e1016;
   --vip-text-on-brand: #ffffff;
 
@@ -136,7 +136,7 @@
   --vip-warning: #e0a52e;
   --vip-warning-soft: rgba(224, 165, 46, 0.15);
   --vip-warning-text: #f2bd52;
-  --vip-danger: #e5544b;
+  --vip-danger: #c03932;
   --vip-danger-soft: rgba(229, 84, 75, 0.15);
   --vip-danger-text: #ff7b73;
   --vip-info: #4aa3ff;
@@ -175,7 +175,7 @@
   --vip-text-primary: #171a21;
   --vip-text-secondary: #454b58;
   --vip-text-muted: #6b7280;
-  --vip-text-disabled: #a0a6b0;
+  --vip-text-disabled: #687181;
   --vip-text-inverse: #ffffff;
   --vip-text-on-brand: #ffffff;
 

@@ -69,7 +69,7 @@ function addPaletteNode(kind: PipelineNodeKind) {
   if (compact.value) paletteOpen.value = false
 }
 
-const canEdit = computed(() => platform.can('pipeline:write'))
+const canEdit = computed(() => platform.can('pipeline.create') || platform.can('pipeline.update'))
 
 // Unwrapped accessors for template use (composable exposes refs).
 const dirty = computed(() => editor.value?.dirty.value ?? false)
@@ -96,7 +96,7 @@ watch(
 async function load() {
   loading.value = true
   const id = route.params.id as string | undefined
-  const pipeline: Pipeline = id ? await pipelineService.get(id) : newDraft()
+  const pipeline: Pipeline = id && id !== 'new' ? await pipelineService.get(id) : newDraft()
   editor.value = usePipelineEditor(pipeline)
   validation.value = editor.value.validate()
   loading.value = false
@@ -128,24 +128,33 @@ watch(
 )
 
 /* ---- actions ---- */
-async function save() {
+async function persist(showToast = false) {
   if (!editor.value || !canEdit.value) return
+  const isFirstSave = editor.value.pipeline.id === 'new'
   saving.value = true
-  const saved = await pipelineService.save(editor.value.pipeline as Pipeline)
-  editor.value.markSaved()
-  autosaveAt.value = saved.updatedAt
-  saving.value = false
-  ui.pushToast({ kind: 'success', title: 'Pipeline saved' })
-  // First save from /pipelines/new: adopt the created ID URL for deep-link /
-  // reload stability (QA VIP-FE-H005).
-  if (!route.params.id) {
-    router.replace(`/pipelines/${saved.id}`)
+  try {
+    const saved = isFirstSave
+      ? await pipelineService.create(editor.value.pipeline as Pipeline)
+      : await pipelineService.save(editor.value.pipeline as Pipeline)
+    Object.assign(editor.value.pipeline, saved)
+    editor.value.markSaved()
+    autosaveAt.value = saved.updatedAt
+    if (isFirstSave) await router.replace(`/pipelines/${saved.id}`)
+    if (showToast) ui.pushToast({ kind: 'success', title: 'Pipeline saved' })
+    return saved
+  } finally {
+    saving.value = false
   }
 }
 
-function runValidation() {
+async function save() {
+  await persist(true)
+}
+
+async function runValidation() {
   if (!editor.value) return
-  validation.value = editor.value.validate()
+  await persist()
+  validation.value = await pipelineService.validate(editor.value.pipeline.id)
   bottomTab.value = 'validation'
   bottomOpen.value = true
   if (validation.value.valid)
@@ -164,7 +173,8 @@ function runValidation() {
 
 async function publish() {
   if (!editor.value) return
-  const report = editor.value.validate()
+  await persist()
+  const report = await pipelineService.validate(editor.value.pipeline.id)
   validation.value = report
   if (!report.valid) {
     bottomTab.value = 'validation'
@@ -172,16 +182,15 @@ async function publish() {
     ui.pushToast({ kind: 'error', title: 'Cannot publish', message: 'Resolve validation errors first.' })
     return
   }
-  await save()
   const published = await pipelineService.publish(editor.value.pipeline as Pipeline)
-  editor.value.pipeline.status = published.status
-  editor.value.pipeline.version = published.version
+  Object.assign(editor.value.pipeline, await pipelineService.get(editor.value.pipeline.id))
   ui.pushToast({ kind: 'success', title: 'Pipeline published', message: `Version ${published.version} is now live` })
 }
 
-function run() {
+async function run() {
   if (!editor.value) return
-  const report = editor.value.validate()
+  await persist()
+  const report = await pipelineService.validate(editor.value.pipeline.id)
   if (!report.valid) {
     validation.value = report
     bottomTab.value = 'validation'
@@ -191,32 +200,30 @@ function run() {
   }
   bottomTab.value = 'logs'
   bottomOpen.value = true
-  // Revenue pipeline deterministically fails at its join node to demo failure UX
-  const failNode =
-    editor.value.pipeline.id === 'pl_revenue'
-      ? editor.value.pipeline.nodes.find((n) => n.kind === 'join')?.id
-      : undefined
-  runner.start(editor.value.pipeline as Pipeline, { failNode })
+  await runner.start(editor.value.pipeline.id)
 }
 
-function retry() {
-  if (!editor.value || !runner.run.value) return
-  runner.start(editor.value.pipeline as Pipeline, { attempt: runner.run.value.attempt + 1 })
+async function retry() {
+  if (!runner.run.value) return
+  await runner.retry()
 }
 
 const runMenuItems = [
   { key: 'schedule', label: 'Configure schedule…', icon: 'calendar' },
   { key: 'deps', label: 'View dependencies', icon: 'lineage' },
   { key: 'versions', label: 'Version history', icon: 'clock' },
-]
-function onRunMenu(key: string) {
-  if (key === 'versions')
+].filter((item) => item.key !== 'schedule')
+async function onRunMenu(key: string) {
+  if (key === 'versions' && editor.value) {
+    const versions = await pipelineService.versions(editor.value.pipeline.id)
     ui.pushToast({
       kind: 'info',
       title: 'Version history',
-      message: `Current version v${editor.value?.pipeline.version}. Full history is a backend dependency.`,
+      message: versions.length
+        ? `${versions.length} immutable version${versions.length === 1 ? '' : 's'}; latest is v${versions[0].version_number}.`
+        : 'This pipeline has not been published yet.',
     })
-  else if (key === 'schedule')
+  } else if (key === 'schedule')
     ui.pushToast({
       kind: 'info',
       title: 'Schedule',
@@ -283,15 +290,16 @@ function onKeydown(e: KeyboardEvent) {
 /* ---- autosave (debounced on dirty) ---- */
 let autosaveTimer: number | undefined
 watch(
-  () => editor.value?.dirty,
+  () => editor.value?.dirty.value,
   (d) => {
-    if (d && canEdit.value) {
+    // A new pipeline is created only by an explicit Save. Otherwise a long
+    // source upload can race an autosave that replaces the editor instance,
+    // leaving the completed source binding on a detached draft.
+    if (d && canEdit.value && editor.value?.pipeline.id !== 'new') {
       window.clearTimeout(autosaveTimer)
       autosaveTimer = window.setTimeout(async () => {
-        if (!editor.value?.dirty) return
-        await pipelineService.save(editor.value.pipeline as Pipeline)
-        editor.value.markSaved()
-        autosaveAt.value = new Date().toISOString()
+        if (!editor.value?.dirty.value) return
+        await persist()
       }, 2500)
     }
   },
@@ -299,13 +307,13 @@ watch(
 
 /* ---- unsaved protection ---- */
 function beforeUnload(e: BeforeUnloadEvent) {
-  if (editor.value?.dirty) {
+  if (editor.value?.dirty.value) {
     e.preventDefault()
     e.returnValue = ''
   }
 }
 onBeforeRouteLeave(() => {
-  if (editor.value?.dirty) {
+  if (editor.value?.dirty.value) {
     return window.confirm('You have unsaved changes. Leave anyway?')
   }
   return true
@@ -441,6 +449,7 @@ onBeforeUnmount(() => {
           role="region"
           aria-label="Node palette"
           :aria-hidden="compact && !paletteOpen"
+          :inert="compact && !paletteOpen"
           :class="{ 'is-overlay': compact, 'is-open': paletteOpen }"
           :style="compact ? {} : { width: `${leftPanel.size.value}px` }"
         >
@@ -466,6 +475,7 @@ onBeforeUnmount(() => {
           role="region"
           aria-label="Node inspector"
           :aria-hidden="compact && !inspectorOpen"
+          :inert="compact && !inspectorOpen"
           :class="{ 'is-overlay': compact, 'is-open': inspectorOpen }"
           :style="compact ? {} : { width: `${rightPanel.size.value}px` }"
         >
@@ -508,6 +518,8 @@ onBeforeUnmount(() => {
               variant="ghost"
               size="xs"
               :icon="bottomOpen ? 'chevronDown' : 'chevronUp'"
+              :title="bottomOpen ? 'Collapse results panel' : 'Expand results panel'"
+              :aria-label="bottomOpen ? 'Collapse results panel' : 'Expand results panel'"
               @click="bottomOpen = !bottomOpen"
             />
           </div>

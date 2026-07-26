@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { homeService } from './home.service'
 import { usePlatformStore } from '@/shared/stores/platform'
-import { ROLES } from '@/shared/permissions/roles'
 import { QUICK_CREATE } from '@/app/navigation'
 import { relativeTime } from '@/shared/lib/format'
 import VipCard from '@/shared/ui/VipCard.vue'
@@ -20,6 +20,12 @@ const { data, isLoading } = useQuery('home:summary', () => homeService.summary()
 const quickActions = QUICK_CREATE.filter((a) => !a.permission || platform.can(a.permission))
 const hour = new Date().getHours()
 const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+const roleLabel = computed(() => {
+  const roles = new Set(
+    [platform.organization?.membershipRole, platform.role].filter((value): value is string => !!value),
+  )
+  return [...roles].map((role) => role.replace(/_/g, ' ')).join(' · ')
+})
 </script>
 
 <template>
@@ -28,7 +34,10 @@ const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Go
       <div>
         <div class="home__greeting">{{ greeting }}, {{ platform.user.name.split(' ')[0] }}</div>
         <h1 class="home__title">{{ platform.workspace?.name }} workspace</h1>
-        <p class="home__sub">{{ platform.organization.name }} · Signed in as {{ ROLES[platform.role].label }}</p>
+        <p class="home__sub">
+          {{ platform.organization?.name ?? 'No organization available' }} · Signed in as
+          {{ roleLabel || 'no active role' }}
+        </p>
       </div>
       <div class="home__quick">
         <VipButton

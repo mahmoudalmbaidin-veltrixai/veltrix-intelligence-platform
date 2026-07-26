@@ -1,0 +1,16 @@
+transaction_id,transaction_date,customer_id,product_id,product_category,region,quantity,unit_price,discount_pct,cost
+B850001,2026-07-01,C001,P001,Analytics,Riyadh,2,1200.00,0.10,1400.00
+B850002,2026-07-02,C002,P002,Security,Jeddah,1,2200.00,0.05,1500.00
+B850003,2026-07-03,C003,P003,Integration,Dammam,3,800.00,0.00,1200.00
+B850004,2026-07-04,C004,P001,Analytics,Riyadh,4,1200.00,0.15,2500.00
+B850005,2026-07-05,C005,P004,Automation,Jeddah,2,950.00,0.10,1000.00
+B850005,2026-07-05,C005,P004,Automation,Jeddah,2,950.00,0.10,1000.00
+B850006,2026-07-06,C999,P002,Security,Riyadh,1,2200.00,0.00,1500.00
+B850007,not-a-date,C007,P003,Integration,Dammam,2,800.00,0.05,900.00
+B850008,2026-07-08,C008,P999,Unknown,Riyadh,1,500.00,0.00,200.00
+B850009,2026-07-09,C009,P001,Analytics,Jeddah,-2,1200.00,0.10,1400.00
+B850010,2026-07-10,C010,P002,Security,Dammam,1,invalid-price,0.05,1500.00
+B850011,2026-07-11,,P003,Integration,Riyadh,3,800.00,0.00,1200.00
+B850012,2026-07-12,C012,P004,Automation,Jeddah,2,950.00,1.25,1000.00
+B850013,2026-07-13,C013,P005,,Dammam,0,0.00,0.00,0.00
+B850014,2026-07-14,C014,P005,automation,riyadh,1,750.00,0.00,300.00

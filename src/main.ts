@@ -5,7 +5,12 @@ import { router } from './app/router'
 import { useThemeStore } from './shared/stores/theme'
 import { usePlatformStore } from './shared/stores/platform'
 import { useAuthStore } from './shared/stores/auth'
-import { setRequestContextProvider, setUnauthorizedHandler, cancelAllRequests } from './shared/lib/apiClient'
+import {
+  setRequestContextProvider,
+  setTenantAccessLostHandler,
+  setUnauthorizedHandler,
+  cancelAllRequests,
+} from './shared/lib/apiClient'
 
 import './styles/tokens.css'
 import './styles/base.css'
@@ -20,7 +25,6 @@ useThemeStore().apply()
 const platform = usePlatformStore()
 const auth = useAuthStore()
 setRequestContextProvider(() => ({
-  token: auth.session?.token,
   orgId: platform.organization?.id,
   workspaceId: platform.workspace?.id,
   locale: platform.user?.locale,
@@ -36,6 +40,9 @@ setUnauthorizedHandler(() => {
     auth.setIntended(current.fullPath)
     router.replace({ name: 'login', query: { expired: '1' } })
   }
+})
+setTenantAccessLostHandler(() => {
+  void platform.bootstrapTenancy(true)
 })
 
 // Restore the session before mounting so guards see a settled auth state.

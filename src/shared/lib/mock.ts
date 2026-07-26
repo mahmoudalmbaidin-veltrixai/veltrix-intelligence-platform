@@ -7,6 +7,7 @@
  * state survives reloads. Secrets are NEVER written here (see NOTE below).
  */
 import { ApiError, type ApiErrorKind } from '@/shared/types/api'
+import { config } from '@/shared/config/env'
 
 let seed = 1
 /** Deterministic PRNG so mock data is stable across reloads/tests. */
@@ -26,6 +27,7 @@ export function randInt(min: number, max: number): number {
 }
 
 export function latency(min = 180, max = 520): Promise<void> {
+  if (!config.enableMockLatency) return Promise.resolve()
   const ms = min + Math.round(Math.random() * (max - min))
   return new Promise((resolve) => setTimeout(resolve, ms))
 }

@@ -26,8 +26,12 @@ async function toggle() {
     focusItem(0)
   }
 }
-function close() {
+function focusTrigger() {
+  root.value?.querySelector<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])')?.focus()
+}
+function close(restoreFocus = false) {
   open.value = false
+  if (restoreFocus) nextTick(focusTrigger)
 }
 
 function menuItems(): HTMLElement[] {
@@ -54,7 +58,10 @@ function onMenuKeydown(e: KeyboardEvent) {
   } else if (e.key === 'End') {
     e.preventDefault()
     focusItem(items.length - 1)
-  } else if (e.key === 'Escape' || e.key === 'Tab') {
+  } else if (e.key === 'Escape') {
+    e.preventDefault()
+    close(true)
+  } else if (e.key === 'Tab') {
     close()
   }
 }

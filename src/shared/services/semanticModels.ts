@@ -8,6 +8,7 @@
  */
 import type {
   CellValue,
+  NumberFormat,
   QueryColumn,
   QueryResult,
   SemanticField,
@@ -15,6 +16,8 @@ import type {
   SemanticQuery,
 } from '@/shared/types/semantic'
 import { latency, nowIso } from '@/shared/lib/mock'
+import { apiClient } from '@/shared/lib/apiClient'
+import { defineService } from '@/shared/services/serviceFactory'
 
 function f(
   id: string,
@@ -257,7 +260,7 @@ export function runQuerySync(query: SemanticQuery): QueryResult {
   }
 }
 
-export const semanticService = {
+const mockSemanticService = {
   async listModels(): Promise<SemanticModel[]> {
     await latency(120, 300)
     return MODELS
@@ -271,3 +274,127 @@ export const semanticService = {
     return runQuerySync(q)
   },
 }
+
+interface ApiModel {
+  id: string
+  key: string
+  name: string
+  description: string
+  status: string
+  updated_at: string
+}
+interface ApiDimension {
+  id: string
+  key: string
+  name: string
+  description: string
+  data_type: string
+  is_time_dimension: boolean
+  time_granularities: string[]
+  is_hidden: boolean
+}
+interface ApiMetric {
+  id: string
+  key: string
+  name: string
+  description: string
+  format: NumberFormat
+}
+interface ApiQueryResult {
+  columns: QueryColumn[]
+  rows: Record<string, CellValue>[]
+  row_count: number
+  execution: { executed_at: string }
+}
+
+function dataType(value: string): SemanticField['dataType'] {
+  if (['integer', 'decimal'].includes(value)) return 'number'
+  if (['date', 'datetime', 'boolean'].includes(value)) return value as SemanticField['dataType']
+  return 'string'
+}
+
+async function liveModel(item: ApiModel): Promise<SemanticModel> {
+  const [dimensions, metrics] = await Promise.all([
+    apiClient.get<ApiDimension[]>(`/semantic-models/${item.id}/dimensions`),
+    apiClient.get<ApiMetric[]>(`/semantic-models/${item.id}/metrics`),
+  ])
+  const fields: SemanticField[] = [
+    ...dimensions
+      .filter((entry) => !entry.is_hidden)
+      .map((entry) => ({
+        id: entry.key,
+        name: entry.key,
+        label: entry.name,
+        description: entry.description,
+        role: entry.is_time_dimension ? ('time' as const) : ('dimension' as const),
+        dataType: dataType(entry.data_type),
+        grains: entry.time_granularities as SemanticField['grains'],
+      })),
+    ...metrics.map((entry) => ({
+      id: entry.key,
+      name: entry.key,
+      label: entry.name,
+      description: entry.description,
+      role: 'metric' as const,
+      dataType: 'number' as const,
+      format: entry.format,
+    })),
+  ]
+  return {
+    id: item.id,
+    name: item.key,
+    label: item.name,
+    description: item.description,
+    owner: 'Workspace',
+    certified: item.status === 'published',
+    freshness: item.updated_at,
+    entities: [{ id: item.id, name: item.key, label: item.name, fields }],
+    fields,
+  }
+}
+
+const apiSemanticService = {
+  async listModels(): Promise<SemanticModel[]> {
+    const models = await apiClient.get<ApiModel[]>('/semantic-models')
+    return Promise.all(models.map(liveModel))
+  },
+  async getModel(id: string): Promise<SemanticModel | undefined> {
+    return liveModel(await apiClient.get<ApiModel>(`/semantic-models/${id}`))
+  },
+  async query(q: SemanticQuery): Promise<QueryResult> {
+    const result = await apiClient.post<ApiQueryResult>('/semantic-query', {
+      semantic_model_id: q.modelId,
+      metrics: q.measures.map((item) => item.fieldId),
+      dimensions: q.dimensions.map((item) => item.fieldId),
+      filters: q.filters.map((item) => ({
+        field: item.fieldId,
+        operator:
+          (
+            {
+              eq: 'equals',
+              neq: 'not_equals',
+              nin: 'not_in',
+              gt: 'greater_than',
+              gte: 'greater_than_or_equal',
+              lt: 'less_than',
+              lte: 'less_than_or_equal',
+              starts: 'starts_with',
+              ends: 'ends_with',
+            } as Record<string, string>
+          )[item.operator] ?? item.operator,
+        value: item.value,
+      })),
+      order_by: (q.sorts ?? []).map((item) => ({ field: item.fieldId, direction: item.dir })),
+      limit: q.limit,
+    })
+    return {
+      columns: result.columns,
+      rows: result.rows,
+      totalRows: result.row_count,
+      freshness: result.execution.executed_at,
+      simulated: false,
+    }
+  },
+}
+
+export const semanticService = defineService(mockSemanticService, () => apiSemanticService)

@@ -26,7 +26,7 @@ import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 
 const ui = useUiStore()
 const platform = usePlatformStore()
-const canWrite = computed(() => platform.can('report:write'))
+const canWrite = computed(() => platform.can('report.schedule'))
 
 const {
   data: deliveries,

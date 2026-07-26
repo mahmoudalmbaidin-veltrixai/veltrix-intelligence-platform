@@ -59,7 +59,7 @@ const warnCount = computed(() => metrics.value.filter((m) => state(m) === 'warn'
       description="Track consumption against the limits included in your current plan."
     >
       <template #status>
-        <VipBadge tone="brand" variant="soft" size="sm">{{ platform.organization.plan }}</VipBadge>
+        <VipBadge tone="brand" variant="soft" size="sm">{{ platform.organization?.plan ?? 'trial' }}</VipBadge>
       </template>
     </VipPageHeader>
 

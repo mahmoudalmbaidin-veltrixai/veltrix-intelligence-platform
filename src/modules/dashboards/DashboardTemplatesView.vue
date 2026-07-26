@@ -81,7 +81,7 @@ function useTemplate(t: Template) {
       <template #actions>
         <VipButton variant="tertiary" icon="chart" @click="router.push('/dashboards')">All dashboards</VipButton>
         <VipButton
-          v-if="platform.can('dashboard:write')"
+          v-if="platform.can('dashboard.create')"
           variant="primary"
           icon="plus"
           @click="router.push('/dashboards/new')"
@@ -100,7 +100,7 @@ function useTemplate(t: Template) {
           variant="secondary"
           size="sm"
           block
-          :disabled="!platform.can('dashboard:write')"
+          :disabled="!platform.can('dashboard.create')"
           @click="useTemplate(t)"
           >Use template</VipButton
         >

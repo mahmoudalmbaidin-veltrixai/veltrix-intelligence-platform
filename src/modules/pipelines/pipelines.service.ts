@@ -1,185 +1,282 @@
-/**
- * Pipeline service (mock + local persistence).
- *
- * INTEGRATION POINT
- *   GET    /api/v1/pipelines                 -> PipelineListItem[]
- *   GET    /api/v1/pipelines/:id             -> Pipeline
- *   PUT    /api/v1/pipelines/:id             -> Pipeline   (save draft)
- *   POST   /api/v1/pipelines/:id/publish     -> Pipeline
- *   POST   /api/v1/pipelines/:id/runs        -> PipelineRun (start run)
- *   Required permission: pipeline:read / pipeline:write / pipeline:run / pipeline:publish
- *
- * Editor state persists to localStorage so canvas work survives reloads.
- * Secrets are never stored here.
- */
-import type { Pipeline, PipelineListItem, PipelineRun } from '@/shared/types/pipeline'
-import { LocalStore, latency, isoAgo, isoAhead, nowIso, clone, currentStorageScope } from '@/shared/lib/mock'
-import { ApiError } from '@/shared/types/api'
+/** Live B7 pipeline REST adapter. No production-path seeds or local persistence. */
 import { apiClient } from '@/shared/lib/apiClient'
-import { defineService } from '@/shared/services/serviceFactory'
-import { SEED_PIPELINES } from './seed'
+import type {
+  Pipeline,
+  PipelineListItem,
+  PipelineNode,
+  PipelineRun,
+  RunLogEntry,
+  RunNodeState,
+  ValidationReport,
+} from '@/shared/types/pipeline'
 
-// Tenant/workspace-partitioned so pipelines never leak across tenants (C002).
-const store = new LocalStore<Record<string, Pipeline>>('vip.pipelines', { scoped: true })
-
-function db(): Record<string, Pipeline> {
-  const existing = store.read({})
-  if (Object.keys(existing).length === 0 && currentStorageScope().startsWith('org_veltrix')) {
-    const seeded: Record<string, Pipeline> = {}
-    SEED_PIPELINES.forEach((p) => (seeded[p.id] = p))
-    store.write(seeded)
-    return seeded
-  }
-  return existing
+interface SummaryDto {
+  id: string
+  name: string
+  description: string
+  status: 'draft' | 'published'
+  tags: string[]
+  row_version: number
+  published_version: number | null
+  node_count: number
+  last_run_at: string | null
+  last_run_status: string | null
+  updated_at: string
+}
+interface NodeDto {
+  id?: string | null
+  key: string
+  type: PipelineNode['kind']
+  title: string
+  x: number
+  y: number
+  config: Record<string, unknown>
+}
+interface EdgeDto {
+  id?: string | null
+  key: string
+  source: string
+  target: string
+  source_port?: string | null
+  target_port?: string | null
+}
+interface EditorDto {
+  pipeline: SummaryDto
+  canvas: Record<string, unknown>
+  nodes: NodeDto[]
+  edges: EdgeDto[]
+}
+interface RunDto {
+  id: string
+  pipeline_id: string
+  status: PipelineRun['status']
+  progress: number
+  trigger: PipelineRun['trigger']
+  correlation_id: string
+  current_attempt: number
+  rows_processed: number
+  created_at: string
+  started_at: string | null
+  completed_at: string | null
+  safe_error_message: string | null
+  nodes?: Array<{
+    node_key: string
+    status: RunNodeState['status']
+    rows_out: number
+    started_at: string | null
+    completed_at: string | null
+  }>
+  logs?: Array<{
+    created_at: string
+    level: 'info' | 'warning' | 'error'
+    node_key: string | null
+    message: string
+  }>
 }
 
-function toListItem(p: Pipeline): PipelineListItem {
+const nodeId = (node: NodeDto) => node.key
+function mapEditor(dto: EditorDto): Pipeline {
   return {
-    id: p.id,
-    name: p.name,
-    status: p.status,
-    owner: p.owner,
-    tags: p.tags,
-    version: p.version,
-    updatedAt: p.updatedAt,
-    lastRunAt: p.lastRunAt,
-    lastRunStatus: p.lastRunStatus,
-    nextSchedule: p.nextSchedule,
-    nodeCount: p.nodes.length,
+    id: dto.pipeline.id,
+    name: dto.pipeline.name,
+    description: dto.pipeline.description,
+    status: dto.pipeline.status,
+    version: dto.pipeline.published_version ?? 0,
+    rowVersion: dto.pipeline.row_version,
+    owner: 'You',
+    tags: dto.pipeline.tags,
+    nodes: dto.nodes.map((node) => ({
+      id: nodeId(node),
+      kind: node.type,
+      title: node.title,
+      x: node.x,
+      y: node.y,
+      config: node.config,
+    })),
+    edges: dto.edges.map((edge) => ({
+      id: edge.key,
+      sourceNode: edge.source,
+      targetNode: edge.target,
+      sourcePort: edge.source_port ?? 'out',
+      targetPort: edge.target_port ?? 'in',
+    })),
+    canvas: {
+      x: typeof dto.canvas.x === 'number' ? dto.canvas.x : 40,
+      y: typeof dto.canvas.y === 'number' ? dto.canvas.y : 40,
+      scale: typeof dto.canvas.scale === 'number' ? dto.canvas.scale : 1,
+      snapGrid: typeof dto.canvas.snapGrid === 'boolean' ? dto.canvas.snapGrid : true,
+      initialized: typeof dto.canvas.initialized === 'boolean' ? dto.canvas.initialized : false,
+    },
+    updatedAt: dto.pipeline.updated_at,
+    lastRunAt: dto.pipeline.last_run_at ?? undefined,
+    lastRunStatus: (dto.pipeline.last_run_status as Pipeline['lastRunStatus']) ?? undefined,
+  }
+}
+function mapSummary(dto: SummaryDto): PipelineListItem {
+  return {
+    id: dto.id,
+    name: dto.name,
+    status: dto.status,
+    owner: 'You',
+    tags: dto.tags,
+    version: dto.published_version ?? 0,
+    rowVersion: dto.row_version,
+    updatedAt: dto.updated_at,
+    lastRunAt: dto.last_run_at ?? undefined,
+    lastRunStatus: (dto.last_run_status as PipelineListItem['lastRunStatus']) ?? undefined,
+    nodeCount: dto.node_count,
+  }
+}
+function saveBody(pipeline: Pipeline) {
+  return {
+    name: pipeline.name,
+    description: pipeline.description,
+    tags: pipeline.tags,
+    expected_version: pipeline.rowVersion,
+    canvas: pipeline.canvas,
+    nodes: pipeline.nodes.map((node) => ({
+      key: node.id,
+      type: node.kind,
+      title: node.title,
+      x: node.x,
+      y: node.y,
+      config: node.config,
+    })),
+    edges: pipeline.edges.map((edge) => ({
+      key: edge.id,
+      source: edge.sourceNode,
+      target: edge.targetNode,
+      source_port: edge.sourcePort,
+      target_port: edge.targetPort,
+    })),
+  }
+}
+function mapRun(dto: RunDto): PipelineRun {
+  const states: RunNodeState[] = (dto.nodes ?? []).map((node) => ({
+    nodeId: node.node_key,
+    status: node.status,
+    rows: node.rows_out,
+    durationMs:
+      node.started_at && node.completed_at
+        ? new Date(node.completed_at).getTime() - new Date(node.started_at).getTime()
+        : undefined,
+  }))
+  const logs: RunLogEntry[] = (dto.logs ?? []).map((entry) => ({
+    ts: entry.created_at,
+    level: entry.level === 'warning' ? 'warn' : entry.level,
+    nodeId: entry.node_key ?? undefined,
+    message: entry.message,
+  }))
+  return {
+    id: dto.id,
+    pipelineId: dto.pipeline_id,
+    status: dto.status,
+    startedAt: dto.started_at ?? dto.created_at,
+    finishedAt: dto.completed_at ?? undefined,
+    durationMs:
+      dto.started_at && dto.completed_at
+        ? new Date(dto.completed_at).getTime() - new Date(dto.started_at).getTime()
+        : undefined,
+    correlationId: dto.correlation_id,
+    trigger: dto.trigger,
+    progress: dto.progress,
+    nodeStates: states,
+    logs,
+    attempt: dto.current_attempt,
+    rowsProcessed: dto.rows_processed,
   }
 }
 
-export interface PipelineService {
-  list(): Promise<PipelineListItem[]>
-  get(id: string): Promise<Pipeline>
-  save(pipeline: Pipeline): Promise<Pipeline>
-  publish(pipeline: Pipeline): Promise<Pipeline>
-}
-
-const mockPipelineService: PipelineService = {
+export const pipelineService = {
   async list(): Promise<PipelineListItem[]> {
-    await latency()
-    return Object.values(db())
-      .map(toListItem)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    const page = await apiClient.get<{ items: SummaryDto[] }>('/api/v1/pipelines')
+    return page.items.map(mapSummary)
   },
-
   async get(id: string): Promise<Pipeline> {
-    await latency(120, 320)
-    const found = db()[id]
-    if (!found) {
-      // return a fresh empty draft for /pipelines/new or unknown ids
-      if (id === 'new') return newDraft()
-      throw new ApiError('not-found', `Pipeline ${id} not found`)
-    }
-    return clone(found)
+    return mapEditor(await apiClient.get<EditorDto>(`/api/v1/pipelines/${id}`))
   },
-
+  async create(draft: Pipeline): Promise<Pipeline> {
+    const created = mapEditor(
+      await apiClient.post<EditorDto>('/api/v1/pipelines', {
+        name: draft.name,
+        description: draft.description,
+        tags: draft.tags,
+      }),
+    )
+    if (!draft.nodes.length && !draft.edges.length) return created
+    return mapEditor(
+      await apiClient.put<EditorDto>(
+        `/api/v1/pipelines/${created.id}`,
+        saveBody({ ...draft, ...created, nodes: draft.nodes, edges: draft.edges }),
+      ),
+    )
+  },
   async save(pipeline: Pipeline): Promise<Pipeline> {
-    await latency(150, 380)
-    const current = db()
-    const saved: Pipeline = { ...pipeline, updatedAt: nowIso() }
-    current[saved.id] = saved
-    store.write(current)
-    return clone(saved)
+    return mapEditor(await apiClient.put<EditorDto>(`/api/v1/pipelines/${pipeline.id}`, saveBody(pipeline)))
   },
-
-  async publish(pipeline: Pipeline): Promise<Pipeline> {
-    await latency(200, 480)
-    const published: Pipeline = { ...pipeline, status: 'published', version: pipeline.version + 1, updatedAt: nowIso() }
-    const current = db()
-    current[published.id] = published
-    store.write(current)
-    return clone(published)
+  async publish(pipeline: Pipeline): Promise<{ version: number }> {
+    const response = await apiClient.post<{ version_number: number }>(`/api/v1/pipelines/${pipeline.id}/publish`, {
+      expected_version: pipeline.rowVersion,
+      change_summary: 'Published from Pipeline Studio',
+    })
+    return { version: response.version_number }
+  },
+  async versions(id: string): Promise<Array<{ id: string; version_number: number; created_at: string }>> {
+    return apiClient.get(`/api/v1/pipelines/${id}/versions`)
+  },
+  async validate(id: string): Promise<ValidationReport> {
+    const response = await apiClient.post<{
+      valid: boolean
+      errors: Array<{ code: string; message: string; node_key?: string }>
+      warnings: Array<{ code: string; message: string; node_key?: string }>
+    }>(`/api/v1/pipelines/${id}/validate`)
+    return {
+      valid: response.valid,
+      checkedAt: new Date().toISOString(),
+      issues: [
+        ...response.errors.map((issue) => ({ ...issue, level: 'error' as const })),
+        ...response.warnings.map((issue) => ({ ...issue, level: 'warning' as const })),
+      ].map((issue, index) => ({
+        id: `${issue.code}-${index}`,
+        code: issue.code,
+        message: issue.message,
+        level: issue.level,
+        scope: issue.node_key ? 'node' : 'pipeline',
+        nodeId: issue.node_key,
+      })),
+    }
+  },
+  async startRun(id: string): Promise<PipelineRun> {
+    return mapRun(await apiClient.post<RunDto>(`/api/v1/pipelines/${id}/runs`, {}))
+  },
+  async getRun(pipelineId: string, runId: string): Promise<PipelineRun> {
+    return mapRun(await apiClient.get<RunDto>(`/api/v1/pipelines/${pipelineId}/runs/${runId}`))
+  },
+  async listRuns(id: string): Promise<PipelineRun[]> {
+    const page = await apiClient.get<{ items: RunDto[] }>(`/api/v1/pipelines/${id}/runs`)
+    return page.items.map(mapRun)
+  },
+  async cancelRun(pipelineId: string, runId: string): Promise<PipelineRun> {
+    return mapRun(await apiClient.post<RunDto>(`/api/v1/pipelines/${pipelineId}/runs/${runId}/cancel`))
+  },
+  async retryRun(pipelineId: string, runId: string): Promise<PipelineRun> {
+    return mapRun(await apiClient.post<RunDto>(`/api/v1/pipelines/${pipelineId}/runs/${runId}/retry`))
   },
 }
-
-const apiPipelineService: PipelineService = {
-  list: () => apiClient.get<PipelineListItem[]>('/pipelines'),
-  get: (id) => apiClient.get<Pipeline>(`/pipelines/${id}`),
-  save: (pipeline) => apiClient.put<Pipeline>(`/pipelines/${pipeline.id}`, pipeline),
-  publish: (pipeline) => apiClient.post<Pipeline>(`/pipelines/${pipeline.id}/publish`, pipeline),
-}
-
-export const pipelineService: PipelineService = defineService(mockPipelineService, () => apiPipelineService)
 
 export function newDraft(): Pipeline {
   return {
-    id: `pl_${Math.random().toString(36).slice(2, 8)}`,
+    id: 'new',
     name: 'Untitled pipeline',
     description: '',
     status: 'draft',
-    version: 1,
+    version: 0,
+    rowVersion: 1,
     owner: 'You',
     tags: [],
     nodes: [],
     edges: [],
-    updatedAt: nowIso(),
+    canvas: { x: 40, y: 40, scale: 1, snapGrid: true, initialized: false },
+    updatedAt: new Date().toISOString(),
   }
 }
-
-/* -------- Run simulation --------
-   Produces a live-updating run by advancing node states in topological order. */
-export function createRun(pipeline: Pipeline, trigger: PipelineRun['trigger'] = 'manual', attempt = 1): PipelineRun {
-  return {
-    id: `run_${Math.random().toString(36).slice(2, 9)}`,
-    pipelineId: pipeline.id,
-    status: 'queued',
-    startedAt: nowIso(),
-    correlationId: crypto.randomUUID().slice(0, 13),
-    trigger,
-    progress: 0,
-    nodeStates: pipeline.nodes.map((n) => ({ nodeId: n.id, status: 'queued' })),
-    logs: [{ ts: nowIso(), level: 'info', message: `Run queued (attempt ${attempt}) · trigger: ${trigger}` }],
-    attempt,
-    rowsProcessed: 0,
-  }
-}
-
-export const RECENT_RUNS: (pipelineId: string) => PipelineRun[] = (pipelineId) => [
-  {
-    id: 'run_a1',
-    pipelineId,
-    status: 'succeeded',
-    startedAt: isoAgo(180),
-    finishedAt: isoAgo(176),
-    durationMs: 242_000,
-    correlationId: 'c-8f21a90b3',
-    trigger: 'schedule',
-    progress: 100,
-    nodeStates: [],
-    logs: [],
-    attempt: 1,
-    rowsProcessed: 2_412_880,
-  },
-  {
-    id: 'run_a2',
-    pipelineId,
-    status: 'failed',
-    startedAt: isoAgo(60),
-    finishedAt: isoAgo(58),
-    durationMs: 96_000,
-    correlationId: 'c-1b7742de5',
-    trigger: 'schedule',
-    progress: 64,
-    nodeStates: [],
-    logs: [],
-    attempt: 1,
-    rowsProcessed: 1_100_400,
-  },
-  {
-    id: 'run_a3',
-    pipelineId,
-    status: 'running',
-    startedAt: isoAgo(3),
-    correlationId: 'c-4a09fe112',
-    trigger: 'manual',
-    progress: 42,
-    nodeStates: [],
-    logs: [],
-    attempt: 2,
-    rowsProcessed: 640_200,
-  },
-]
-
-export const NEXT_SCHEDULE = isoAhead(360)

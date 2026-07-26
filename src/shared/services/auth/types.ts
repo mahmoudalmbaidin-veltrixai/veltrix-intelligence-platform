@@ -1,15 +1,20 @@
-import type { AuthContext } from '@/shared/types/identity'
-
 export interface LoginCredentials {
   email: string
   password: string
 }
 
+export type UserStatus = 'pending' | 'active' | 'locked' | 'disabled' | 'suspended' | 'deleted'
+
+export interface AuthenticatedUser {
+  id: string
+  email: string
+  displayName: string
+  status: UserStatus
+}
+
 export interface Session {
-  /** Short-lived access token abstraction. In cookie-session mode this may be empty. */
-  token?: string
   expiresAt: string
-  context: AuthContext
+  user: AuthenticatedUser
 }
 
 /**
@@ -23,7 +28,7 @@ export interface AuthService {
   bootstrap(): Promise<Session | null>
   login(credentials: LoginCredentials): Promise<Session>
   logout(): Promise<void>
-  currentUser(): Promise<AuthContext | null>
+  currentUser(): Promise<Session | null>
   /** Exchange a refresh token / re-validate the session. */
   refresh(): Promise<Session | null>
 }

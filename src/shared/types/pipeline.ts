@@ -8,9 +8,7 @@ import type { DataType } from './semantic'
 
 export type PipelineNodeKind =
   // Sources
-  | 'source-database'
-  | 'source-file'
-  | 'source-rest'
+  | 'source-dataset'
   // Transforms
   | 'select-columns'
   | 'rename-columns'
@@ -23,8 +21,6 @@ export type PipelineNodeKind =
   | 'type-convert'
   | 'deduplicate'
   | 'null-handling'
-  | 'sql-transform'
-  | 'python-transform'
   // Outputs
   | 'output-dataset'
   | 'file-export'
@@ -119,10 +115,12 @@ export interface Pipeline {
   description: string
   status: PipelineStatus
   version: number
+  rowVersion: number
   owner: string
   tags: string[]
   nodes: PipelineNode[]
   edges: PipelineEdge[]
+  canvas: { x: number; y: number; scale: number; snapGrid: boolean; initialized: boolean }
   updatedAt: string
   lastRunAt?: string
   lastRunStatus?: NodeExecStatus
@@ -136,6 +134,7 @@ export interface PipelineListItem {
   owner: string
   tags: string[]
   version: number
+  rowVersion: number
   updatedAt: string
   lastRunAt?: string
   lastRunStatus?: NodeExecStatus

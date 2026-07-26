@@ -1,12 +1,9 @@
-/**
- * Administration service (mock).
- * INTEGRATION POINT: /api/v1/admin/{organizations,members,workspaces,policies}
- * permission: admin:platform / admin:org / admin:workspace
- */
-import { latency, isoAgo } from '@/shared/lib/mock'
-import type { TenantStatus } from '@/shared/types/identity'
+/** Live B2/B3 administration APIs scoped to the active organization. */
 import { apiClient } from '@/shared/lib/apiClient'
-import { defineService } from '@/shared/services/serviceFactory'
+import { governanceService, type RoleDto } from '@/shared/services/governance/apiGovernanceService'
+import { tenancyService, type UpdateWorkspacePayload } from '@/shared/services/tenancy/apiTenancyService'
+import { usePlatformStore } from '@/shared/stores/platform'
+import type { TenantStatus } from '@/shared/types/identity'
 
 export interface OrgRow {
   id: string
@@ -16,6 +13,7 @@ export interface OrgRow {
   members: number
   createdAt: string
 }
+
 export interface Member {
   id: string
   name: string
@@ -24,194 +22,158 @@ export interface Member {
   status: 'active' | 'invited' | 'suspended'
   lastActive: string
 }
+
 export interface WorkspaceRow {
   id: string
   name: string
-  members: number
-  archived: boolean
+  slug: string
+  status: 'active' | 'archived' | 'deleted'
+  isDefault: boolean
+}
+
+export interface InvitationRow {
+  id: string
+  email: string
+  organizationRole: string
+  workspaceRole: string
+  workspaceIds: string[]
+  status: 'pending' | 'accepted' | 'expired' | 'revoked'
+  expiresAt: string
   createdAt: string
 }
-export interface Policy {
-  key: string
-  label: string
-  description: string
-  value: boolean | string
+
+interface MemberDto {
+  id: string
+  display_name: string
+  email: string
+  role: string
+  status: 'active' | 'invited' | 'suspended' | 'removed'
 }
 
-const ORGS: OrgRow[] = [
-  {
-    id: 'org_veltrix',
-    name: 'Veltrix Global',
-    status: 'active',
-    plan: 'Enterprise',
-    members: 248,
-    createdAt: isoAgo(60 * 24 * 800),
-  },
-  {
-    id: 'org_northwind',
-    name: 'Northwind Trading',
-    status: 'trial',
-    plan: 'Trial',
-    members: 12,
-    createdAt: isoAgo(60 * 24 * 12),
-  },
-  {
-    id: 'org_contoso',
-    name: 'Contoso Retail',
-    status: 'active',
-    plan: 'Business',
-    members: 74,
-    createdAt: isoAgo(60 * 24 * 300),
-  },
-  {
-    id: 'org_fabrikam',
-    name: 'Fabrikam Health',
-    status: 'suspended',
-    plan: 'Business',
-    members: 33,
-    createdAt: isoAgo(60 * 24 * 500),
-  },
-  {
-    id: 'org_initech',
-    name: 'Initech Systems',
-    status: 'pending-deletion',
-    plan: 'Team',
-    members: 5,
-    createdAt: isoAgo(60 * 24 * 90),
-  },
-]
-
-const MEMBERS: Member[] = [
-  {
-    id: 'm1',
-    name: 'Mahmoud Almbaidin',
-    email: 'mahmoud.almbaidin@shabakkatksa.com',
-    role: 'Workspace Administrator',
-    status: 'active',
-    lastActive: isoAgo(4),
-  },
-  {
-    id: 'm2',
-    name: 'Aisha Rahman',
-    email: 'aisha.rahman@veltrix.com',
-    role: 'Analyst',
-    status: 'active',
-    lastActive: isoAgo(60),
-  },
-  {
-    id: 'm3',
-    name: 'David Chen',
-    email: 'david.chen@veltrix.com',
-    role: 'Data Engineer',
-    status: 'active',
-    lastActive: isoAgo(180),
-  },
-  {
-    id: 'm4',
-    name: 'Sofia Marín',
-    email: 'sofia.marin@veltrix.com',
-    role: 'Report Author',
-    status: 'active',
-    lastActive: isoAgo(600),
-  },
-  {
-    id: 'm5',
-    name: 'Tom Becker',
-    email: 'tom.becker@veltrix.com',
-    role: 'Business Viewer',
-    status: 'invited',
-    lastActive: isoAgo(60 * 24 * 3),
-  },
-  {
-    id: 'm6',
-    name: 'Priya Nair',
-    email: 'priya.nair@veltrix.com',
-    role: 'Developer',
-    status: 'suspended',
-    lastActive: isoAgo(60 * 24 * 30),
-  },
-]
-
-const WORKSPACES: WorkspaceRow[] = [
-  { id: 'ws_analytics', name: 'Analytics', members: 42, archived: false, createdAt: isoAgo(60 * 24 * 400) },
-  { id: 'ws_revops', name: 'Revenue Ops', members: 18, archived: false, createdAt: isoAgo(60 * 24 * 200) },
-  { id: 'ws_platform', name: 'Platform', members: 26, archived: false, createdAt: isoAgo(60 * 24 * 300) },
-  { id: 'ws_legacy', name: 'Legacy Reporting', members: 3, archived: true, createdAt: isoAgo(60 * 24 * 900) },
-]
-
-const POLICIES: Policy[] = [
-  {
-    key: 'retention',
-    label: 'Data retention',
-    description: 'Days audit and run history are retained.',
-    value: '365 days',
-  },
-  {
-    key: 'mfa',
-    label: 'Enforce MFA',
-    description: 'Require multi-factor authentication for all members.',
-    value: true,
-  },
-  {
-    key: 'session',
-    label: 'Session duration',
-    description: 'Idle timeout before re-authentication.',
-    value: '8 hours',
-  },
-  {
-    key: 'domains',
-    label: 'Allowed email domains',
-    description: 'Restrict membership to approved domains.',
-    value: 'veltrix.com, shabakkatksa.com',
-  },
-  { key: 'wscreate', label: 'Workspace creation', description: 'Who can create new workspaces.', value: 'Admins only' },
-  { key: 'external', label: 'External sharing', description: 'Allow sharing outside the organization.', value: false },
-  { key: 'ai', label: 'AI usage', description: 'Allow AI features on workspace data.', value: true },
-  { key: 'apikeys', label: 'API-key usage', description: 'Allow members to create API keys.', value: true },
-]
-
-export interface AdminService {
-  listOrgs(): Promise<OrgRow[]>
-  listMembers(): Promise<Member[]>
-  listWorkspaces(): Promise<WorkspaceRow[]>
-  listPolicies(): Promise<Policy[]>
+function activeOrganizationId(): string {
+  const organizationId = usePlatformStore().organization?.id
+  if (!organizationId) throw new Error('Organization context is required.')
+  return organizationId
 }
 
-const mockAdminService: AdminService = {
-  async listOrgs() {
-    await latency()
-    return ORGS.map((o) => ({ ...o }))
-  },
-  async listMembers() {
-    await latency()
-    return MEMBERS.map((m) => ({ ...m }))
-  },
-  async listWorkspaces() {
-    await latency()
-    return WORKSPACES.map((w) => ({ ...w }))
-  },
-  async listPolicies() {
-    await latency()
-    return POLICIES.map((p) => ({ ...p }))
-  },
+function mapMember(member: MemberDto): Member {
+  return {
+    id: member.id,
+    name: member.display_name,
+    email: member.email,
+    role: member.role,
+    status: member.status === 'removed' ? 'suspended' : member.status,
+    lastActive: '',
+  }
 }
 
-const apiAdminService: AdminService = {
-  listOrgs: () => apiClient.get<OrgRow[]>('/admin/organizations'),
-  listMembers: () => apiClient.get<Member[]>('/admin/members'),
-  listWorkspaces: () => apiClient.get<WorkspaceRow[]>('/admin/workspaces'),
-  listPolicies: () => apiClient.get<Policy[]>('/admin/policies'),
+export const adminService = {
+  async listOrgs(): Promise<OrgRow[]> {
+    const organizations = await tenancyService.listOrganizations()
+    return organizations.map((organization) => ({
+      id: organization.id,
+      name: organization.name,
+      status: organization.status,
+      plan: 'Not loaded',
+      members: 0,
+      createdAt: '',
+    }))
+  },
+
+  async updateOrganization(name: string, slug: string): Promise<void> {
+    await tenancyService.updateOrganization(activeOrganizationId(), { name, slug })
+  },
+
+  async listMembers(): Promise<Member[]> {
+    const response = await apiClient.get<{ items: MemberDto[] }>(
+      `/api/v1/organizations/${encodeURIComponent(activeOrganizationId())}/members`,
+    )
+    return response.items.map(mapMember)
+  },
+
+  async listWorkspaces(): Promise<WorkspaceRow[]> {
+    const workspaces = await tenancyService.listWorkspaces(activeOrganizationId(), true)
+    return workspaces.map((workspace) => ({
+      id: workspace.id,
+      name: workspace.name,
+      slug: workspace.slug,
+      status: workspace.status,
+      isDefault: workspace.is_default,
+    }))
+  },
+
+  async createWorkspace(name: string, slug: string): Promise<WorkspaceRow> {
+    const workspace = await tenancyService.createWorkspace(activeOrganizationId(), { name, slug })
+    return {
+      id: workspace.id,
+      name: workspace.name,
+      slug: workspace.slug,
+      status: workspace.status,
+      isDefault: workspace.is_default,
+    }
+  },
+
+  async updateWorkspace(workspaceId: string, payload: UpdateWorkspacePayload): Promise<WorkspaceRow> {
+    const workspace = await tenancyService.updateWorkspace(activeOrganizationId(), workspaceId, payload)
+    return {
+      id: workspace.id,
+      name: workspace.name,
+      slug: workspace.slug,
+      status: workspace.status,
+      isDefault: workspace.is_default,
+    }
+  },
+
+  async listAssignableOrganizationRoles(): Promise<RoleDto[]> {
+    return (await governanceService.roles()).filter((role) => role.scope === 'organization' && role.is_assignable)
+  },
+
+  async updateMember(membershipId: string, role: string): Promise<Member> {
+    const member = await apiClient.patch<MemberDto>(
+      `/api/v1/organizations/${encodeURIComponent(activeOrganizationId())}/members/${encodeURIComponent(membershipId)}`,
+      { role },
+    )
+    return mapMember(member)
+  },
+
+  async inviteMember(email: string, organizationRole: string): Promise<void> {
+    const platform = usePlatformStore()
+    await apiClient.post(`/api/v1/organizations/${encodeURIComponent(activeOrganizationId())}/invitations`, {
+      email,
+      organization_role: organizationRole,
+      workspace_role: 'viewer',
+      workspace_ids: platform.workspace?.id ? [platform.workspace.id] : [],
+    })
+  },
+
+  async listInvitations(): Promise<InvitationRow[]> {
+    const response = await apiClient.get<{
+      items: Array<{
+        id: string
+        email: string
+        organization_role: string
+        workspace_role: string
+        workspace_ids: string[]
+        status: InvitationRow['status']
+        expires_at: string
+        created_at: string
+      }>
+    }>(`/api/v1/organizations/${encodeURIComponent(activeOrganizationId())}/invitations`)
+    return response.items.map((invitation) => ({
+      id: invitation.id,
+      email: invitation.email,
+      organizationRole: invitation.organization_role,
+      workspaceRole: invitation.workspace_role,
+      workspaceIds: invitation.workspace_ids,
+      status: invitation.status,
+      expiresAt: invitation.expires_at,
+      createdAt: invitation.created_at,
+    }))
+  },
+
+  async revokeInvitation(invitationId: string): Promise<void> {
+    await apiClient.delete(
+      `/api/v1/organizations/${encodeURIComponent(activeOrganizationId())}/invitations/${encodeURIComponent(invitationId)}`,
+    )
+  },
 }
-
-export const adminService: AdminService = defineService(mockAdminService, () => apiAdminService)
-
-export const ASSIGNABLE_ROLES = [
-  'Organization Owner',
-  'Organization Administrator',
-  'Workspace Administrator',
-  'Data Engineer',
-  'Analyst',
-  'Report Author',
-  'Business Viewer',
-  'Developer',
-]

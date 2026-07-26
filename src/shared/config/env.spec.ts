@@ -36,12 +36,28 @@ describe('env config', () => {
     expect(() => buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'production' })).toThrow(EnvConfigError)
   })
 
+  it('rejects mock services in staging and production', () => {
+    expect(() =>
+      buildConfig({ VITE_APP_ENV: 'staging', VITE_API_MODE: 'mock', VITE_API_BASE_URL: 'https://api.x.com' }),
+    ).toThrow(EnvConfigError)
+    expect(() =>
+      buildConfig({ VITE_APP_ENV: 'production', VITE_API_MODE: 'mock', VITE_API_BASE_URL: 'https://api.x.com' }),
+    ).toThrow(EnvConfigError)
+  })
+
   it('rejects an invalid API mode', () => {
     expect(() => buildConfig({ VITE_API_MODE: 'bogus' })).toThrow(EnvConfigError)
   })
 
   it('rejects an invalid app env', () => {
     expect(() => buildConfig({ VITE_APP_ENV: 'nope' })).toThrow(EnvConfigError)
+  })
+
+  it('rejects invalid or unsafe live base URLs', () => {
+    expect(() => buildConfig({ VITE_API_MODE: 'live', VITE_API_BASE_URL: 'api.internal' })).toThrow(EnvConfigError)
+    expect(() => buildConfig({ VITE_API_MODE: 'live', VITE_API_BASE_URL: 'javascript:alert(1)' })).toThrow(
+      EnvConfigError,
+    )
   })
 
   it('parses numeric timeout and boolean flags', () => {

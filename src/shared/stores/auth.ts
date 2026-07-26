@@ -1,91 +1,99 @@
-/**
- * Authentication store: authoritative session lifecycle. On bootstrap/login it
- * hydrates the platform context from the session (QA VIP-FE-H001); on
- * logout/expiry it clears context (VIP-FE-H002). Mock logout is durable — a
- * deliberate sign-out is remembered so a refresh does not re-seed a session
- * (VIP-FE-H013).
- */
+/** Authoritative in-memory authentication state backed by HTTP-only cookies. */
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { authService, seedMockSession, type Session } from '@/shared/services/auth'
+import { authService, type Session } from '@/shared/services/auth'
 import { usePlatformStore } from '@/shared/stores/platform'
-import { config } from '@/shared/config/env'
 import { ApiError } from '@/shared/types/api'
-import { LocalStore } from '@/shared/lib/mock'
 
-export type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated'
-
-const logoutFlag = new LocalStore<{ signedOut: boolean }>('vip.auth.signedout')
+export type AuthStatus = 'idle' | 'loading' | 'authenticated' | 'unauthenticated' | 'error'
 
 export const useAuthStore = defineStore('auth', () => {
-  const status = ref<AuthStatus>('booting')
+  const status = ref<AuthStatus>('idle')
+  const initialized = ref(false)
   const session = ref<Session | null>(null)
   const error = ref<ApiError | null>(null)
   const intendedRoute = ref<string | null>(null)
-  /** Bumped whenever a session expires (401) so the router can react. */
   const expiredTick = ref(0)
+  let bootstrapPromise: Promise<void> | null = null
 
   const isAuthenticated = computed(() => status.value === 'authenticated')
-  const isBooting = computed(() => status.value === 'booting')
+  const isBooting = computed(() => !initialized.value || status.value === 'loading')
 
-  function applySession(s: Session | null) {
-    session.value = s
-    status.value = s ? 'authenticated' : 'unauthenticated'
+  async function applySession(value: Session | null): Promise<void> {
+    session.value = value
+    status.value = value ? 'authenticated' : 'unauthenticated'
     const platform = usePlatformStore()
-    if (s) platform.hydrate(s.context)
-    else platform.clearContext()
+    if (value) {
+      platform.hydrateAuthenticatedUser(value.user)
+      await platform.bootstrapTenancy()
+    } else platform.clearContext()
   }
 
   async function bootstrap(): Promise<void> {
-    status.value = 'booting'
-    const deliberatelyOut = logoutFlag.read({ signedOut: false }).signedOut
-    // Mock mode boots "logged in" for reviewers — unless the user deliberately
-    // signed out (durable logout).
-    if (config.apiMode === 'mock' && !deliberatelyOut) seedMockSession()
-    try {
-      applySession(await authService.bootstrap())
-    } catch {
-      applySession(null)
-    }
+    if (bootstrapPromise) return bootstrapPromise
+    status.value = 'loading'
+    bootstrapPromise = (async () => {
+      try {
+        await applySession(await authService.bootstrap())
+      } catch (cause) {
+        error.value = ApiError.from(cause)
+        await applySession(null)
+      } finally {
+        initialized.value = true
+        bootstrapPromise = null
+      }
+    })()
+    return bootstrapPromise
   }
 
   async function login(email: string, password: string): Promise<boolean> {
     error.value = null
+    status.value = 'loading'
     try {
-      const s = await authService.login({ email, password })
-      logoutFlag.write({ signedOut: false })
-      applySession(s)
+      await applySession(await authService.login({ email, password }))
+      initialized.value = true
       return true
-    } catch (e) {
-      error.value = ApiError.from(e)
+    } catch (cause) {
+      error.value = ApiError.from(cause)
+      await applySession(null)
+      initialized.value = true
       return false
     }
   }
 
   async function logout(): Promise<void> {
-    await authService.logout()
-    logoutFlag.write({ signedOut: true })
-    applySession(null)
+    try {
+      await authService.logout()
+    } finally {
+      await applySession(null)
+      initialized.value = true
+    }
   }
 
-  /** Called by the API client on a 401 to force reauthentication. */
+  async function refreshSession(): Promise<boolean> {
+    const refreshed = await authService.refresh()
+    await applySession(refreshed)
+    return refreshed != null
+  }
+
   function onUnauthorized(): void {
-    if (status.value !== 'authenticated') return
-    applySession(null)
-    expiredTick.value++
+    if (status.value === 'authenticated') expiredTick.value++
+    void applySession(null)
+    initialized.value = true
   }
 
   function setIntended(path: string): void {
     intendedRoute.value = path
   }
   function takeIntended(): string {
-    const r = intendedRoute.value ?? '/home'
+    const path = intendedRoute.value ?? '/home'
     intendedRoute.value = null
-    return r
+    return path
   }
 
   return {
     status,
+    initialized,
     session,
     error,
     intendedRoute,
@@ -95,6 +103,7 @@ export const useAuthStore = defineStore('auth', () => {
     bootstrap,
     login,
     logout,
+    refreshSession,
     onUnauthorized,
     setIntended,
     takeIntended,

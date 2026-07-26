@@ -5,9 +5,14 @@
 
 export interface Page<T> {
   items: T[]
+  /** Canonical total; `totalItems` is accepted at DTO mapping boundaries. */
   total: number
   page: number
   pageSize: number
+  totalPages: number
+  cursor?: string
+  nextCursor?: string
+  previousCursor?: string
 }
 
 export interface ListParams {
@@ -36,7 +41,40 @@ export type ApiErrorKind =
 
 export interface FieldError {
   field: string
+  code?: string
   message: string
+}
+
+export type AsyncJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'partially_completed'
+
+export interface AsyncJob<TResult = unknown> {
+  id: string
+  status: AsyncJobStatus
+  progress: number
+  currentStep?: string
+  startedAt?: string
+  completedAt?: string
+  result?: TResult
+  error?: { message: string; code?: string; correlationId?: string }
+  canRetry: boolean
+  canCancel: boolean
+}
+
+export interface UploadContract<TResult = unknown> {
+  acceptedTypes: string[]
+  maxSizeBytes: number
+  progress: number
+  status: 'pending' | 'uploading' | 'scanning' | 'succeeded' | 'failed' | 'cancelled'
+  result?: TResult
+  errors?: FieldError[]
+  multipart?: { uploadId: string; partSizeBytes: number }
+}
+
+export interface DownloadContract {
+  blob: Blob
+  fileName: string
+  mimeType: string
+  correlationId?: string
 }
 
 /** Human-friendly, safe messages per category (never leak raw backend text). */
@@ -62,11 +100,12 @@ export class ApiError extends Error {
   /** Technical detail — shown only in dev / diagnostics, never as the primary UI message. */
   detail?: string
   status?: number
+  code?: string
 
   constructor(
     kind: ApiErrorKind,
     message: string,
-    opts?: { correlationId?: string; fieldErrors?: FieldError[]; detail?: string; status?: number },
+    opts?: { correlationId?: string; fieldErrors?: FieldError[]; detail?: string; status?: number; code?: string },
   ) {
     super(message)
     this.name = 'ApiError'
@@ -75,6 +114,7 @@ export class ApiError extends Error {
     this.fieldErrors = opts?.fieldErrors
     this.detail = opts?.detail
     this.status = opts?.status
+    this.code = opts?.code
   }
 
   /** Safe, user-facing message. */
@@ -90,7 +130,7 @@ export class ApiError extends Error {
   /** Map an HTTP status code to a normalized error. */
   static fromStatus(
     status: number,
-    opts?: { message?: string; correlationId?: string; fieldErrors?: FieldError[]; detail?: string },
+    opts?: { message?: string; correlationId?: string; fieldErrors?: FieldError[]; detail?: string; code?: string },
   ): ApiError {
     const kind = statusToKind(status)
     return new ApiError(kind, opts?.message ?? FRIENDLY[kind], { ...opts, status })

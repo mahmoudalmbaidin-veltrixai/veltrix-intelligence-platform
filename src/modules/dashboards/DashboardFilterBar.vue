@@ -1,33 +1,68 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Dashboard } from '@/shared/types/dashboard'
-import type { QueryFilter } from '@/shared/types/semantic'
-import { MODELS } from '@/shared/services/semanticModels'
+import type { QueryFilter, SemanticModel } from '@/shared/types/semantic'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipMenu from '@/shared/ui/VipMenu.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 
-defineProps<{ dashboard: Dashboard; crossFilters: QueryFilter[] }>()
-const emit = defineEmits<{ clearCross: []; removeCross: [QueryFilter] }>()
+const props = withDefaults(
+  defineProps<{
+    dashboard: Dashboard
+    crossFilters: QueryFilter[]
+    models?: SemanticModel[]
+    modelId?: string
+    filters?: QueryFilter[]
+  }>(),
+  { models: () => [], modelId: '', filters: () => [] },
+)
+const emit = defineEmits<{
+  clearCross: []
+  removeCross: [QueryFilter]
+  'update:filters': [QueryFilter[]]
+}>()
 
 const dateRange = ref('last-90')
-const dims = MODELS[0].fields.filter((f) => f.role === 'dimension')
+const model = computed(() => props.models.find((item) => item.id === props.modelId) ?? props.models[0])
+const dims = computed(() => (model.value?.fields ?? []).filter((f) => f.role === 'dimension' || f.role === 'time'))
 
-const addItems = dims.map((d) => ({ key: d.id, label: d.label, icon: 'filter' }))
-const localFilters = ref<QueryFilter[]>([])
-
-const VALUES: Record<string, string[]> = {
-  region: ['EMEA', 'Americas', 'APAC', 'MEA'],
-  category: ['Software', 'Hardware', 'Services', 'Support', 'Training'],
-  segment: ['Enterprise', 'Mid-Market', 'SMB', 'Public Sector'],
-  channel: ['Direct', 'Partner', 'Self-Serve', 'Marketplace'],
-}
+const addItems = computed(() => dims.value.map((d) => ({ key: d.id, label: d.label, icon: 'filter' })))
+const localFilters = ref<QueryFilter[]>([...props.filters])
+const pendingFieldId = ref('')
+const pendingValue = ref('')
+watch(
+  () => props.filters,
+  (filters) => {
+    localFilters.value = [...filters]
+  },
+  { deep: true },
+)
 function addFilter(fieldId: string) {
-  const first = VALUES[fieldId]?.[0] ?? 'All'
-  localFilters.value.push({ fieldId, operator: 'eq', value: first, label: `${fieldId} = ${first}` })
+  pendingFieldId.value = fieldId
+  pendingValue.value = ''
+}
+function commitFilter() {
+  const value = pendingValue.value.trim()
+  const field = dims.value.find((item) => item.id === pendingFieldId.value)
+  if (!value || !field) return
+  localFilters.value = [
+    ...localFilters.value.filter((item) => item.fieldId !== field.id),
+    { fieldId: field.id, operator: 'eq', value, label: `${field.label} = ${value}` },
+  ]
+  emit('update:filters', localFilters.value)
+  pendingFieldId.value = ''
+  pendingValue.value = ''
 }
 function removeFilter(f: QueryFilter) {
   localFilters.value = localFilters.value.filter((x) => x !== f)
+  emit('update:filters', localFilters.value)
+}
+function resetFilters() {
+  localFilters.value = []
+  pendingFieldId.value = ''
+  pendingValue.value = ''
+  emit('update:filters', [])
+  emit('clearCross')
 }
 
 const dateOptions = [
@@ -65,12 +100,25 @@ const dateOptions = [
     <VipMenu :items="addItems" @select="addFilter">
       <template #trigger><VipButton variant="tertiary" size="xs" icon="plus">Filter</VipButton></template>
     </VipMenu>
+    <form v-if="pendingFieldId" class="fbar__value" @submit.prevent="commitFilter">
+      <label :for="`dashboard-filter-${pendingFieldId}`">
+        {{ dims.find((field) => field.id === pendingFieldId)?.label }}
+      </label>
+      <input
+        :id="`dashboard-filter-${pendingFieldId}`"
+        v-model="pendingValue"
+        autocomplete="off"
+        placeholder="Filter value"
+      />
+      <VipButton type="submit" variant="primary" size="xs" :disabled="!pendingValue.trim()">Apply</VipButton>
+      <VipButton type="button" variant="ghost" size="xs" @click="pendingFieldId = ''">Cancel</VipButton>
+    </form>
     <VipButton
       v-if="localFilters.length || crossFilters.length"
       variant="ghost"
       size="xs"
       icon="refresh"
-      @click="((localFilters = []), emit('clearCross'))"
+      @click="resetFilters"
       >Reset</VipButton
     >
     <span v-if="crossFilters.length" class="fbar__count"
@@ -144,6 +192,24 @@ const dateOptions = [
 .fbar__count {
   font-size: var(--vip-fs-xs);
   color: var(--vip-brand-text);
+}
+.fbar__value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+}
+.fbar__value label {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-secondary);
+}
+.fbar__value input {
+  min-width: 140px;
+  height: 28px;
+  padding: 0 var(--vip-sp-3);
+  color: var(--vip-text-primary);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-md);
 }
 .fbar__spacer {
   flex: 1;

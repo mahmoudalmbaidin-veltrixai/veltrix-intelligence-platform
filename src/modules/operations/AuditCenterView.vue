@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useQuery } from '@/shared/lib/query'
-import { useUiStore } from '@/shared/stores/ui'
 import { relativeTime, formatDateTime } from '@/shared/lib/format'
-import { operationsService, type AuditEvent, type AuditResult } from './operations.service'
+import { auditService, type AuditEvent, type AuditResult } from '@/shared/services/governance/auditService'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
@@ -14,10 +13,8 @@ import VipDrawer from '@/shared/ui/VipDrawer.vue'
 import VipAlert from '@/shared/ui/VipAlert.vue'
 import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 
-const ui = useUiStore()
-
-const { data, isLoading } = useQuery('operations:audit', (signal) =>
-  operationsService.listAudit().then((r) => {
+const { data, error, isLoading } = useQuery('governance:audit', (signal) =>
+  auditService.list().then((r) => {
     signal.throwIfAborted()
     return r
   }),
@@ -39,6 +36,7 @@ const resultOptions: { value: AuditResult | 'all'; label: string }[] = [
   { value: 'all', label: 'All results' },
   { value: 'success', label: 'Success' },
   { value: 'denied', label: 'Denied' },
+  { value: 'failed', label: 'Failed' },
   { value: 'error', label: 'Error' },
 ]
 
@@ -64,6 +62,7 @@ const rows = computed<AuditEvent[]>(() =>
 const RESULT_TONE: Record<AuditResult, 'success' | 'warning' | 'danger'> = {
   success: 'success',
   denied: 'warning',
+  failed: 'danger',
   error: 'danger',
 }
 
@@ -84,14 +83,6 @@ function closeDetail() {
   selected.value = null
 }
 
-function exportLog() {
-  ui.pushToast({
-    kind: 'info',
-    title: 'Export queued',
-    message: `Exporting ${rows.value.length} audit events to CSV. This is a backend dependency.`,
-  })
-}
-
 function pretty(value: Record<string, unknown> | undefined): string {
   if (!value) return '—'
   return JSON.stringify(value, null, 2)
@@ -100,14 +91,11 @@ function pretty(value: Record<string, unknown> | undefined): string {
 
 <template>
   <div class="aud">
-    <VipPageHeader
-      title="Audit log"
-      description="Immutable record of security-relevant actions across the organization."
-    >
-      <template #actions>
-        <VipButton variant="tertiary" icon="download" @click="exportLog">Export</VipButton>
-      </template>
-    </VipPageHeader>
+    <VipPageHeader title="Audit log" description="Live immutable security events for the active organization." />
+
+    <VipAlert v-if="error" tone="danger" title="Audit events unavailable">
+      The persisted audit trail could not be loaded.
+    </VipAlert>
 
     <VipCard :padded="false">
       <div class="aud__toolbar">

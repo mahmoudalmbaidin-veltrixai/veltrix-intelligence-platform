@@ -20,14 +20,27 @@ const { data, isLoading } = useQuery('pipelines:list', () => pipelineService.lis
 
 const search = ref('')
 const statusFilter = ref<'all' | 'published' | 'draft'>('all')
+const sortKey = ref('')
+const sortDir = ref<'asc' | 'desc'>('asc')
 
 const rows = computed(() => {
   let items = data.value ?? []
   if (statusFilter.value !== 'all') items = items.filter((p) => p.status === statusFilter.value)
   const q = search.value.trim().toLowerCase()
   if (q) items = items.filter((p) => p.name.toLowerCase().includes(q) || p.tags.some((t) => t.includes(q)))
+  if (sortKey.value === 'name') {
+    items = [...items].sort((a, b) => a.name.localeCompare(b.name) * (sortDir.value === 'asc' ? 1 : -1))
+  }
   return items
 })
+
+function onSort(key: string) {
+  if (sortKey.value === key) sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  else {
+    sortKey.value = key
+    sortDir.value = 'asc'
+  }
+}
 
 const columns: Column<PipelineListItem>[] = [
   { key: 'name', label: 'Pipeline', sortable: true },
@@ -48,7 +61,7 @@ function statusTone(s?: string) {
     <VipPageHeader title="Pipelines" description="Design, validate, publish and monitor data pipelines.">
       <template #actions>
         <VipButton
-          v-if="platform.can('pipeline:write')"
+          v-if="platform.can('pipeline.create')"
           variant="primary"
           icon="plus"
           @click="router.push('/pipelines/new')"
@@ -75,10 +88,13 @@ function statusTone(s?: string) {
       :rows="rows"
       :row-key="(r) => r.id"
       :loading="isLoading"
+      :sort-key="sortKey"
+      :sort-dir="sortDir"
       clickable
       empty-title="No pipelines"
       empty-description="Create your first pipeline to start moving data."
       @row-click="(r) => router.push(`/pipelines/${r.id}`)"
+      @sort="onSort"
     >
       <template #cell-name="{ row }">
         <div class="pl-name">

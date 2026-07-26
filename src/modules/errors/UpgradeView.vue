@@ -2,12 +2,16 @@
 import { useRoute, useRouter } from 'vue-router'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
+import VipLogo from '@/shared/ui/VipLogo.vue'
 const route = useRoute()
 const router = useRouter()
 </script>
 
 <template>
   <div class="err">
+    <RouterLink to="/home" class="err__brand" aria-label="VIP home"
+      ><VipLogo variant="full" size="md" decorative
+    /></RouterLink>
     <div class="err__icon"><VipIcon name="sparkles" :size="28" /></div>
     <h1 class="err__title">Upgrade required</h1>
     <p class="err__desc">
@@ -24,6 +28,13 @@ const router = useRouter()
 <style scoped>
 .err {
   text-align: center;
+}
+.err__brand {
+  display: inline-flex;
+  margin-bottom: var(--vip-sp-8);
+  color: var(--vip-text-primary);
+  text-decoration: none;
+  border-radius: var(--vip-radius-sm);
 }
 .err__icon {
   width: 64px;

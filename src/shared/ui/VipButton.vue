@@ -34,7 +34,14 @@ function onClick(e: MouseEvent) {
 </script>
 
 <template>
-  <button :class="classes" :type="type" :disabled="disabled || loading" :title="title" @click="onClick">
+  <button
+    :class="classes"
+    :type="type"
+    :disabled="disabled || loading"
+    :title="title"
+    :aria-label="!$slots.default && title ? title : undefined"
+    @click="onClick"
+  >
     <span v-if="loading" class="vip-btn__spinner" aria-hidden="true" />
     <VipIcon v-else-if="icon" :name="icon" :size="size === 'lg' ? 17 : size === 'xs' ? 13 : 15" />
     <span v-if="$slots.default" class="vip-btn__label"><slot /></span>
@@ -55,12 +62,20 @@ function onClick(e: MouseEvent) {
   transition:
     background var(--vip-motion-fast) var(--vip-ease-standard),
     border-color var(--vip-motion-fast) var(--vip-ease-standard),
-    color var(--vip-motion-fast) var(--vip-ease-standard);
+    color var(--vip-motion-fast) var(--vip-ease-standard),
+    transform var(--vip-motion-fast) var(--vip-ease-standard);
   user-select: none;
+}
+.vip-btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 .vip-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+}
+.vip-btn.is-loading {
+  cursor: progress;
 }
 .is-block {
   width: 100%;

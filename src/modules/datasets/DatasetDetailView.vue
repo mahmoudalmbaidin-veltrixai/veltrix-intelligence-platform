@@ -3,7 +3,13 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { relativeTime, formatDateTime, formatNumber } from '@/shared/lib/format'
-import { datasetService, type Dataset, type QualityRule, type QualityRuleStatus } from './datasets.service'
+import {
+  datasetService,
+  type Dataset,
+  type DatasetField,
+  type QualityRule,
+  type QualityRuleStatus,
+} from './datasets.service'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
@@ -23,6 +29,19 @@ const { data: dataset, isLoading } = useQuery(
   () => datasetService.get(id.value),
 )
 const { data: rules } = useQuery('datasets:rules', () => datasetService.listQualityRules())
+const { data: schema } = useQuery(
+  () => `dataset:${id.value}:fields`,
+  () => datasetService.listFields(id.value),
+)
+const previewPage = ref(1)
+const { data: preview, isLoading: previewLoading } = useQuery(
+  () => `dataset:${id.value}:preview:${previewPage.value}`,
+  () => datasetService.preview(id.value, previewPage.value, 25),
+)
+const { data: profile, isLoading: profileLoading } = useQuery(
+  () => `dataset:${id.value}:profile`,
+  () => datasetService.profile(id.value),
+)
 
 const datasetRules = computed<QualityRule[]>(() => (rules.value ?? []).filter((r) => r.dataset === dataset.value?.name))
 
@@ -39,7 +58,8 @@ const tabs = [
 ]
 const activeTab = ref('overview')
 
-function qualityTone(score: number): 'success' | 'warning' | 'danger' {
+function qualityTone(score: number | null): 'success' | 'warning' | 'danger' {
+  if (score == null) return 'warning'
   if (score >= 90) return 'success'
   if (score >= 75) return 'warning'
   return 'danger'
@@ -48,6 +68,8 @@ const RULE_TONE: Record<QualityRuleStatus, 'success' | 'warning' | 'danger'> = {
   passing: 'success',
   warning: 'warning',
   failing: 'danger',
+  unknown: 'warning',
+  not_evaluated: 'warning',
 }
 
 /* ---- overview stat cards ---- */
@@ -55,78 +77,27 @@ function overviewCards(d: Dataset): { label: string; value: string; icon: string
   return [
     { label: 'Owner', value: d.owner, icon: 'users' },
     { label: 'Rows', value: formatNumber(d.rowCount, { style: 'compact' }), icon: 'hash' },
-    { label: 'Quality score', value: `${d.qualityScore}`, icon: 'gauge' },
+    { label: 'Quality score', value: d.qualityScore == null ? 'Not evaluated' : `${d.qualityScore}`, icon: 'gauge' },
     { label: 'Freshness', value: relativeTime(d.freshness), icon: 'clock' },
     { label: 'Source', value: d.source, icon: 'plug' },
     { label: 'Certification', value: d.certified ? 'Certified' : 'Uncertified', icon: 'shield' },
   ]
 }
 
-/* ---- schema (mock) ---- */
-interface ColumnInfo {
-  name: string
-  type: string
-  nullable: boolean
-  description: string
-}
-const schema: ColumnInfo[] = [
-  { name: 'order_id', type: 'bigint', nullable: false, description: 'Primary key' },
-  { name: 'customer_id', type: 'bigint', nullable: false, description: 'FK to dim_customers' },
-  { name: 'order_date', type: 'date', nullable: false, description: 'Date order was placed' },
-  { name: 'amount', type: 'numeric(12,2)', nullable: false, description: 'Gross order amount' },
-  { name: 'discount', type: 'numeric(12,2)', nullable: true, description: 'Applied discount' },
-  { name: 'currency', type: 'char(3)', nullable: false, description: 'ISO 4217 currency code' },
-  { name: 'status', type: 'varchar(24)', nullable: false, description: 'Fulfilment status' },
-  { name: 'channel', type: 'varchar(24)', nullable: true, description: 'Sales channel' },
-]
-const schemaColumns: Column<ColumnInfo>[] = [
+const schemaColumns: Column<DatasetField>[] = [
   { key: 'name', label: 'Column' },
   { key: 'type', label: 'Type' },
   { key: 'nullable', label: 'Nullable' },
   { key: 'description', label: 'Description' },
 ]
 
-/* ---- data preview (mock) ---- */
-interface PreviewRow {
-  order_id: number
-  customer_id: number
-  amount: number
-  currency: string
-  status: string
-  order_date: string
-}
-const preview: PreviewRow[] = [
-  { order_id: 90211, customer_id: 4021, amount: 12480, currency: 'USD', status: 'paid', order_date: '2026-07-14' },
-  { order_id: 90210, customer_id: 5530, amount: 3120, currency: 'USD', status: 'pending', order_date: '2026-07-14' },
-  { order_id: 90209, customer_id: 1188, amount: 58900, currency: 'EUR', status: 'paid', order_date: '2026-07-13' },
-  { order_id: 90208, customer_id: 7742, amount: 740, currency: 'GBP', status: 'refunded', order_date: '2026-07-13' },
-  { order_id: 90207, customer_id: 3390, amount: 22150, currency: 'USD', status: 'paid', order_date: '2026-07-12' },
-]
-const previewColumns: Column<PreviewRow>[] = [
-  { key: 'order_id', label: 'order_id', align: 'right' },
-  { key: 'customer_id', label: 'customer_id', align: 'right' },
-  { key: 'amount', label: 'amount', align: 'right', cell: (r) => formatNumber(r.amount, { decimals: 0 }) },
-  { key: 'currency', label: 'currency' },
-  { key: 'status', label: 'status' },
-  { key: 'order_date', label: 'order_date' },
-]
-
-/* ---- profile (mock per-column stats) ---- */
-interface ProfileStat {
-  column: string
-  nulls: number
-  distinct: number
-  min: string
-  max: string
-}
-const profile: ProfileStat[] = [
-  { column: 'order_id', nulls: 0, distinct: 100, min: '1', max: '1,284,502' },
-  { column: 'customer_id', nulls: 0, distinct: 66, min: '1', max: '84,213' },
-  { column: 'amount', nulls: 0, distinct: 92, min: '0.00', max: '412,900.00' },
-  { column: 'discount', nulls: 34, distinct: 41, min: '0.00', max: '18,400.00' },
-  { column: 'currency', nulls: 0, distinct: 4, min: 'EUR', max: 'USD' },
-  { column: 'status', nulls: 0, distinct: 5, min: 'cancelled', max: 'refunded' },
-]
+const previewColumns = computed<Column<Record<string, unknown>>[]>(() =>
+  (preview.value?.columns ?? []).map((column) => ({
+    key: column.name,
+    label: column.displayName,
+    cell: (row) => String(row[column.name] ?? '—'),
+  })),
+)
 
 /* ---- access (mock) ---- */
 interface AccessGrant {
@@ -234,24 +205,39 @@ const activity: ActivityItem[] = [
       <!-- DATA PREVIEW -->
       <VipCard v-else-if="activeTab === 'preview'" :padded="false">
         <div class="dd__preview-head">
-          <span class="dd__mono">{{ dataset.name }} · first 5 rows</span>
-          <VipBadge tone="neutral" variant="soft" size="sm">sample</VipBadge>
+          <span class="dd__mono">{{ dataset.name }} · page {{ previewPage }}</span>
+          <VipBadge v-if="preview?.maskedFields.length" tone="warning" variant="soft" size="sm">
+            sensitive values masked
+          </VipBadge>
         </div>
-        <VipTable :columns="previewColumns" :rows="preview" :row-key="(r) => String(r.order_id)" density="compact">
-          <template #cell-status="{ row }">
-            <VipBadge
-              :tone="row.status === 'paid' ? 'success' : row.status === 'refunded' ? 'danger' : 'warning'"
-              variant="soft"
-              size="sm"
-              >{{ row.status }}</VipBadge
-            >
-          </template>
-        </VipTable>
+        <div v-if="previewLoading" class="dd__loading"><VipSpinner label="Loading live preview…" /></div>
+        <VipTable
+          v-else-if="preview?.rows.length"
+          :columns="previewColumns"
+          :rows="preview.rows"
+          :row-key="(row) => JSON.stringify(row)"
+          density="compact"
+        />
+        <VipEmptyState
+          v-else
+          icon="table"
+          title="No preview rows"
+          description="The source returned no rows for this page."
+        />
+        <div class="dd__pager">
+          <VipButton size="sm" :disabled="previewPage === 1" @click="previewPage--">Previous</VipButton>
+          <VipButton
+            size="sm"
+            :disabled="(preview?.returnedRows ?? 0) < (preview?.pageSize ?? 25)"
+            @click="previewPage++"
+            >Next</VipButton
+          >
+        </div>
       </VipCard>
 
       <!-- SCHEMA -->
       <VipCard v-else-if="activeTab === 'schema'" :padded="false">
-        <VipTable :columns="schemaColumns" :rows="schema" :row-key="(r) => r.name" density="compact">
+        <VipTable :columns="schemaColumns" :rows="schema ?? []" :row-key="(r) => r.name" density="compact">
           <template #cell-name="{ row }"
             ><span class="dd__mono">{{ row.name }}</span></template
           >
@@ -269,32 +255,49 @@ const activity: ActivityItem[] = [
       <!-- PROFILE -->
       <VipCard v-else-if="activeTab === 'profile'">
         <h3 class="dd__card-title">Column profile</h3>
-        <p class="dd__muted">Null ratio and distinct-value cardinality per column (sampled).</p>
-        <ul class="dd__profile">
-          <li v-for="p in profile" :key="p.column" class="dd__profile-row">
-            <span class="dd__profile-name">{{ p.column }}</span>
+        <p class="dd__muted">Live statistics over {{ profile?.sampleSize ?? 0 }} sampled rows.</p>
+        <div v-if="profileLoading" class="dd__loading"><VipSpinner label="Profiling dataset…" /></div>
+        <ul v-else-if="profile?.fields.length" class="dd__profile">
+          <li v-for="p in profile.fields" :key="p.name" class="dd__profile-row">
+            <span class="dd__profile-name">{{ p.name }}</span>
             <div class="dd__profile-bars">
               <div class="dd__bar-group">
-                <span class="dd__bar-label">nulls {{ p.nulls }}%</span>
-                <div class="dd__bar-track"><div class="dd__bar dd__bar--null" :style="{ width: `${p.nulls}%` }" /></div>
+                <span class="dd__bar-label">nulls {{ p.nullCount }}</span>
+                <div class="dd__bar-track">
+                  <div
+                    class="dd__bar dd__bar--null"
+                    :style="{ width: `${profile.sampleSize ? (p.nullCount / profile.sampleSize) * 100 : 0}%` }"
+                  />
+                </div>
               </div>
               <div class="dd__bar-group">
-                <span class="dd__bar-label">distinct {{ p.distinct }}%</span>
+                <span class="dd__bar-label">distinct {{ p.distinctCount }}</span>
                 <div class="dd__bar-track">
-                  <div class="dd__bar dd__bar--distinct" :style="{ width: `${p.distinct}%` }" />
+                  <div
+                    class="dd__bar dd__bar--distinct"
+                    :style="{ width: `${profile.sampleSize ? (p.distinctCount / profile.sampleSize) * 100 : 0}%` }"
+                  />
                 </div>
               </div>
             </div>
-            <span class="dd__profile-range">{{ p.min }} … {{ p.max }}</span>
+            <span class="dd__profile-range">{{ p.minimum ?? '—' }} … {{ p.maximum ?? '—' }}</span>
           </li>
         </ul>
+        <VipEmptyState
+          v-else
+          icon="gauge"
+          title="No profile available"
+          description="The source has no fields to profile."
+        />
       </VipCard>
 
       <!-- QUALITY -->
       <VipCard v-else-if="activeTab === 'quality'">
         <div class="dd__quality-head">
           <h3 class="dd__card-title">Quality rules</h3>
-          <VipBadge :tone="qualityTone(dataset.qualityScore)" variant="soft">Score {{ dataset.qualityScore }}</VipBadge>
+          <VipBadge :tone="qualityTone(dataset.qualityScore)" variant="soft">
+            {{ dataset.qualityScore == null ? 'Not evaluated' : `Score ${dataset.qualityScore}` }}
+          </VipBadge>
         </div>
         <VipTable
           v-if="datasetRules.length"
@@ -483,6 +486,13 @@ const activity: ActivityItem[] = [
   justify-content: space-between;
   padding: var(--vip-sp-5) var(--vip-sp-6);
   border-bottom: 1px solid var(--vip-border-subtle);
+}
+.dd__pager {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--vip-sp-3);
+  padding: var(--vip-sp-4) var(--vip-sp-6);
+  border-top: 1px solid var(--vip-border-subtle);
 }
 
 .dd__profile {

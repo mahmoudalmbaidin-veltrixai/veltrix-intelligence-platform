@@ -18,7 +18,7 @@ import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 const router = useRouter()
 const ui = useUiStore()
 const platform = usePlatformStore()
-const canWrite = computed(() => platform.can('report:write'))
+const canWrite = computed(() => platform.can('report.create') || platform.can('report.update'))
 
 const { data: reports, isLoading } = useQuery(
   () => 'reports:list',

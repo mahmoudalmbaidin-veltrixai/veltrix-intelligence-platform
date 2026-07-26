@@ -6,7 +6,8 @@ import { useDashboardEditor } from './useDashboardEditor'
 import { useUiStore } from '@/shared/stores/ui'
 import { usePlatformStore } from '@/shared/stores/platform'
 import type { Dashboard } from '@/shared/types/dashboard'
-import type { QueryFilter } from '@/shared/types/semantic'
+import type { QueryFilter, SemanticModel } from '@/shared/types/semantic'
+import { semanticStudioService } from '@/modules/semantic/semantic.service'
 import { relativeTime } from '@/shared/lib/format'
 import DashboardGridCanvas from './DashboardGridCanvas.vue'
 import DashboardFilterBar from './DashboardFilterBar.vue'
@@ -26,6 +27,14 @@ const loading = ref(true)
 // shallowRef so the composable's inner refs stay intact (reactive() unwraps them).
 const editor = shallowRef<ReturnType<typeof useDashboardEditor>>()
 const crossFilters = ref<QueryFilter[]>([])
+const dashboardFilters = ref<QueryFilter[]>([])
+const models = ref<SemanticModel[]>([])
+const modelId = computed(
+  () =>
+    editor.value?.dashboard.pages.flatMap((page) => page.widgets).find((widget) => widget.modelId)?.modelId ??
+    models.value[0]?.id ??
+    '',
+)
 const refreshedAt = ref(LAST_REFRESH)
 const activePageId = computed<string>({
   get: () => editor.value?.activePageId.value ?? '',
@@ -36,7 +45,12 @@ const activePageId = computed<string>({
 
 async function load() {
   loading.value = true
-  const d: Dashboard = await dashboardService.get(route.params.id as string)
+  const [d, semanticModels]: [Dashboard, SemanticModel[]] = await Promise.all([
+    dashboardService.getPublished(route.params.id as string),
+    semanticStudioService.listModels(),
+  ])
+  models.value = semanticModels
+  dashboardFilters.value = [...d.filters]
   editor.value = useDashboardEditor(d)
   loading.value = false
 }
@@ -101,7 +115,7 @@ onMounted(load)
         />
         <VipButton variant="ghost" size="sm" icon="refresh" title="Refresh" @click="refresh" />
         <VipButton
-          v-if="platform.can('dashboard:write')"
+          v-if="platform.can('dashboard.update')"
           variant="secondary"
           size="sm"
           icon="settings"
@@ -129,14 +143,18 @@ onMounted(load)
       </div>
       <DashboardFilterBar
         :dashboard="editor.dashboard"
+        :models="models"
+        :model-id="modelId"
         :cross-filters="crossFilters"
+        :filters="dashboardFilters"
+        @update:filters="dashboardFilters = $event"
         @clear-cross="crossFilters = []"
         @remove-cross="(f) => (crossFilters = crossFilters.filter((x) => x !== f))"
       />
       <div class="dview__canvas">
         <DashboardGridCanvas
           :editor="editor"
-          :cross-filters="crossFilters"
+          :cross-filters="[...dashboardFilters, ...crossFilters]"
           :editable="false"
           @cross-filter="onCrossFilter"
         />

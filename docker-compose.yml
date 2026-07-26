@@ -1,0 +1,319 @@
+name: vip
+
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vip}
+      POSTGRES_USER: ${POSTGRES_USER:-vip}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vip_local_dev_only}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - vip_postgres_data:/var/lib/postgresql/data
+      - ./apps/api/scripts/postgres-init-test-db.sh:/docker-entrypoint-initdb.d/10-test-database.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [vip_backend]
+
+  redis:
+    image: redis:8.0.3-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - vip_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks: [vip_backend]
+
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      APP_NAME: VIP API
+      APP_ENV: ${APP_ENV:-development}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SERVICE_NAME: vip-api
+      ENABLE_DOCS: ${ENABLE_DOCS:-true}
+      API_V1_PREFIX: /api/v1
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-vip}:${POSTGRES_PASSWORD:-vip_local_dev_only}@postgres:5432/${POSTGRES_DB:-vip}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-20}
+      DATABASE_POOL_TIMEOUT: ${DATABASE_POOL_TIMEOUT:-30}
+      DATABASE_CONNECT_TIMEOUT: ${DATABASE_CONNECT_TIMEOUT:-5}
+      DATABASE_ECHO: ${DATABASE_ECHO:-false}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_SOCKET_TIMEOUT: ${REDIS_SOCKET_TIMEOUT:-5}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3009}
+      CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-true}
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-localhost,127.0.0.1,api}
+      AUTH_ACCESS_SESSION_TTL_MINUTES: ${AUTH_ACCESS_SESSION_TTL_MINUTES:-15}
+      AUTH_REFRESH_SESSION_TTL_DAYS: ${AUTH_REFRESH_SESSION_TTL_DAYS:-14}
+      AUTH_SESSION_IDLE_TTL_MINUTES: ${AUTH_SESSION_IDLE_TTL_MINUTES:-60}
+      AUTH_MAX_ACTIVE_SESSIONS_PER_USER: ${AUTH_MAX_ACTIVE_SESSIONS_PER_USER:-100}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}
+      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
+      AUTH_MAX_FAILED_LOGIN_ATTEMPTS: ${AUTH_MAX_FAILED_LOGIN_ATTEMPTS:-5}
+      AUTH_LOCKOUT_MINUTES: ${AUTH_LOCKOUT_MINUTES:-15}
+      # Development/browser QA performs many isolated logins. Production does not use this Compose default.
+      AUTH_LOGIN_RATE_LIMIT_PER_MINUTE: ${AUTH_LOGIN_RATE_LIMIT_PER_MINUTE:-1000}
+      PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-12}
+      PASSWORD_MAX_LENGTH: ${PASSWORD_MAX_LENGTH:-256}
+      PASSWORD_RESET_TOKEN_TTL_MINUTES: ${PASSWORD_RESET_TOKEN_TTL_MINUTES:-30}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3009}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:3009}
+      TENANCY_ORGANIZATION_HEADER: ${TENANCY_ORGANIZATION_HEADER:-X-Organization-ID}
+      TENANCY_WORKSPACE_HEADER: ${TENANCY_WORKSPACE_HEADER:-X-Workspace-ID}
+      TENANCY_REQUIRE_WORKSPACE_BY_DEFAULT: ${TENANCY_REQUIRE_WORKSPACE_BY_DEFAULT:-false}
+      TENANCY_DEFAULT_WORKSPACE_NAME: ${TENANCY_DEFAULT_WORKSPACE_NAME:-Default}
+      TENANCY_AUDIT_ENABLED: ${TENANCY_AUDIT_ENABLED:-true}
+      TENANCY_CACHE_PREFIX: ${TENANCY_CACHE_PREFIX:-vip}
+      INVITATION_TOKEN_TTL_HOURS: ${INVITATION_TOKEN_TTL_HOURS:-72}
+      INVITATION_TOKEN_BYTES: ${INVITATION_TOKEN_BYTES:-32}
+      INVITATION_ACCEPT_URL: ${INVITATION_ACCEPT_URL:-http://localhost:3009/invitations/accept}
+      AUTHORIZATION_CACHE_ENABLED: ${AUTHORIZATION_CACHE_ENABLED:-false}
+      AUTHORIZATION_CACHE_TTL_SECONDS: ${AUTHORIZATION_CACHE_TTL_SECONDS:-60}
+      FEATURE_FLAGS_CACHE_TTL_SECONDS: ${FEATURE_FLAGS_CACHE_TTL_SECONDS:-60}
+      ENTITLEMENTS_CACHE_TTL_SECONDS: ${ENTITLEMENTS_CACHE_TTL_SECONDS:-60}
+      QUOTA_CACHE_TTL_SECONDS: ${QUOTA_CACHE_TTL_SECONDS:-30}
+      AUDIT_EVENTS_ENABLED: ${AUDIT_EVENTS_ENABLED:-true}
+      AUDIT_DENIED_ACCESS: ${AUDIT_DENIED_ACCESS:-true}
+      AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-365}
+      GOVERNANCE_FAIL_CLOSED: ${GOVERNANCE_FAIL_CLOSED:-true}
+      CONNECTION_SECRET_PROVIDER: ${CONNECTION_SECRET_PROVIDER:-database_encrypted}
+      CONNECTION_ENCRYPTION_KEY: ${CONNECTION_ENCRYPTION_KEY:-REREREREREREREREREREREREREREREREREREREREREQ=}
+      CONNECTION_ENCRYPTION_KEY_VERSION: ${CONNECTION_ENCRYPTION_KEY_VERSION:-dev-v1}
+      CONNECTION_TEST_TIMEOUT_SECONDS: ${CONNECTION_TEST_TIMEOUT_SECONDS:-15}
+      CONNECTION_TEST_MAX_REDIRECTS: ${CONNECTION_TEST_MAX_REDIRECTS:-2}
+      CONNECTION_TEST_RATE_LIMIT_PER_MINUTE: ${CONNECTION_TEST_RATE_LIMIT_PER_MINUTE:-10}
+      CONNECTION_ALLOW_PRIVATE_NETWORKS: ${CONNECTION_ALLOW_PRIVATE_NETWORKS:-true}
+      CONNECTION_ALLOW_HTTP: ${CONNECTION_ALLOW_HTTP:-false}
+      CONNECTION_BLOCK_CLOUD_METADATA: ${CONNECTION_BLOCK_CLOUD_METADATA:-true}
+      CONNECTION_MAX_CONFIGURATION_BYTES: ${CONNECTION_MAX_CONFIGURATION_BYTES:-32768}
+      CONNECTION_MAX_SECRET_BYTES: ${CONNECTION_MAX_SECRET_BYTES:-16384}
+      B5_DEMO_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vip_local_dev_only}
+      B5_DEMO_POSTGRES_HOST: postgres
+      METADATA_DISCOVERY_TIMEOUT_SECONDS: ${METADATA_DISCOVERY_TIMEOUT_SECONDS:-30}
+      METADATA_DISCOVERY_MAX_OBJECTS: ${METADATA_DISCOVERY_MAX_OBJECTS:-500}
+      METADATA_DISCOVERY_MAX_FIELDS_PER_OBJECT: ${METADATA_DISCOVERY_MAX_FIELDS_PER_OBJECT:-500}
+      LINEAGE_MAX_DEPTH: ${LINEAGE_MAX_DEPTH:-5}
+      LINEAGE_MAX_NODES: ${LINEAGE_MAX_NODES:-250}
+      SEMANTIC_QUERY_DEFAULT_LIMIT: ${SEMANTIC_QUERY_DEFAULT_LIMIT:-100}
+      SEMANTIC_QUERY_MAX_LIMIT: ${SEMANTIC_QUERY_MAX_LIMIT:-1000}
+      SEMANTIC_QUERY_TIMEOUT_SECONDS: ${SEMANTIC_QUERY_TIMEOUT_SECONDS:-30}
+      SEMANTIC_QUERY_MAX_RESULT_BYTES: ${SEMANTIC_QUERY_MAX_RESULT_BYTES:-5242880}
+      DASHBOARD_MAX_PAGES: ${DASHBOARD_MAX_PAGES:-50}
+      DASHBOARD_MAX_WIDGETS: ${DASHBOARD_MAX_WIDGETS:-250}
+      DASHBOARD_MAX_WIDGETS_PER_PAGE: ${DASHBOARD_MAX_WIDGETS_PER_PAGE:-100}
+      DASHBOARD_MAX_FILTERS: ${DASHBOARD_MAX_FILTERS:-50}
+      DASHBOARD_MAX_EDITOR_PAYLOAD_BYTES: ${DASHBOARD_MAX_EDITOR_PAYLOAD_BYTES:-2097152}
+      DASHBOARD_MAX_VERSION_SNAPSHOT_BYTES: ${DASHBOARD_MAX_VERSION_SNAPSHOT_BYTES:-5242880}
+      DASHBOARD_QUERY_MAX_CONCURRENT_WIDGETS: ${DASHBOARD_QUERY_MAX_CONCURRENT_WIDGETS:-8}
+      DASHBOARD_QUERY_TIMEOUT_SECONDS: ${DASHBOARD_QUERY_TIMEOUT_SECONDS:-30}
+      DASHBOARD_QUERY_CACHE_ENABLED: ${DASHBOARD_QUERY_CACHE_ENABLED:-false}
+      DASHBOARD_QUERY_CACHE_TTL_SECONDS: ${DASHBOARD_QUERY_CACHE_TTL_SECONDS:-60}
+      DASHBOARD_QUERY_MAX_RESULT_BYTES: ${DASHBOARD_QUERY_MAX_RESULT_BYTES:-5242880}
+      DASHBOARD_SNAPSHOT_MAX_BYTES: ${DASHBOARD_SNAPSHOT_MAX_BYTES:-20971520}
+      DASHBOARD_SNAPSHOT_RETENTION_DAYS: ${DASHBOARD_SNAPSHOT_RETENTION_DAYS:-30}
+      DASHBOARD_EXPORT_MAX_ATTEMPTS: ${DASHBOARD_EXPORT_MAX_ATTEMPTS:-3}
+      DASHBOARD_EXPORT_MAX_ARTIFACT_BYTES: ${DASHBOARD_EXPORT_MAX_ARTIFACT_BYTES:-52428800}
+      DASHBOARD_EXPORT_RETENTION_HOURS: ${DASHBOARD_EXPORT_RETENTION_HOURS:-24}
+      DASHBOARD_EXPORT_LEASE_SECONDS: ${DASHBOARD_EXPORT_LEASE_SECONDS:-120}
+      DASHBOARD_ARTIFACT_ROOT: /data/vip-artifacts
+      DASHBOARD_DOWNLOAD_TOKEN_TTL_SECONDS: ${DASHBOARD_DOWNLOAD_TOKEN_TTL_SECONDS:-300}
+      DASHBOARD_DOWNLOAD_SIGNING_KEY: ${DASHBOARD_DOWNLOAD_SIGNING_KEY:-vip-local-download-signing-key-change-me-2026}
+      DASHBOARD_EMAIL_PROVIDER: ${DASHBOARD_EMAIL_PROVIDER:-file}
+      DASHBOARD_EMAIL_OUTBOX_ROOT: /data/vip-email-outbox
+      DASHBOARD_EMAIL_FROM: ${DASHBOARD_EMAIL_FROM:-no-reply@vip.local}
+      DASHBOARD_SMTP_HOST: ${DASHBOARD_SMTP_HOST:-}
+      DASHBOARD_SMTP_PORT: ${DASHBOARD_SMTP_PORT:-587}
+      DASHBOARD_SMTP_USERNAME: ${DASHBOARD_SMTP_USERNAME:-}
+      DASHBOARD_SMTP_PASSWORD: ${DASHBOARD_SMTP_PASSWORD:-}
+      DASHBOARD_SMTP_STARTTLS: ${DASHBOARD_SMTP_STARTTLS:-true}
+      DASHBOARD_SMTP_USE_TLS: ${DASHBOARD_SMTP_USE_TLS:-false}
+      DASHBOARD_SMTP_TIMEOUT_SECONDS: ${DASHBOARD_SMTP_TIMEOUT_SECONDS:-30}
+      PIPELINE_RUN_MAX_ATTEMPTS: ${PIPELINE_RUN_MAX_ATTEMPTS:-3}
+      PIPELINE_RUN_MAX_ROWS: ${PIPELINE_RUN_MAX_ROWS:-100000}
+      PIPELINE_RUN_MAX_RESULT_BYTES: ${PIPELINE_RUN_MAX_RESULT_BYTES:-52428800}
+      PIPELINE_RUN_TIMEOUT_SECONDS: ${PIPELINE_RUN_TIMEOUT_SECONDS:-900}
+      PIPELINE_ARTIFACT_ROOT: /data/vip-pipeline-artifacts
+      PIPELINE_DOWNLOAD_TOKEN_TTL_SECONDS: ${PIPELINE_DOWNLOAD_TOKEN_TTL_SECONDS:-300}
+      PIPELINE_DOWNLOAD_SIGNING_KEY: ${PIPELINE_DOWNLOAD_SIGNING_KEY:-vip-local-pipeline-signing-key-change-me-2026}
+      JOB_QUEUE_PREFIX: ${JOB_QUEUE_PREFIX:-vip:jobs}
+      JOB_DEFAULT_QUEUE: ${JOB_DEFAULT_QUEUE:-default}
+      JOB_WORKER_QUEUES: ${JOB_WORKER_QUEUES:-default,dashboard}
+      JOB_WORKER_CONCURRENCY: ${JOB_WORKER_CONCURRENCY:-4}
+      JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-120}
+      JOB_HEARTBEAT_SECONDS: ${JOB_HEARTBEAT_SECONDS:-15}
+      FILE_STORAGE_PROVIDER: ${FILE_STORAGE_PROVIDER:-local}
+      FILE_STORAGE_ROOT: /data/vip-files
+      FILE_MAX_UPLOAD_BYTES: ${FILE_MAX_UPLOAD_BYTES:-104857600}
+      FILE_MALWARE_SCANNER: ${FILE_MALWARE_SCANNER:-noop}
+      FILE_DOWNLOAD_SIGNING_KEY: ${FILE_DOWNLOAD_SIGNING_KEY:-vip-local-file-signing-key-change-me-2026}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/src:/app/src:ro
+      - ./apps/api/alembic:/app/alembic:ro
+      - vip_dashboard_artifacts:/data/vip-artifacts
+      - vip_dashboard_email_outbox:/data/vip-email-outbox
+      - vip_pipeline_artifacts:/data/vip-pipeline-artifacts
+      - vip_files:/data/vip-files
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    init: true
+    networks: [vip_backend]
+
+  dashboard-storage-init:
+    build:
+      context: ./apps/api
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["chown -R vip:vip /data/vip-artifacts /data/vip-email-outbox /data/vip-pipeline-artifacts /data/vip-files"]
+    volumes:
+      - vip_dashboard_artifacts:/data/vip-artifacts
+      - vip_dashboard_email_outbox:/data/vip-email-outbox
+      - vip_pipeline_artifacts:/data/vip-pipeline-artifacts
+      - vip_files:/data/vip-files
+    restart: "no"
+    networks: [vip_backend]
+
+  dashboard-worker:
+    build:
+      context: ./apps/api
+    command: ["python", "-m", "vip_api.jobs.worker"]
+    environment:
+      SKIP_PLATFORM_BOOTSTRAP: "true"
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SERVICE_NAME: vip-dashboard-worker
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-vip}:${POSTGRES_PASSWORD:-vip_local_dev_only}@postgres:5432/${POSTGRES_DB:-vip}
+      REDIS_URL: redis://redis:6379/0
+      CONNECTION_SECRET_PROVIDER: database_encrypted
+      CONNECTION_ENCRYPTION_KEY: ${CONNECTION_ENCRYPTION_KEY:-REREREREREREREREREREREREREREREREREREREREREQ=}
+      CONNECTION_ENCRYPTION_KEY_VERSION: ${CONNECTION_ENCRYPTION_KEY_VERSION:-dev-v1}
+      # Local demo data source is the private Compose PostgreSQL network.
+      CONNECTION_ALLOW_PRIVATE_NETWORKS: ${CONNECTION_ALLOW_PRIVATE_NETWORKS:-true}
+      DASHBOARD_EXPORT_MAX_ATTEMPTS: ${DASHBOARD_EXPORT_MAX_ATTEMPTS:-3}
+      DASHBOARD_EXPORT_MAX_ARTIFACT_BYTES: ${DASHBOARD_EXPORT_MAX_ARTIFACT_BYTES:-52428800}
+      DASHBOARD_EXPORT_RETENTION_HOURS: ${DASHBOARD_EXPORT_RETENTION_HOURS:-24}
+      DASHBOARD_EXPORT_WORKER_POLL_SECONDS: ${DASHBOARD_EXPORT_WORKER_POLL_SECONDS:-1}
+      DASHBOARD_EXPORT_LEASE_SECONDS: ${DASHBOARD_EXPORT_LEASE_SECONDS:-120}
+      DASHBOARD_ARTIFACT_ROOT: /data/vip-artifacts
+      DASHBOARD_DOWNLOAD_SIGNING_KEY: ${DASHBOARD_DOWNLOAD_SIGNING_KEY:-vip-local-download-signing-key-change-me-2026}
+      DASHBOARD_EMAIL_PROVIDER: ${DASHBOARD_EMAIL_PROVIDER:-file}
+      DASHBOARD_EMAIL_OUTBOX_ROOT: /data/vip-email-outbox
+      DASHBOARD_EMAIL_FROM: ${DASHBOARD_EMAIL_FROM:-no-reply@vip.local}
+      DASHBOARD_SMTP_HOST: ${DASHBOARD_SMTP_HOST:-}
+      DASHBOARD_SMTP_PORT: ${DASHBOARD_SMTP_PORT:-587}
+      DASHBOARD_SMTP_USERNAME: ${DASHBOARD_SMTP_USERNAME:-}
+      DASHBOARD_SMTP_PASSWORD: ${DASHBOARD_SMTP_PASSWORD:-}
+      DASHBOARD_SMTP_STARTTLS: ${DASHBOARD_SMTP_STARTTLS:-true}
+      DASHBOARD_SMTP_USE_TLS: ${DASHBOARD_SMTP_USE_TLS:-false}
+      DASHBOARD_SMTP_TIMEOUT_SECONDS: ${DASHBOARD_SMTP_TIMEOUT_SECONDS:-30}
+      B5_DEMO_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vip_local_dev_only}
+      B5_DEMO_POSTGRES_HOST: postgres
+      JOB_QUEUE_PREFIX: ${JOB_QUEUE_PREFIX:-vip:jobs}
+      JOB_WORKER_QUEUES: ${JOB_WORKER_QUEUES:-default,dashboard}
+      JOB_WORKER_CONCURRENCY: ${JOB_WORKER_CONCURRENCY:-4}
+      JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-120}
+      JOB_HEARTBEAT_SECONDS: ${JOB_HEARTBEAT_SECONDS:-15}
+      FILE_STORAGE_PROVIDER: local
+      FILE_STORAGE_ROOT: /data/vip-files
+      FILE_MALWARE_SCANNER: noop
+      FILE_DOWNLOAD_SIGNING_KEY: ${FILE_DOWNLOAD_SIGNING_KEY:-vip-local-file-signing-key-change-me-2026}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      dashboard-storage-init:
+        condition: service_completed_successfully
+    volumes:
+      - vip_dashboard_artifacts:/data/vip-artifacts
+      - vip_dashboard_email_outbox:/data/vip-email-outbox
+      - vip_files:/data/vip-files
+    healthcheck:
+      test: ["CMD", "python", "/app/scripts/worker-health.py"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    init: true
+    networks: [vip_backend]
+
+  pipeline-worker:
+    build:
+      context: ./apps/api
+    command: ["python", "-m", "vip_api.pipelines.worker"]
+    environment:
+      SKIP_PLATFORM_BOOTSTRAP: "true"
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SERVICE_NAME: vip-pipeline-worker
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-vip}:${POSTGRES_PASSWORD:-vip_local_dev_only}@postgres:5432/${POSTGRES_DB:-vip}
+      REDIS_URL: redis://redis:6379/0
+      CONNECTION_SECRET_PROVIDER: database_encrypted
+      CONNECTION_ENCRYPTION_KEY: ${CONNECTION_ENCRYPTION_KEY:-REREREREREREREREREREREREREREREREREREREREREQ=}
+      CONNECTION_ENCRYPTION_KEY_VERSION: ${CONNECTION_ENCRYPTION_KEY_VERSION:-dev-v1}
+      CONNECTION_ALLOW_PRIVATE_NETWORKS: ${CONNECTION_ALLOW_PRIVATE_NETWORKS:-true}
+      PIPELINE_RUN_MAX_ATTEMPTS: ${PIPELINE_RUN_MAX_ATTEMPTS:-3}
+      PIPELINE_RUN_MAX_ROWS: ${PIPELINE_RUN_MAX_ROWS:-100000}
+      PIPELINE_RUN_MAX_RESULT_BYTES: ${PIPELINE_RUN_MAX_RESULT_BYTES:-52428800}
+      PIPELINE_RUN_TIMEOUT_SECONDS: ${PIPELINE_RUN_TIMEOUT_SECONDS:-900}
+      PIPELINE_WORKER_POLL_SECONDS: ${PIPELINE_WORKER_POLL_SECONDS:-1}
+      PIPELINE_WORKER_LEASE_SECONDS: ${PIPELINE_WORKER_LEASE_SECONDS:-120}
+      PIPELINE_ARTIFACT_ROOT: /data/vip-pipeline-artifacts
+      PIPELINE_ARTIFACT_RETENTION_HOURS: ${PIPELINE_ARTIFACT_RETENTION_HOURS:-24}
+      PIPELINE_DOWNLOAD_SIGNING_KEY: ${PIPELINE_DOWNLOAD_SIGNING_KEY:-vip-local-pipeline-signing-key-change-me-2026}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      dashboard-storage-init:
+        condition: service_completed_successfully
+    volumes:
+      - vip_pipeline_artifacts:/data/vip-pipeline-artifacts
+    restart: unless-stopped
+    init: true
+    networks: [vip_backend]
+
+volumes:
+  vip_postgres_data:
+  vip_redis_data:
+  vip_dashboard_artifacts:
+  vip_dashboard_email_outbox:
+  vip_pipeline_artifacts:
+  vip_files:
+
+networks:
+  vip_backend:
+    driver: bridge

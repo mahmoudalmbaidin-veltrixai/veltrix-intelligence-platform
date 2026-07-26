@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { RECENT_RUNS } from './pipelines.service'
+import { pipelineService } from './pipelines.service'
 import type { PipelineRun } from '@/shared/types/pipeline'
 import { relativeTime, formatDuration, formatNumber } from '@/shared/lib/format'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
@@ -13,8 +13,32 @@ import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 const route = useRoute()
 const router = useRouter()
 const id = route.params.id as string
-const runs = ref<PipelineRun[]>(RECENT_RUNS(id))
+const runs = ref<PipelineRun[]>([])
 const selected = ref<PipelineRun | null>(null)
+const loading = ref(true)
+
+async function loadRuns() {
+  loading.value = true
+  runs.value = await pipelineService.listRuns(id)
+  loading.value = false
+}
+async function retrySelected() {
+  if (!selected.value) return
+  selected.value = await pipelineService.retryRun(id, selected.value.id)
+  await loadRuns()
+}
+async function cancelSelected() {
+  if (!selected.value) return
+  selected.value = await pipelineService.cancelRun(id, selected.value.id)
+  await loadRuns()
+}
+async function copyDiagnostics() {
+  if (!selected.value) return
+  await navigator.clipboard.writeText(
+    `Run ${selected.value.id}\nCorrelation ID: ${selected.value.correlationId}\nStatus: ${selected.value.status}`,
+  )
+}
+onMounted(loadRuns)
 
 const columns: Column<PipelineRun>[] = [
   { key: 'status', label: 'Status' },
@@ -39,7 +63,15 @@ function tone(s: string) {
       </template>
     </VipPageHeader>
 
-    <VipTable :columns="columns" :rows="runs" :row-key="(r) => r.id" clickable @row-click="(r) => (selected = r)">
+    <p v-if="loading" aria-live="polite">Loading run historyâ€¦</p>
+    <VipTable
+      v-else
+      :columns="columns"
+      :rows="runs"
+      :row-key="(r) => r.id"
+      clickable
+      @row-click="(r) => (selected = r)"
+    >
       <template #cell-status="{ row }"
         ><VipBadge :tone="tone(row.status)" size="sm">{{ row.status }}</VipBadge></template
       >
@@ -68,11 +100,23 @@ function tone(s: string) {
           </div>
         </div>
         <div class="rn-actions">
-          <VipButton v-if="selected.status === 'failed'" variant="secondary" size="sm" icon="refresh"
+          <VipButton
+            v-if="selected.status === 'failed'"
+            variant="secondary"
+            size="sm"
+            icon="refresh"
+            @click="retrySelected"
             >Retry run</VipButton
           >
-          <VipButton v-if="selected.status === 'running'" variant="danger" size="sm" icon="close">Cancel</VipButton>
-          <VipButton variant="tertiary" size="sm" icon="copy">Copy diagnostics</VipButton>
+          <VipButton
+            v-if="['queued', 'running', 'waiting'].includes(selected.status)"
+            variant="danger"
+            size="sm"
+            icon="close"
+            @click="cancelSelected"
+            >Cancel</VipButton
+          >
+          <VipButton variant="tertiary" size="sm" icon="copy" @click="copyDiagnostics">Copy diagnostics</VipButton>
         </div>
       </template>
     </VipDrawer>

@@ -9,7 +9,10 @@ import { announce } from '@/shared/composables/useAnnouncer'
 import { useUiStore } from '@/shared/stores/ui'
 import { usePlatformStore } from '@/shared/stores/platform'
 import type { Dashboard, WidgetType } from '@/shared/types/dashboard'
+import { ApiError } from '@/shared/types/api'
 import type { QueryFilter } from '@/shared/types/semantic'
+import type { SemanticModel } from '@/shared/types/semantic'
+import { semanticStudioService } from '@/modules/semantic/semantic.service'
 import { relativeTime } from '@/shared/lib/format'
 import FieldsPanel from './FieldsPanel.vue'
 import DashboardGridCanvas from './DashboardGridCanvas.vue'
@@ -30,13 +33,16 @@ const platform = usePlatformStore()
 const loading = ref(true)
 // shallowRef so the composable's inner refs stay intact (reactive() unwraps them).
 const editor = shallowRef<ReturnType<typeof useDashboardEditor>>()
-const modelId = ref('sm_sales')
+const modelId = ref('')
+const models = ref<SemanticModel[]>([])
 const mode = ref<'edit' | 'preview'>('edit')
 const saving = ref(false)
 const savedAt = ref<string | null>(null)
 const crossFilters = ref<QueryFilter[]>([])
+const dashboardFilters = ref<QueryFilter[]>([])
 const fullscreen = ref(false)
 const shareOpen = ref(false)
+const conflict = ref(false)
 
 const left = useResizable({ key: 'dash.left', initial: 256, min: 200, max: 380 })
 const right = useResizable({ key: 'dash.right', initial: 320, min: 260, max: 460, invert: true })
@@ -58,11 +64,32 @@ function closeOverlays() {
   inspectorOpen.value = false
 }
 function addWidgetFromPanel(t: WidgetType) {
-  editor.value?.addWidget(t)
+  const widget = editor.value?.addWidget(t)
+  const model = models.value.find((item) => item.id === modelId.value) ?? models.value[0]
+  if (widget && model && !['text', 'rich-text', 'image'].includes(t)) {
+    const dimensions = model.fields.filter((field) => field.role === 'dimension' || field.role === 'time')
+    const metrics = model.fields.filter((field) => field.role === 'metric')
+    widget.modelId = model.id
+    widget.wells = {}
+    if (['kpi', 'metric-comparison', 'gauge', 'progress'].includes(t) && metrics[0]) {
+      widget.wells.values = [{ fieldId: metrics[0].id, aggregation: 'sum' }]
+    } else if (['bar', 'column', 'stacked-bar', 'line', 'area', 'pie', 'donut'].includes(t)) {
+      if (dimensions[0]) widget.wells.category = [dimensions[0].id]
+      if (metrics[0]) widget.wells.values = [{ fieldId: metrics[0].id, aggregation: 'sum' }]
+    } else if (t === 'scatter') {
+      if (dimensions[0]) widget.wells.category = [dimensions[0].id]
+      widget.wells.values = metrics.slice(0, 2).map((field) => ({ fieldId: field.id, aggregation: 'sum' }))
+    } else if (t === 'table' || t === 'pivot') {
+      widget.wells.category = dimensions.slice(0, 3).map((field) => field.id)
+      widget.wells.values = metrics.slice(0, 3).map((field) => ({ fieldId: field.id, aggregation: 'sum' }))
+    } else if ((t === 'filter' || t === 'date-filter') && dimensions[0]) {
+      widget.wells.category = [dimensions[0].id]
+    }
+  }
   if (compact.value) fieldsOpen.value = false
 }
 
-const canEdit = computed(() => platform.can('dashboard:write'))
+const canEdit = computed(() => platform.can('dashboard.create') || platform.can('dashboard.update'))
 
 // Unwrapped accessors for template use (composable exposes refs).
 const dirty = computed(() => editor.value?.dirty.value ?? false)
@@ -90,33 +117,77 @@ watch(
 
 async function load() {
   loading.value = true
-  const id = route.params.id as string | undefined
-  const d: Dashboard = id ? await dashboardService.get(id) : newDashboard()
-  editor.value = useDashboardEditor(d)
-  loading.value = false
+  try {
+    const id = route.params.id as string | undefined
+    const [d, semanticModels] = await Promise.all([
+      id ? dashboardService.get(id) : Promise.resolve(newDashboard()),
+      semanticStudioService.listModels(),
+    ])
+    models.value = semanticModels
+    modelId.value =
+      d.pages.flatMap((page) => page.widgets).find((widget) => widget.modelId)?.modelId ?? semanticModels[0]?.id ?? ''
+    editor.value = useDashboardEditor(d)
+    dashboardFilters.value = [...d.filters]
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Dashboard could not load', message: ApiError.from(error).message })
+  } finally {
+    loading.value = false
+  }
 }
 
 async function save() {
   if (!editor.value || !canEdit.value) return
+  const isFirstSave = route.name === 'dashboard-new' || route.path === '/dashboards/new'
   saving.value = true
-  const saved = await dashboardService.save(editor.value.dashboard as Dashboard)
-  editor.value.markSaved()
-  savedAt.value = saved.updatedAt
-  saving.value = false
-  ui.pushToast({ kind: 'success', title: 'Dashboard saved' })
-  // First save from /dashboards/new: adopt the stable ID URL so the dashboard
-  // can be deep-linked and reloaded (QA VIP-FE-H004).
-  if (!route.params.id) {
-    router.replace(`/dashboards/${saved.id}/edit`)
+  try {
+    const saved = await dashboardService.save(editor.value.dashboard as Dashboard)
+    editor.value = useDashboardEditor(saved)
+    savedAt.value = saved.updatedAt
+    conflict.value = false
+    ui.pushToast({ kind: 'success', title: 'Dashboard saved' })
+    // First save from /dashboards/new: adopt the stable ID URL so the dashboard
+    // can be deep-linked and reloaded (QA VIP-FE-H004).
+    if (isFirstSave) await router.replace(`/dashboards/${saved.id}/edit`)
+  } catch (error) {
+    const apiError = ApiError.from(error)
+    if (apiError.code === 'DASHBOARD_VERSION_CONFLICT') {
+      conflict.value = true
+      window.clearTimeout(timer)
+    } else {
+      ui.pushToast({ kind: 'error', title: 'Dashboard was not saved', message: apiError.message })
+    }
+  } finally {
+    saving.value = false
   }
 }
 async function publish() {
   if (!editor.value) return
   await save()
+  if (conflict.value || !editor.value) return
   const p = await dashboardService.publish(editor.value.dashboard as Dashboard)
   editor.value.dashboard.status = p.status
   editor.value.dashboard.version = p.version
   ui.pushToast({ kind: 'success', title: 'Dashboard published', message: `Version ${p.version} is live` })
+}
+async function openGovernance() {
+  if (editor.value?.dashboard.id !== 'new') shareOpen.value = true
+}
+
+async function reloadConflict() {
+  conflict.value = false
+  await load()
+}
+async function saveConflictCopy() {
+  if (!editor.value) return
+  editor.value.dashboard.id = 'new'
+  editor.value.dashboard.version = 1
+  editor.value.dashboard.name = `${editor.value.dashboard.name} copy`
+  conflict.value = false
+  await save()
+}
+
+function applyGovernanceUpdate(dashboard: Dashboard) {
+  editor.value = useDashboardEditor(dashboard)
 }
 
 function onCrossFilter({ field, value }: { field: string; value: string }) {
@@ -128,19 +199,31 @@ function onCrossFilter({ field, value }: { field: string; value: string }) {
       { fieldId: field, operator: 'eq', value, label: `${field} = ${value}` },
     ]
 }
+function updateDashboardFilters(filters: QueryFilter[]) {
+  dashboardFilters.value = filters
+  if (!editor.value) return
+  editor.value.dashboard.filters = [...filters]
+  editor.value.commit()
+}
 
 /* autosave */
 let timer: number | undefined
 watch(
-  () => editor.value?.dirty,
+  () => editor.value?.dirty.value,
   (d) => {
-    if (d && canEdit.value) {
+    // Creation is explicit. Autosaving a "new" dashboard can race the Save
+    // action and issue two creates for the same slug.
+    if (d && canEdit.value && editor.value?.dashboard.id !== 'new') {
       window.clearTimeout(timer)
       timer = window.setTimeout(async () => {
-        if (!editor.value?.dirty) return
-        await dashboardService.save(editor.value.dashboard as Dashboard)
-        editor.value.markSaved()
-        savedAt.value = new Date().toISOString()
+        if (!editor.value?.dirty.value) return
+        try {
+          const saved = await dashboardService.save(editor.value.dashboard as Dashboard)
+          editor.value = useDashboardEditor(saved)
+          savedAt.value = saved.updatedAt
+        } catch (error) {
+          if (ApiError.from(error).code === 'DASHBOARD_VERSION_CONFLICT') conflict.value = true
+        }
       }, 2500)
     }
   },
@@ -204,12 +287,12 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 function beforeUnload(e: BeforeUnloadEvent) {
-  if (editor.value?.dirty) {
+  if (editor.value?.dirty.value) {
     e.preventDefault()
     e.returnValue = ''
   }
 }
-onBeforeRouteLeave(() => (editor.value?.dirty ? window.confirm('You have unsaved changes. Leave anyway?') : true))
+onBeforeRouteLeave(() => (editor.value?.dirty.value ? window.confirm('You have unsaved changes. Leave anyway?') : true))
 
 function renamePagePrompt(id: string, current: string) {
   if (mode.value !== 'edit' || !editor.value) return
@@ -236,6 +319,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="dstudio" :class="{ 'is-fullscreen': fullscreen }">
+    <div v-if="conflict" class="dstudio__conflict" role="alertdialog" aria-labelledby="dashboard-conflict-title">
+      <strong id="dashboard-conflict-title">This dashboard was updated by another user.</strong>
+      <span>Your unsaved work has not overwritten the server version.</span>
+      <VipButton size="sm" variant="primary" @click="reloadConflict">Reload latest</VipButton>
+      <VipButton size="sm" variant="secondary" @click="saveConflictCopy">Save current work as copy</VipButton>
+      <VipButton size="sm" variant="ghost" @click="conflict = false">Cancel</VipButton>
+    </div>
     <header class="dstudio__toolbar">
       <div class="dstudio__tb-left">
         <VipButton variant="ghost" size="sm" icon="chevronLeft" title="Back" @click="router.push('/dashboards')" />
@@ -296,12 +386,21 @@ onBeforeUnmount(() => {
         <VipButton variant="secondary" size="sm" icon="save" :loading="saving" :disabled="!canEdit" @click="save"
           >Save</VipButton
         >
-        <VipButton variant="secondary" size="sm" icon="share" @click="shareOpen = true">Share</VipButton>
+        <VipButton
+          variant="secondary"
+          size="sm"
+          icon="share"
+          :disabled="!editor || editor.dashboard.id === 'new'"
+          title="Save the dashboard before managing governance"
+          @click="openGovernance"
+          >Share</VipButton
+        >
         <VipButton variant="primary" size="sm" icon="upload" :disabled="!canEdit" @click="publish">Publish</VipButton>
         <VipButton
           variant="ghost"
           size="sm"
           :icon="fullscreen ? 'minimize' : 'maximize'"
+          :title="fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
           @click="fullscreen = !fullscreen"
         />
       </div>
@@ -318,10 +417,11 @@ onBeforeUnmount(() => {
         role="region"
         aria-label="Fields and visuals"
         :aria-hidden="compact && !fieldsOpen"
+        :inert="compact && !fieldsOpen"
         :class="{ 'is-overlay': compact, 'is-open': fieldsOpen }"
         :style="compact ? {} : { width: `${left.size.value}px` }"
       >
-        <FieldsPanel v-model:model-id="modelId" @add-widget="addWidgetFromPanel" />
+        <FieldsPanel v-model:model-id="modelId" :models="models" @add-widget="addWidgetFromPanel" />
       </div>
       <div v-if="mode === 'edit' && !compact" class="dstudio__resizer" @pointerdown="left.startResize" />
 
@@ -354,7 +454,11 @@ onBeforeUnmount(() => {
 
         <DashboardFilterBar
           :dashboard="editor.dashboard"
+          :models="models"
+          :model-id="modelId"
           :cross-filters="crossFilters"
+          :filters="dashboardFilters"
+          @update:filters="updateDashboardFilters"
           @clear-cross="crossFilters = []"
           @remove-cross="(f) => (crossFilters = crossFilters.filter((x) => x !== f))"
         />
@@ -362,8 +466,9 @@ onBeforeUnmount(() => {
         <div class="dstudio__canvas" @dragover.prevent @drop="onCanvasDrop">
           <DashboardGridCanvas
             :editor="editor"
-            :cross-filters="crossFilters"
+            :cross-filters="[...dashboardFilters, ...crossFilters]"
             :editable="mode === 'edit' && canEdit"
+            :draft-preview="true"
             @cross-filter="onCrossFilter"
           />
         </div>
@@ -377,14 +482,21 @@ onBeforeUnmount(() => {
         role="region"
         aria-label="Visual inspector"
         :aria-hidden="compact && !inspectorOpen"
+        :inert="compact && !inspectorOpen"
         :class="{ 'is-overlay': compact, 'is-open': inspectorOpen }"
         :style="compact ? {} : { width: `${right.size.value}px` }"
       >
-        <WidgetInspector :editor="editor" />
+        <WidgetInspector :editor="editor" :models="models" />
       </div>
     </div>
 
-    <DashboardShareDialog v-if="editor" :open="shareOpen" :dashboard="editor.dashboard" @close="shareOpen = false" />
+    <DashboardShareDialog
+      v-if="editor"
+      :open="shareOpen"
+      :dashboard="editor.dashboard"
+      @close="shareOpen = false"
+      @updated="applyGovernanceUpdate"
+    />
   </div>
 </template>
 

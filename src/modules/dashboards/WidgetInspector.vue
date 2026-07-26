@@ -2,8 +2,7 @@
 import { computed, ref } from 'vue'
 import type { DashboardEditor } from './useDashboardEditor'
 import type { DashboardWidget, FieldWells, WellValue, WidgetType } from '@/shared/types/dashboard'
-import type { Aggregation, SemanticField } from '@/shared/types/semantic'
-import { MODELS } from '@/shared/services/semanticModels'
+import type { Aggregation, SemanticField, SemanticModel } from '@/shared/types/semantic'
 import { WIDGET_CATALOG } from './widgetFactory'
 import VipSegmented from '@/shared/ui/VipSegmented.vue'
 import VipSelect from '@/shared/ui/VipSelect.vue'
@@ -13,11 +12,11 @@ import VipMenu from '@/shared/ui/VipMenu.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
 
-const props = defineProps<{ editor: DashboardEditor }>()
+const props = defineProps<{ editor: DashboardEditor; models: SemanticModel[] }>()
 const tab = ref<'build' | 'format' | 'interactions' | 'general'>('build')
 
 const w = props.editor.selectedWidget
-const model = computed(() => MODELS.find((m) => m.id === w.value?.modelId) ?? MODELS[0])
+const model = computed(() => props.models.find((m) => m.id === w.value?.modelId) ?? props.models[0])
 
 type DimWellKey = 'xAxis' | 'category' | 'legend' | 'series'
 interface WellDef {
@@ -54,11 +53,11 @@ const wellDefs = computed<WellDef[]>(() => {
   return [{ key: 'values', label: 'Value', kind: 'measure' }]
 })
 
-const dims = computed(() => model.value.fields.filter((f) => f.role === 'dimension' || f.role === 'time'))
-const measures = computed(() => model.value.fields.filter((f) => f.role === 'measure' || f.role === 'metric'))
+const dims = computed(() => (model.value?.fields ?? []).filter((f) => f.role === 'dimension' || f.role === 'time'))
+const measures = computed(() => (model.value?.fields ?? []).filter((f) => f.role === 'measure' || f.role === 'metric'))
 
 function fieldLabel(id: string): string {
-  return model.value.fields.find((f) => f.id === id)?.label ?? id
+  return model.value?.fields.find((f) => f.id === id)?.label ?? id
 }
 function patchWells(update: Partial<FieldWells>) {
   if (!w.value) return
@@ -176,7 +175,7 @@ const vizTypeOptions = WIDGET_CATALOG.filter((c) => c.group !== 'Content' && c.g
             <label class="winsp__label">Data source</label>
             <VipSelect
               :model-value="w.modelId ?? ''"
-              :options="MODELS.map((m) => ({ value: m.id, label: m.label }))"
+              :options="models.map((m) => ({ value: m.id, label: m.label }))"
               size="sm"
               @update:model-value="editor.patchWidget(w!.id, { modelId: $event })"
             />

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useQuery } from '@/shared/lib/query'
 import { insightsService, SUGGESTED_QUESTIONS } from './insights.service'
+import { semanticStudioService } from '@/modules/semantic/semantic.service'
 import { usePlatformStore } from '@/shared/stores/platform'
 import { useUiStore } from '@/shared/stores/ui'
-import { MODELS } from '@/shared/services/semanticModels'
 import type { Insight } from '@/shared/types/insight'
+import type { SemanticModel } from '@/shared/types/semantic'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
@@ -18,17 +19,25 @@ import InsightCard from './InsightCard.vue'
 
 const platform = usePlatformStore()
 const ui = useUiStore()
-const modelId = ref('sm_sales')
+const modelId = ref('')
+const models = ref<SemanticModel[]>([])
+const hasModel = computed(() => Boolean(modelId.value))
 const filter = ref<'all' | 'positive' | 'negative'>('all')
 const { data, isLoading, refetch } = useQuery(
   () => `insights:${modelId.value}`,
   () => insightsService.list(modelId.value),
+  { enabled: hasModel },
 )
 
 const generated = ref<Insight[]>([])
 const nlq = ref('')
 const asking = ref(false)
 const nlqEnabled = computed(() => platform.flagEnabled('insights-nlq'))
+
+onMounted(async () => {
+  models.value = (await semanticStudioService.listModels()).filter((model) => model.certified)
+  modelId.value = models.value[0]?.id ?? ''
+})
 
 const cards = computed(() => {
   const list = [...generated.value, ...(data.value ?? [])]
@@ -76,7 +85,7 @@ function onExplain(i: Insight) {
       <template #actions>
         <VipSelect
           v-model="modelId"
-          :options="MODELS.map((m) => ({ value: m.id, label: m.label }))"
+          :options="models.map((m) => ({ value: m.id, label: m.label }))"
           size="sm"
           @update:model-value="refetch()"
         />
@@ -106,9 +115,8 @@ function onExplain(i: Insight) {
       </div>
     </div>
 
-    <VipAlert tone="info" title="Development insights">
-      Insights shown here are generated over simulated data and clearly labelled. Confidence scores are illustrative
-      until backend analytics services are connected.
+    <VipAlert v-if="!models.length && !isLoading" tone="info" title="No published semantic model">
+      Publish a semantic model before evaluating governed insights.
     </VipAlert>
 
     <div v-if="isLoading" class="insights__grid">

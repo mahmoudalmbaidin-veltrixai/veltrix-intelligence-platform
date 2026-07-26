@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { relativeTime, formatNumber } from '@/shared/lib/format'
 import { datasetService, type Dataset, type DatasetStatus } from './datasets.service'
+import { connectionService } from '@/modules/connections/connections.service'
+import { usePlatformStore } from '@/shared/stores/platform'
+import { useUiStore } from '@/shared/stores/ui'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
 import VipInput from '@/shared/ui/VipInput.vue'
@@ -12,11 +15,106 @@ import VipCheckbox from '@/shared/ui/VipCheckbox.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipTooltip from '@/shared/ui/VipTooltip.vue'
+import VipButton from '@/shared/ui/VipButton.vue'
+import VipDialog from '@/shared/ui/VipDialog.vue'
+import VipTextarea from '@/shared/ui/VipTextarea.vue'
 import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 
 const router = useRouter()
+const platform = usePlatformStore()
+const ui = useUiStore()
 
-const { data, isLoading } = useQuery('datasets:list', () => datasetService.list())
+const { data, isLoading, refetch } = useQuery('datasets:list', () => datasetService.list())
+const { data: connections } = useQuery('datasets:connections', async () => (await connectionService.list(1, 100)).items)
+const canDiscover = computed(() => platform.can('dataset.discover'))
+const discoverOpen = ref(false)
+const dialogMode = ref<'discover' | 'csv'>('discover')
+const discoverBusy = ref(false)
+const discoverError = ref('')
+const discovery = reactive({ connectionId: '', schemas: 'public', names: '*' })
+const csvImport = reactive({
+  connectionId: '',
+  schema: 'vip_data',
+  table: '',
+  displayName: '',
+  description: '',
+  content: '',
+})
+const connectionOptions = computed(() =>
+  (connections.value ?? [])
+    .filter((item) => item.status === 'active')
+    .map((item) => ({ value: item.id, label: `${item.name} · ${item.type.name}` })),
+)
+const dialogConnectionId = computed({
+  get: () => (dialogMode.value === 'csv' ? csvImport.connectionId : discovery.connectionId),
+  set: (value: string) => {
+    if (dialogMode.value === 'csv') csvImport.connectionId = value
+    else discovery.connectionId = value
+  },
+})
+
+function openDiscovery(): void {
+  dialogMode.value = 'discover'
+  discovery.connectionId = connectionOptions.value[0]?.value ?? ''
+  discoverError.value = ''
+  discoverOpen.value = true
+}
+
+function openCsvImport(): void {
+  dialogMode.value = 'csv'
+  csvImport.connectionId = connectionOptions.value[0]?.value ?? ''
+  csvImport.schema = 'vip_data'
+  csvImport.table = ''
+  csvImport.displayName = ''
+  csvImport.description = ''
+  csvImport.content = ''
+  discoverError.value = ''
+  discoverOpen.value = true
+}
+
+async function discover(): Promise<void> {
+  const connectionId = dialogMode.value === 'csv' ? csvImport.connectionId : discovery.connectionId
+  if (!connectionId) {
+    discoverError.value = 'Select a connection.'
+    return
+  }
+  discoverBusy.value = true
+  discoverError.value = ''
+  try {
+    const result =
+      dialogMode.value === 'csv'
+        ? await datasetService.ingestCsv({
+            connectionId: csvImport.connectionId,
+            schema: csvImport.schema.trim(),
+            table: csvImport.table.trim(),
+            displayName: csvImport.displayName.trim(),
+            description: csvImport.description.trim(),
+            csvContent: csvImport.content,
+          })
+        : await datasetService.discover({
+            connectionId: discovery.connectionId,
+            schemas: discovery.schemas
+              .split(',')
+              .map((item) => item.trim())
+              .filter(Boolean),
+            includeNames: discovery.names
+              .split(',')
+              .map((item) => item.trim())
+              .filter(Boolean),
+          })
+    await refetch()
+    discoverOpen.value = false
+    ui.pushToast({
+      kind: 'success',
+      title: 'Discovery completed',
+      message: `${result.persisted} of ${result.discovered} objects persisted.`,
+    })
+  } catch (cause) {
+    discoverError.value = (cause as Error).message
+  } finally {
+    discoverBusy.value = false
+  }
+}
 
 const search = ref('')
 const statusFilter = ref<'all' | DatasetStatus>('all')
@@ -50,7 +148,8 @@ const STATUS_TONE: Record<DatasetStatus, 'success' | 'info' | 'neutral'> = {
   deprecated: 'neutral',
 }
 
-function qualityTone(score: number): 'success' | 'warning' | 'danger' {
+function qualityTone(score: number | null): 'success' | 'warning' | 'danger' {
+  if (score == null) return 'warning'
   if (score >= 90) return 'success'
   if (score >= 75) return 'warning'
   return 'danger'
@@ -72,10 +171,16 @@ function open(row: Dataset) {
 
 <template>
   <div class="dl">
-    <VipPageHeader
-      title="Datasets"
-      description="Browse the certified and in-progress datasets across your workspaces."
-    />
+    <VipPageHeader title="Datasets" description="Browse the certified and in-progress datasets across your workspaces.">
+      <template #actions>
+        <VipButton variant="primary" icon="search" :disabled="!canDiscover" @click="openDiscovery">
+          Discover datasets
+        </VipButton>
+        <VipButton variant="secondary" icon="upload" :disabled="!canDiscover" @click="openCsvImport">
+          Import CSV
+        </VipButton>
+      </template>
+    </VipPageHeader>
 
     <VipCard :padded="false">
       <div class="dl__toolbar">
@@ -83,7 +188,7 @@ function open(row: Dataset) {
           <VipInput v-model="search" icon="search" size="sm" placeholder="Search datasets, owners or tags" />
         </div>
         <div class="dl__filters">
-          <VipSelect v-model="statusFilter" :options="statusOptions" size="sm" />
+          <VipSelect v-model="statusFilter" :options="statusOptions" aria-label="Dataset status" size="sm" />
           <VipCheckbox v-model="certifiedOnly" label="Certified only" />
           <span class="dl__count">{{ rows.length }} of {{ data?.length ?? 0 }}</span>
         </div>
@@ -122,7 +227,9 @@ function open(row: Dataset) {
         </template>
 
         <template #cell-qualityScore="{ row }">
-          <VipBadge :tone="qualityTone(row.qualityScore)" variant="soft" size="sm">{{ row.qualityScore }}</VipBadge>
+          <VipBadge :tone="qualityTone(row.qualityScore)" variant="soft" size="sm">{{
+            row.qualityScore == null ? 'Not evaluated' : row.qualityScore
+          }}</VipBadge>
         </template>
 
         <template #cell-freshness="{ row }">
@@ -134,6 +241,58 @@ function open(row: Dataset) {
         </template>
       </VipTable>
     </VipCard>
+    <VipDialog
+      :open="discoverOpen"
+      :title="dialogMode === 'csv' ? 'Import CSV dataset' : 'Discover datasets'"
+      :description="
+        dialogMode === 'csv'
+          ? 'Create a governed PostgreSQL table from deterministic CSV data.'
+          : 'Inspect a live connection and persist selected governed objects.'
+      "
+      @close="discoverOpen = false"
+    >
+      <div class="discovery-form">
+        <VipSelect
+          v-model="dialogConnectionId"
+          label="Connection"
+          :options="connectionOptions"
+          placeholder="Select a connection"
+        />
+        <template v-if="dialogMode === 'discover'">
+          <VipInput v-model="discovery.schemas" label="Schemas" help="Comma-separated schema names." />
+          <VipInput
+            v-model="discovery.names"
+            label="Object name patterns"
+            help="Comma-separated exact names or wildcard patterns."
+          />
+        </template>
+        <template v-else>
+          <VipInput v-model="csvImport.schema" label="Target schema" required />
+          <VipInput
+            v-model="csvImport.table"
+            label="Target table"
+            required
+            help="Lowercase letters, numbers, and underscores."
+          />
+          <VipInput v-model="csvImport.displayName" label="Display name" />
+          <VipInput v-model="csvImport.description" label="Description" />
+          <VipTextarea
+            v-model="csvImport.content"
+            label="CSV data"
+            :rows="10"
+            required
+            help="The first row must contain unique field names."
+          />
+        </template>
+        <p v-if="discoverError" role="alert">{{ discoverError }}</p>
+      </div>
+      <template #footer>
+        <VipButton variant="tertiary" @click="discoverOpen = false">Cancel</VipButton>
+        <VipButton variant="primary" :loading="discoverBusy" @click="discover">
+          {{ dialogMode === 'csv' ? 'Import and catalog' : 'Discover and persist' }}
+        </VipButton>
+      </template>
+    </VipDialog>
   </div>
 </template>
 
@@ -214,5 +373,9 @@ function open(row: Dataset) {
 }
 .dl__muted {
   color: var(--vip-text-muted);
+}
+.discovery-form {
+  display: grid;
+  gap: var(--vip-sp-5);
 }
 </style>

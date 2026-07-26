@@ -22,23 +22,23 @@ watch(
 )
 
 const columns: Column<ScheduledDelivery>[] = [
-  { key: 'dashboardName', label: 'Dashboard' },
+  { key: 'name', label: 'Delivery' },
   { key: 'subject', label: 'Subject' },
   { key: 'recipients', label: 'Recipients' },
   { key: 'format', label: 'Format' },
-  { key: 'cadence', label: 'Cadence' },
-  { key: 'nextRun', label: 'Next run' },
-  { key: 'active', label: 'Active', align: 'center' },
+  { key: 'schedule_type', label: 'Cadence' },
+  { key: 'next_run_at', label: 'Next run' },
+  { key: 'enabled', label: 'Active', align: 'center' },
   { key: 'actions', label: '', align: 'right' },
 ]
 
 async function toggle(d: ScheduledDelivery) {
-  d.active = !d.active
-  await deliveryService.toggle(d.id)
-  ui.pushToast({ kind: 'info', title: d.active ? 'Delivery resumed' : 'Delivery paused' })
+  const updated = await deliveryService.toggle(d)
+  Object.assign(d, updated)
+  ui.pushToast({ kind: 'info', title: d.enabled ? 'Delivery resumed' : 'Delivery paused' })
 }
 async function remove(d: ScheduledDelivery) {
-  await deliveryService.remove(d.id)
+  await deliveryService.remove(d)
   refetch()
   ui.pushToast({ kind: 'info', title: 'Delivery removed', message: d.subject })
 }
@@ -63,12 +63,13 @@ async function remove(d: ScheduledDelivery) {
       <template #cell-format="{ row }"
         ><VipBadge tone="neutral" size="sm">{{ row.format.toUpperCase() }}</VipBadge></template
       >
-      <template #cell-cadence="{ row }">{{ row.cadence }}</template>
-      <template #cell-nextRun="{ row }"
-        ><span :title="formatDateTime(row.nextRun)">{{ relativeTime(row.nextRun) }}</span></template
+      <template #cell-schedule_type="{ row }">{{ row.schedule_type.replace('_', ' ') }}</template>
+      <template #cell-next_run_at="{ row }"
+        ><span v-if="row.next_run_at" :title="formatDateTime(row.next_run_at)">{{ relativeTime(row.next_run_at) }}</span
+        ><span v-else class="dd-muted">Not scheduled</span></template
       >
-      <template #cell-active="{ row }"
-        ><VipSwitch :model-value="row.active" size="sm" @update:model-value="toggle(row)"
+      <template #cell-enabled="{ row }"
+        ><VipSwitch :model-value="row.enabled" size="sm" @update:model-value="toggle(row)"
       /></template>
       <template #cell-actions="{ row }"
         ><VipButton variant="ghost" size="xs" icon="trash" @click="remove(row)"

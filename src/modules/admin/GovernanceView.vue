@@ -1,86 +1,89 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { useQuery } from '@/shared/lib/query'
-import { adminService, type Policy } from './admin.service'
-import { useUiStore } from '@/shared/stores/ui'
-import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
+import { computed } from 'vue'
+import { useAuthorizationStore } from '@/shared/stores/authorization'
+import { usePlatformStore } from '@/shared/stores/platform'
+import VipAlert from '@/shared/ui/VipAlert.vue'
+import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
-import VipSwitch from '@/shared/ui/VipSwitch.vue'
-import VipInput from '@/shared/ui/VipInput.vue'
-import VipButton from '@/shared/ui/VipButton.vue'
+import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 
-const ui = useUiStore()
-const { data } = useQuery('admin:policies', () => adminService.listPolicies())
-const policies = ref<Policy[]>([])
-watch(
-  data,
-  (d) => {
-    if (d) policies.value = d
-  },
-  { immediate: true },
-)
-function save() {
-  ui.pushToast({ kind: 'success', title: 'Governance policies saved' })
-}
+const platform = usePlatformStore()
+const authorization = useAuthorizationStore()
+const features = computed(() => Object.entries(platform.featureFlags).sort(([a], [b]) => a.localeCompare(b)))
+const entitlements = computed(() => [...authorization.entitlements].sort())
+const quotas = computed(() => Object.values(authorization.quotas).sort((a, b) => a.key.localeCompare(b.key)))
+const label = (key: string) => key.replace(/[._-]/g, ' ').replace(/\b\w/g, (value) => value.toUpperCase())
 </script>
 
 <template>
   <div>
     <VipPageHeader
-      title="Governance Policies"
-      description="Organization-wide security, retention and data-handling controls."
-    >
-      <template #actions><VipButton variant="primary" icon="save" @click="save">Save policies</VipButton></template>
-    </VipPageHeader>
-    <div class="gov">
-      <VipCard v-for="p in policies" :key="p.key" class="gov-row">
-        <div class="gov-info">
-          <div class="gov-name">{{ p.label }}</div>
-          <p class="gov-desc">{{ p.description }}</p>
-        </div>
-        <div class="gov-control">
-          <VipSwitch
-            v-if="typeof p.value === 'boolean'"
-            :model-value="p.value"
-            @update:model-value="p.value = $event"
-          />
-          <VipInput v-else :model-value="p.value" size="sm" @update:model-value="p.value = String($event)" />
-        </div>
-      </VipCard>
-    </div>
+      title="Governance"
+      description="Server-resolved features, entitlements, quotas, and effective access for the active tenant."
+    />
+    <VipAlert tone="info" title="Backend-authoritative policy">
+      This view is read-only because B3 provides policy evaluation and auditability, not policy mutation APIs.
+    </VipAlert>
+
+    <section class="gov-section">
+      <h2>Feature flags</h2>
+      <div class="gov-grid">
+        <VipCard v-for="[key, enabled] in features" :key="key" class="gov-row">
+          <span>{{ label(key) }}</span>
+          <VipBadge :tone="enabled ? 'success' : 'neutral'" size="sm">{{ enabled ? 'enabled' : 'disabled' }}</VipBadge>
+        </VipCard>
+      </div>
+    </section>
+
+    <section class="gov-section">
+      <h2>Entitlements</h2>
+      <div class="gov-grid">
+        <VipCard v-for="key in entitlements" :key="key" class="gov-row">
+          <span>{{ label(key) }}</span
+          ><VipBadge tone="brand" size="sm">granted</VipBadge>
+        </VipCard>
+      </div>
+    </section>
+
+    <section class="gov-section">
+      <h2>Quotas</h2>
+      <div class="gov-grid">
+        <VipCard v-for="quota in quotas" :key="quota.key" class="gov-row">
+          <div>
+            <strong>{{ label(quota.key) }}</strong>
+            <p>{{ quota.used }} used · {{ quota.remaining }} remaining</p>
+          </div>
+          <VipBadge :tone="quota.remaining > 0 ? 'success' : 'warning'" size="sm">
+            {{ quota.limit }} {{ quota.hard ? 'hard limit' : 'soft limit' }}
+          </VipBadge>
+        </VipCard>
+      </div>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.gov {
-  display: flex;
-  flex-direction: column;
+.gov-section {
+  margin-top: var(--vip-sp-7);
+  max-width: 900px;
+}
+.gov-section h2 {
+  margin-bottom: var(--vip-sp-4);
+}
+.gov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--vip-sp-4);
-  max-width: 820px;
 }
 .gov-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--vip-sp-6);
+  gap: var(--vip-sp-5);
 }
-.gov-info {
-  flex: 1;
-}
-.gov-name {
-  font-weight: var(--vip-fw-semibold);
-}
-.gov-desc {
-  font-size: var(--vip-fs-sm);
+.gov-row p {
   color: var(--vip-text-muted);
+  font-size: var(--vip-fs-xs);
   margin-top: var(--vip-sp-2);
-}
-.gov-control {
-  min-width: 240px;
-  display: flex;
-  justify-content: flex-end;
-}
-.gov-control :deep(.vip-field) {
-  width: 100%;
 }
 </style>

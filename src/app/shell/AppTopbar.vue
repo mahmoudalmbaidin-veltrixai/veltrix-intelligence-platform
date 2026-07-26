@@ -6,8 +6,6 @@ import { useAuthStore } from '@/shared/stores/auth'
 import { useUiStore } from '@/shared/stores/ui'
 import { useThemeStore } from '@/shared/stores/theme'
 import { QUICK_CREATE } from '@/app/navigation'
-import { ROLES } from '@/shared/permissions/roles'
-import type { RoleKey } from '@/shared/types/identity'
 import { config } from '@/shared/config/env'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipMenu from '@/shared/ui/VipMenu.vue'
@@ -15,7 +13,7 @@ import VipAvatar from '@/shared/ui/VipAvatar.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipTooltip from '@/shared/ui/VipTooltip.vue'
 
-const isMockMode = config.apiMode === 'mock'
+const isHybridMode = config.apiMode === 'mock'
 const platform = usePlatformStore()
 const auth = useAuthStore()
 const ui = useUiStore()
@@ -24,6 +22,13 @@ const route = useRoute()
 const router = useRouter()
 
 const breadcrumb = computed(() => (route.meta.title as string) ?? '')
+const formatRole = (value: string) => value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+const roleLabel = computed(() => {
+  const roles = new Set(
+    [platform.organization?.membershipRole, platform.role].filter((value): value is string => !!value),
+  )
+  return [...roles].map(formatRole).join(' · ')
+})
 
 const orgItems = computed(() => platform.organizations.map((o) => ({ key: o.id, label: o.name, icon: 'building' })))
 const wsItems = computed(() => platform.workspaces.map((w) => ({ key: w.id, label: w.name, icon: 'layers' })))
@@ -34,10 +39,6 @@ const createItems = computed(() =>
     icon: i.icon,
   })),
 )
-const roleItems = computed(() =>
-  (Object.keys(ROLES) as RoleKey[]).map((r) => ({ key: r, label: ROLES[r].label, icon: 'users' })),
-)
-
 const userItems = [
   { key: '/settings/personal', label: 'Profile & preferences', icon: 'settings' },
   { key: 'appearance', label: 'Toggle appearance', icon: 'moon' },
@@ -65,12 +66,19 @@ async function onUserSelect(key: string) {
 
       <VipMenu :items="orgItems" align="start" @select="platform.switchOrg($event)">
         <template #trigger>
-          <button class="vip-switcher">
-            <span class="vip-switcher__mark">{{ platform.organization.name.charAt(0) }}</span>
-            <span class="vip-switcher__name">{{ platform.organization.name }}</span>
-            <VipBadge v-if="platform.organization.status !== 'active'" size="sm" tone="warning">{{
-              platform.organization.status
-            }}</VipBadge>
+          <button
+            class="vip-switcher"
+            :disabled="platform.status === 'loading'"
+            :aria-label="`Organization: ${platform.organization?.name ?? 'None'}`"
+          >
+            <span class="vip-switcher__mark">{{ platform.organization?.name.charAt(0) ?? '—' }}</span>
+            <span class="vip-switcher__name">{{ platform.organization?.name ?? 'No organization' }}</span>
+            <VipBadge
+              v-if="platform.organization && platform.organization.status !== 'active'"
+              size="sm"
+              tone="warning"
+              >{{ platform.organization.status }}</VipBadge
+            >
             <VipIcon name="chevronDown" :size="14" />
           </button>
         </template>
@@ -80,9 +88,9 @@ async function onUserSelect(key: string) {
 
       <VipMenu :items="wsItems" align="start" @select="platform.switchWorkspace($event)">
         <template #trigger>
-          <button class="vip-switcher is-ws">
+          <button class="vip-switcher is-ws" :disabled="!platform.workspace">
             <VipIcon name="layers" :size="15" />
-            <span class="vip-switcher__name">{{ platform.workspace?.name }}</span>
+            <span class="vip-switcher__name">{{ platform.workspace?.name ?? 'No workspace' }}</span>
             <VipIcon name="chevronDown" :size="14" />
           </button>
         </template>
@@ -121,21 +129,19 @@ async function onUserSelect(key: string) {
         <span v-if="ui.unreadNotifications" class="vip-icon-btn__badge">{{ ui.unreadNotifications }}</span>
       </button>
 
-      <VipTooltip v-if="isMockMode" text="Mock mode — data and actions are simulated, no backend calls are made.">
-        <span class="vip-mock-pill" aria-label="Application is running in mock mode">
-          <VipIcon name="info" :size="12" /> Mock
+      <VipTooltip
+        v-if="isHybridMode"
+        text="Hybrid local mode — B0–B4 foundation features are live; later business modules use demo data."
+      >
+        <span class="vip-mock-pill" aria-label="Application is running in hybrid local mode">
+          <VipIcon name="info" :size="12" /> Hybrid
         </span>
       </VipTooltip>
 
-      <VipMenu :items="roleItems" @select="platform.setRole($event as RoleKey)">
-        <template #trigger>
-          <button class="vip-role" title="Simulate role (dev)">
-            <VipIcon name="users" :size="14" />
-            <span>{{ ROLES[platform.role].label }}</span>
-            <VipIcon name="chevronDown" :size="13" />
-          </button>
-        </template>
-      </VipMenu>
+      <span class="vip-role" aria-label="Active organization and workspace roles">
+        <VipIcon name="users" :size="14" />
+        <span>{{ roleLabel || 'No role' }}</span>
+      </span>
 
       <VipMenu :items="userItems" @select="onUserSelect">
         <template #trigger>
@@ -345,6 +351,34 @@ async function onUserSelect(key: string) {
   .vip-topbar__crumb,
   .vip-topbar__sep {
     display: none;
+  }
+}
+@media (max-width: 480px) {
+  .vip-switcher:not(.is-ws) .vip-switcher__name {
+    display: none;
+  }
+}
+@media (max-width: 360px) {
+  .vip-topbar {
+    padding: 0 var(--vip-sp-4);
+    gap: var(--vip-sp-2);
+  }
+  .vip-topbar__left,
+  .vip-topbar__right {
+    gap: var(--vip-sp-2);
+  }
+  .vip-switcher:not(.is-ws) {
+    padding: 0 var(--vip-sp-2);
+  }
+  .vip-switcher:not(.is-ws) > svg:last-child {
+    display: none;
+  }
+  .vip-mock-pill {
+    width: 24px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    font-size: 0;
   }
 }
 </style>

@@ -325,7 +325,11 @@ const mockMarketplaceService: MarketplaceService = {
 
 const apiMarketplaceService: MarketplaceService = {
   list: (params) => apiClient.get<Extension[]>('/marketplace/extensions', { query: { ...params } }),
-  get: (id) => apiClient.get<Extension | undefined>(`/marketplace/extensions/${id}`),
+  async get(id) {
+    if (!id || id === 'undefined') return undefined
+    const extensions = await apiClient.get<Extension[]>('/marketplace/extensions')
+    return extensions.find((extension) => extension.id === id)
+  },
 }
 
 export const marketplaceService: MarketplaceService = defineService(mockMarketplaceService, () => apiMarketplaceService)

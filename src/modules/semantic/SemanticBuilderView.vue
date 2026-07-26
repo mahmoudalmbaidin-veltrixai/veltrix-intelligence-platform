@@ -1,715 +1,590 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
-import { relativeTime } from '@/shared/lib/format'
-import { isoAgo } from '@/shared/lib/mock'
 import { useUiStore } from '@/shared/stores/ui'
 import { usePlatformStore } from '@/shared/stores/platform'
-import { MODELS } from '@/shared/services/semanticModels'
-import { semanticStudioService } from './semantic.service'
-import type { Aggregation, DataType, SemanticField } from '@/shared/types/semantic'
-import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
-import VipButton from '@/shared/ui/VipButton.vue'
-import VipBadge from '@/shared/ui/VipBadge.vue'
-import VipIcon from '@/shared/ui/VipIcon.vue'
-import VipTabs from '@/shared/ui/VipTabs.vue'
-import VipCard from '@/shared/ui/VipCard.vue'
-import VipSelect from '@/shared/ui/VipSelect.vue'
-import VipInput from '@/shared/ui/VipInput.vue'
-import VipSwitch from '@/shared/ui/VipSwitch.vue'
+import {
+  semanticStudioService,
+  type DimensionInput,
+  type MeasureInput,
+  type SemanticModelVersion,
+  type SemanticValidation,
+  type StudioDimension,
+  type StudioMeasure,
+} from './semantic.service'
 import VipAlert from '@/shared/ui/VipAlert.vue'
-import VipSpinner from '@/shared/ui/VipSpinner.vue'
+import VipBadge from '@/shared/ui/VipBadge.vue'
+import VipButton from '@/shared/ui/VipButton.vue'
+import VipCard from '@/shared/ui/VipCard.vue'
+import VipDialog from '@/shared/ui/VipDialog.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
+import VipInput from '@/shared/ui/VipInput.vue'
+import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
+import VipSelect from '@/shared/ui/VipSelect.vue'
+import VipSpinner from '@/shared/ui/VipSpinner.vue'
+import VipSwitch from '@/shared/ui/VipSwitch.vue'
+import VipTabs from '@/shared/ui/VipTabs.vue'
+import VipTextarea from '@/shared/ui/VipTextarea.vue'
 
 const route = useRoute()
+const router = useRouter()
 const ui = useUiStore()
 const platform = usePlatformStore()
-const canWrite = computed(() => platform.can('semantic:write'))
+const modelId = computed(() => String(route.params.id))
+const canEdit = computed(() => platform.can('semantic_model.update'))
+const canPublish = computed(() => platform.can('semantic_model.publish'))
+const canArchive = computed(() => platform.can('semantic_model.archive'))
 
-const modelId = computed(() => String(route.params.id ?? MODELS[0].id))
-const { data: model, isLoading } = useQuery(
-  () => `semantic:model:${modelId.value}`,
-  async () => (await semanticStudioService.getModel(modelId.value)) ?? MODELS[0],
+const {
+  data: definition,
+  isLoading,
+  error,
+  refetch,
+} = useQuery(
+  () => `semantic:definition:${modelId.value}`,
+  () => semanticStudioService.getDefinition(modelId.value),
 )
-
-type TabKey = 'entities' | 'relationships' | 'dimensions' | 'measures' | 'metrics' | 'history'
-const tab = ref<TabKey>('entities')
-const tabs = computed(() => {
-  const f = model.value?.fields ?? []
-  return [
-    { value: 'entities', label: 'Entities', count: model.value?.entities.length },
-    { value: 'relationships', label: 'Relationships', count: hierarchies.value.length },
-    {
-      value: 'dimensions',
-      label: 'Dimensions',
-      count: f.filter((x) => x.role === 'dimension' || x.role === 'time').length,
-    },
-    { value: 'measures', label: 'Measures', count: f.filter((x) => x.role === 'measure').length },
-    { value: 'metrics', label: 'Metrics', count: f.filter((x) => x.role === 'metric').length },
-    { value: 'history', label: 'Version history' },
-  ]
-})
-
-/* ---- selection + per-field local config overrides ---- */
-const selectedId = ref<string | null>(null)
-const selected = computed(() => model.value?.fields.find((f) => f.id === selectedId.value) ?? null)
-
-interface FieldConfig {
-  label: string
-  role: SemanticField['role']
-  aggregation: Aggregation
-  format: string
-  visible: boolean
-}
-const overrides = reactive<Record<string, FieldConfig>>({})
-
-function configFor(f: SemanticField): FieldConfig {
-  if (!overrides[f.id]) {
-    overrides[f.id] = {
-      label: f.label,
-      role: f.role,
-      aggregation: f.defaultAggregation ?? (f.role === 'measure' || f.role === 'metric' ? 'sum' : 'none'),
-      format: f.format?.style ?? 'plain',
-      visible: true,
+const tab = ref<'dimensions' | 'measures' | 'metrics' | 'kpis' | 'settings' | 'history'>('dimensions')
+const { data: versions, refetch: refetchVersions } = useQuery(
+  () => `semantic:versions:${modelId.value}`,
+  () => semanticStudioService.listVersions(modelId.value),
+)
+const selectedVersionId = ref('')
+const selectedVersion = computed<SemanticModelVersion | null>(
+  () => versions.value?.find((item) => item.id === selectedVersionId.value) ?? versions.value?.[0] ?? null,
+)
+watch(
+  versions,
+  (value) => {
+    if (!value?.some((item) => item.id === selectedVersionId.value)) {
+      selectedVersionId.value = value?.[0]?.id ?? ''
     }
-  }
-  return overrides[f.id]
-}
-
-watch(model, (m) => {
-  if (m && !selectedId.value) selectedId.value = m.fields[0]?.id ?? null
-})
-
-function selectField(f: SemanticField) {
-  selectedId.value = f.id
-  configFor(f)
-}
-
-/* ---- derived groupings ---- */
-const dimensions = computed(() =>
-  (model.value?.fields ?? []).filter((f) => f.role === 'dimension' || f.role === 'time'),
+  },
+  { immediate: true },
 )
-const measures = computed(() => (model.value?.fields ?? []).filter((f) => f.role === 'measure'))
-const metrics = computed(() => (model.value?.fields ?? []).filter((f) => f.role === 'metric'))
+const tabs = computed(() => [
+  { value: 'dimensions', label: 'Dimensions', count: definition.value?.dimensions.length ?? 0 },
+  { value: 'measures', label: 'Measures', count: definition.value?.measures.length ?? 0 },
+  { value: 'metrics', label: 'Metrics', count: definition.value?.metrics.length ?? 0 },
+  { value: 'kpis', label: 'KPIs', count: definition.value?.kpis.length ?? 0 },
+  { value: 'settings', label: 'Settings' },
+  { value: 'history', label: 'Versions' },
+])
+const isEditable = computed(() => canEdit.value && definition.value?.model.status === 'draft')
 
-interface Hierarchy {
-  id: string
-  label: string
-  levels: SemanticField[]
+const settings = reactive({ name: '', description: '', timezone: 'UTC', currency: 'USD', version: 1 })
+const savedSettings = ref('')
+watch(
+  definition,
+  (value) => {
+    if (!value) return
+    Object.assign(settings, {
+      name: value.model.name,
+      description: value.model.description,
+      timezone: value.model.timezone,
+      currency: value.model.currency,
+      version: value.model.version,
+    })
+    savedSettings.value = JSON.stringify(settings)
+  },
+  { immediate: true },
+)
+const dirty = computed(() => !!definition.value && JSON.stringify(settings) !== savedSettings.value)
+function warnBeforeUnload(event: BeforeUnloadEvent): void {
+  if (!dirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
 }
-const hierarchies = computed<Hierarchy[]>(() => {
-  const map = new Map<string, SemanticField[]>()
-  for (const f of model.value?.fields ?? []) {
-    if (!f.hierarchyId) continue
-    const arr = map.get(f.hierarchyId) ?? []
-    arr.push(f)
-    map.set(f.hierarchyId, arr)
-  }
-  return [...map.entries()].map(([id, levels]) => ({
-    id,
-    label: levels[0]?.folder ?? id,
-    levels: [...levels].sort((a, b) => (a.hierarchyLevel ?? 0) - (b.hierarchyLevel ?? 0)),
-  }))
-})
+onMounted(() => window.addEventListener('beforeunload', warnBeforeUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', warnBeforeUnload))
+onBeforeRouteLeave(() => !dirty.value || window.confirm('Discard unsaved semantic model changes?'))
 
-const aggOptions = [
+const saving = ref(false)
+const publishing = ref(false)
+const validation = ref<SemanticValidation | null>(null)
+async function saveSettings(): Promise<void> {
+  if (!definition.value || !isEditable.value) return
+  saving.value = true
+  try {
+    await semanticStudioService.updateModel(modelId.value, {
+      name: settings.name.trim(),
+      description: settings.description.trim(),
+      timezone: settings.timezone.trim(),
+      currency: settings.currency.toUpperCase(),
+      version: settings.version,
+    })
+    await Promise.all([refetch(), refetchVersions()])
+    ui.pushToast({ kind: 'success', title: 'Draft saved', message: settings.name })
+  } catch (cause) {
+    ui.pushToast({ kind: 'error', title: 'Save failed', message: (cause as Error).message })
+  } finally {
+    saving.value = false
+  }
+}
+async function validate(): Promise<SemanticValidation | null> {
+  try {
+    validation.value = await semanticStudioService.validateModel(modelId.value)
+    return validation.value
+  } catch (cause) {
+    ui.pushToast({ kind: 'error', title: 'Validation failed', message: (cause as Error).message })
+    return null
+  }
+}
+async function publish(): Promise<void> {
+  if (!canPublish.value || definition.value?.model.status !== 'draft') return
+  if (dirty.value) await saveSettings()
+  publishing.value = true
+  try {
+    const result = await validate()
+    if (!result?.valid) return
+    await semanticStudioService.publishModel(modelId.value)
+    await Promise.all([refetch(), refetchVersions()])
+    ui.pushToast({ kind: 'success', title: 'Model published', message: settings.name })
+  } catch (cause) {
+    ui.pushToast({ kind: 'error', title: 'Publish failed', message: (cause as Error).message })
+  } finally {
+    publishing.value = false
+  }
+}
+async function archive(): Promise<void> {
+  if (!canArchive.value || !window.confirm(`Archive ${settings.name}?`)) return
+  try {
+    await semanticStudioService.archiveModel(modelId.value)
+    ui.pushToast({ kind: 'success', title: 'Model archived', message: settings.name })
+    await router.push('/semantic')
+  } catch (cause) {
+    ui.pushToast({ kind: 'error', title: 'Archive failed', message: (cause as Error).message })
+  }
+}
+
+type EditorKind = 'dimension' | 'measure'
+const editorOpen = ref(false)
+const editorKind = ref<EditorKind>('dimension')
+const editingId = ref<string | null>(null)
+const editorError = ref('')
+const editorBusy = ref(false)
+const editor = reactive({
+  name: '',
+  key: '',
+  description: '',
+  fieldId: '',
+  dimensionType: 'categorical',
+  aggregation: 'sum',
+  isTime: false,
+  granularities: 'day,month,quarter,year',
+  hidden: false,
+})
+const fieldOptions = computed(() =>
+  (definition.value?.fields ?? []).map((field) => ({
+    value: field.id,
+    label: `${field.display_name || field.source_name} · ${field.physical_data_type}`,
+  })),
+)
+const dimensionTypeOptions = [
+  { value: 'categorical', label: 'Categorical' },
+  { value: 'time', label: 'Time' },
+  { value: 'geographic', label: 'Geographic' },
+  { value: 'identifier', label: 'Identifier' },
+  { value: 'boolean', label: 'Boolean' },
+  { value: 'numeric', label: 'Numeric' },
+]
+const aggregationOptions = [
   { value: 'sum', label: 'Sum' },
-  { value: 'avg', label: 'Average' },
-  { value: 'min', label: 'Minimum' },
-  { value: 'max', label: 'Maximum' },
   { value: 'count', label: 'Count' },
   { value: 'count_distinct', label: 'Count distinct' },
-  { value: 'median', label: 'Median' },
-  { value: 'none', label: 'None' },
+  { value: 'average', label: 'Average' },
+  { value: 'min', label: 'Minimum' },
+  { value: 'max', label: 'Maximum' },
 ]
-const formatOptions = [
-  { value: 'plain', label: 'Plain number' },
-  { value: 'currency', label: 'Currency' },
-  { value: 'percent', label: 'Percent' },
-  { value: 'compact', label: 'Compact' },
-]
-const roleOptions = [
-  { value: 'dimension', label: 'Dimension' },
-  { value: 'measure', label: 'Measure' },
-  { value: 'metric', label: 'Metric' },
-  { value: 'time', label: 'Time' },
-]
-
-const TYPE_ICON: Record<DataType, string> = {
-  string: 'text',
-  number: 'hash',
-  integer: 'hash',
-  currency: 'card',
-  percent: 'pieChart',
-  boolean: 'check',
-  date: 'calendar',
-  datetime: 'calendarClock',
-  geo: 'target',
+function keyFor(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
 }
-const ROLE_TONE: Record<SemanticField['role'], 'brand' | 'info' | 'success' | 'warning'> = {
-  dimension: 'info',
-  measure: 'brand',
-  metric: 'success',
-  time: 'warning',
+function openEditor(kind: EditorKind, item?: StudioDimension | StudioMeasure): void {
+  if (!isEditable.value) return
+  editorKind.value = kind
+  editingId.value = item?.id ?? null
+  editor.name = item?.name ?? ''
+  editor.key = item?.key ?? ''
+  editor.description = item?.description ?? ''
+  editor.fieldId = item?.field_id ?? fieldOptions.value[0]?.value ?? ''
+  editor.hidden = item?.is_hidden ?? false
+  editor.dimensionType = 'dimension_type' in (item ?? {}) ? (item as StudioDimension).dimension_type : 'categorical'
+  editor.isTime = 'is_time_dimension' in (item ?? {}) && (item as StudioDimension).is_time_dimension
+  editor.granularities =
+    'time_granularities' in (item ?? {}) ? (item as StudioDimension).time_granularities.join(',') : ''
+  editor.aggregation = 'aggregation' in (item ?? {}) ? (item as StudioMeasure).aggregation : 'sum'
+  editorError.value = ''
+  editorOpen.value = true
 }
-
-/* ---- publish / validation ---- */
-const status = ref<'draft' | 'published'>('published')
-const validationIssues = computed(() => {
-  const issues: string[] = []
-  const noAgg = measures.value.filter(
-    (f) => !(f.defaultAggregation || overrides[f.id]?.aggregation) || overrides[f.id]?.aggregation === 'none',
-  )
-  if (noAgg.length) issues.push(`${noAgg.length} measure(s) have no default aggregation`)
-  const noDesc = (model.value?.fields ?? []).filter((f) => !f.description).length
-  if (noDesc > 0) issues.push(`${noDesc} field(s) missing a description`)
-  return issues
-})
-
-function saveDraft() {
-  status.value = 'draft'
-  ui.pushToast({ kind: 'success', title: 'Draft saved', message: `${model.value?.label} saved as draft.` })
-}
-function publish() {
-  if (validationIssues.value.length) {
-    ui.pushToast({ kind: 'warning', title: 'Resolve validation issues', message: validationIssues.value[0] })
+async function saveEditor(): Promise<void> {
+  if (!isEditable.value) return
+  const model = definition.value?.model
+  editor.key ||= keyFor(editor.name)
+  if (!model || !editor.name.trim() || !/^[a-z][a-z0-9_]{1,99}$/.test(editor.key)) {
+    editorError.value = 'Name and a valid stable key are required.'
     return
   }
-  status.value = 'published'
-  ui.pushToast({
-    kind: 'success',
-    title: 'Model published',
-    message: `${model.value?.label} is now certified and query-ready.`,
-  })
+  if (editorKind.value === 'dimension' && !editor.fieldId) {
+    editorError.value = 'Select a dataset field.'
+    return
+  }
+  editorBusy.value = true
+  try {
+    if (editorKind.value === 'dimension') {
+      const payload: DimensionInput = {
+        dataset_id: model.primary_dataset_id,
+        field_id: editor.fieldId,
+        key: editor.key,
+        name: editor.name.trim(),
+        description: editor.description.trim(),
+        dimension_type: editor.dimensionType,
+        is_time_dimension: editor.isTime,
+        time_granularities: editor.isTime
+          ? editor.granularities
+              .split(',')
+              .map((item) => item.trim())
+              .filter(Boolean)
+          : [],
+        is_hidden: editor.hidden,
+      }
+      if (editingId.value) await semanticStudioService.updateDimension(modelId.value, editingId.value, payload)
+      else await semanticStudioService.createDimension(modelId.value, payload)
+    } else {
+      const payload: MeasureInput = {
+        dataset_id: model.primary_dataset_id,
+        field_id: editor.aggregation === 'count' ? null : editor.fieldId,
+        key: editor.key,
+        name: editor.name.trim(),
+        description: editor.description.trim(),
+        aggregation: editor.aggregation,
+        is_hidden: editor.hidden,
+      }
+      if (editingId.value) await semanticStudioService.updateMeasure(modelId.value, editingId.value, payload)
+      else await semanticStudioService.createMeasure(modelId.value, payload)
+    }
+    editorOpen.value = false
+    await refetch()
+    ui.pushToast({ kind: 'success', title: `${editorKind.value} saved`, message: editor.name })
+  } catch (cause) {
+    editorError.value = (cause as Error).message
+  } finally {
+    editorBusy.value = false
+  }
 }
-
-interface Version {
-  id: string
-  label: string
-  author: string
-  when: string
-  note: string
-  current?: boolean
+async function remove(kind: EditorKind, id: string, name: string): Promise<void> {
+  if (!isEditable.value) return
+  if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return
+  try {
+    if (kind === 'dimension') await semanticStudioService.deleteDimension(modelId.value, id)
+    else await semanticStudioService.deleteMeasure(modelId.value, id)
+    await refetch()
+  } catch (cause) {
+    ui.pushToast({ kind: 'error', title: 'Delete failed', message: (cause as Error).message })
+  }
 }
-const versions = computed<Version[]>(() => [
-  {
-    id: 'v14',
-    label: 'v1.4',
-    author: platform.user.name,
-    when: isoAgo(90),
-    note: 'Added margin metric and KPI folder.',
-    current: true,
-  },
-  { id: 'v13', label: 'v1.3', author: 'A. Rahman', when: isoAgo(60 * 26), note: 'Renamed Sales Channel dimension.' },
-  { id: 'v12', label: 'v1.2', author: 'L. Haddad', when: isoAgo(60 * 24 * 6), note: 'Introduced geography hierarchy.' },
-  { id: 'v11', label: 'v1.1', author: 'A. Rahman', when: isoAgo(60 * 24 * 18), note: 'Certified for production use.' },
-  { id: 'v10', label: 'v1.0', author: 'A. Rahman', when: isoAgo(60 * 24 * 40), note: 'Initial model published.' },
-])
 </script>
 
 <template>
-  <div class="wrap">
-    <VipPageHeader :title="model?.label ?? 'Semantic model'" :description="model?.description">
+  <div class="semantic-builder">
+    <VipPageHeader :title="definition?.model.name ?? 'Semantic model'" :description="definition?.model.description">
       <template #status>
-        <VipBadge :tone="status === 'published' ? 'success' : 'warning'" variant="soft">
-          {{ status === 'published' ? 'Published' : 'Draft' }}
+        <VipBadge :tone="definition?.model.status === 'published' ? 'success' : 'warning'" variant="soft">
+          {{ definition?.model.status ?? 'draft' }}
         </VipBadge>
-        <VipBadge v-if="model?.certified" tone="brand" variant="outline" size="sm">
-          <VipIcon name="shield" :size="11" /> Certified
-        </VipBadge>
+        <VipBadge v-if="dirty" tone="warning" variant="outline">Unsaved changes</VipBadge>
       </template>
       <template #actions>
-        <VipButton variant="secondary" icon="save" :disabled="!canWrite" @click="saveDraft">Save draft</VipButton>
-        <VipButton variant="primary" icon="check" :disabled="!canWrite" @click="publish">Publish</VipButton>
+        <VipButton variant="tertiary" :disabled="!canArchive" @click="archive">Archive</VipButton>
+        <VipButton variant="secondary" :disabled="!isEditable || !dirty" :loading="saving" @click="saveSettings">
+          Save draft
+        </VipButton>
+        <VipButton variant="secondary" @click="validate">Validate</VipButton>
+        <VipButton
+          variant="primary"
+          :disabled="!canPublish || definition?.model.status !== 'draft'"
+          :loading="publishing"
+          @click="publish"
+        >
+          Publish
+        </VipButton>
       </template>
-      <template #tabs>
-        <VipTabs v-model="tab" :tabs="tabs" />
-      </template>
+      <template #tabs><VipTabs v-model="tab" :tabs="tabs" /></template>
     </VipPageHeader>
 
-    <VipAlert v-if="validationIssues.length" tone="warning" title="Validation">
-      <ul class="issues">
-        <li v-for="(i, n) in validationIssues" :key="n">{{ i }}</li>
-      </ul>
-    </VipAlert>
+    <div v-if="isLoading" class="state"><VipSpinner /> Loading semantic definition…</div>
+    <VipAlert v-else-if="error" tone="danger" title="Semantic model unavailable">{{ error.message }}</VipAlert>
+    <template v-else-if="definition">
+      <VipAlert v-if="validation && !validation.valid" tone="danger" title="Validation failed">
+        <ul>
+          <li v-for="issue in validation.errors" :key="issue.code + issue.resource">{{ issue.message }}</li>
+        </ul>
+      </VipAlert>
+      <VipAlert v-else-if="validation?.valid" tone="success" title="Validation passed">
+        The semantic model is structurally valid.
+      </VipAlert>
 
-    <div v-if="isLoading" class="loading"><VipSpinner /> <span>Loading model…</span></div>
-
-    <div v-else class="builder">
-      <!-- LEFT: datasets / entities -->
-      <aside class="panel panel--left">
-        <div class="panel__head">Datasets &amp; entities</div>
-        <div class="panel__body">
-          <button v-for="e in model?.entities" :key="e.id" type="button" class="entity-row">
-            <VipIcon name="database" :size="14" />
-            <span class="entity-row__label">{{ e.label }}</span>
-            <span class="entity-row__count">{{ e.fields.length }}</span>
-          </button>
-          <div class="panel__sub">Field folders</div>
-          <button
-            v-for="folder in [...new Set((model?.fields ?? []).map((f) => f.folder ?? 'General'))]"
-            :key="folder"
-            type="button"
-            class="entity-row entity-row--sub"
+      <section v-if="tab === 'dimensions' || tab === 'measures'" class="collection">
+        <div class="collection__head">
+          <div>
+            <h2>{{ tab === 'dimensions' ? 'Dimensions' : 'Measures' }}</h2>
+            <p>Definitions are persisted directly to the governed semantic layer.</p>
+          </div>
+          <VipButton
+            variant="primary"
+            icon="plus"
+            :disabled="!isEditable"
+            @click="openEditor(tab === 'dimensions' ? 'dimension' : 'measure')"
           >
-            <VipIcon name="folder" :size="14" />
-            <span class="entity-row__label">{{ folder }}</span>
-          </button>
+            Add {{ tab === 'dimensions' ? 'dimension' : 'measure' }}
+          </VipButton>
         </div>
-      </aside>
-
-      <!-- CENTER: canvas / tab content -->
-      <section class="panel panel--center">
-        <!-- Entities canvas -->
-        <div v-if="tab === 'entities'" class="canvas">
-          <VipCard v-for="e in model?.entities" :key="e.id" class="entity-card" :padded="false">
-            <header class="entity-card__head">
-              <span class="entity-card__icon"><VipIcon name="database" :size="16" /></span>
+        <VipEmptyState
+          v-if="!(tab === 'dimensions' ? definition.dimensions : definition.measures).length"
+          icon="layers"
+          :title="`No ${tab} defined`"
+          description="Add the first governed definition to continue."
+        />
+        <div v-else class="cards">
+          <VipCard v-for="item in tab === 'dimensions' ? definition.dimensions : definition.measures" :key="item.id">
+            <div class="item-head">
               <div>
-                <div class="entity-card__title">{{ e.label }}</div>
-                <div class="entity-card__sub">{{ e.fields.length }} fields</div>
+                <h3>{{ item.name }}</h3>
+                <code>{{ item.key }}</code>
               </div>
-            </header>
-            <ul class="field-list">
-              <li
-                v-for="f in e.fields"
-                :key="f.id"
-                class="field"
-                :class="{ 'is-selected': f.id === selectedId }"
-                @click="selectField(f)"
+              <VipBadge tone="neutral" variant="soft">
+                {{ 'aggregation' in item ? item.aggregation : item.dimension_type }}
+              </VipBadge>
+            </div>
+            <p>{{ item.description || 'No description provided.' }}</p>
+            <div class="item-actions">
+              <VipButton
+                variant="tertiary"
+                size="sm"
+                :disabled="!isEditable"
+                @click="openEditor(tab === 'dimensions' ? 'dimension' : 'measure', item)"
+                >Edit</VipButton
               >
-                <VipIcon :name="TYPE_ICON[f.dataType]" :size="14" class="field__type" />
-                <span class="field__label">{{ configFor(f).label }}</span>
-                <VipBadge :tone="ROLE_TONE[f.role]" variant="dot" size="sm">{{ f.role }}</VipBadge>
-              </li>
-            </ul>
-          </VipCard>
-        </div>
-
-        <!-- Relationships -->
-        <div v-else-if="tab === 'relationships'" class="rel">
-          <VipEmptyState
-            v-if="!hierarchies.length"
-            icon="lineage"
-            title="No relationships defined"
-            description="This model exposes a single flat entity with no drill hierarchies."
-          />
-          <VipCard v-for="h in hierarchies" v-else :key="h.id" class="rel-card">
-            <div class="rel-card__title"><VipIcon name="lineage" :size="15" /> {{ h.label }} hierarchy</div>
-            <div class="rel-chain">
-              <template v-for="(lvl, i) in h.levels" :key="lvl.id">
-                <span class="rel-node">{{ lvl.label }}</span>
-                <VipIcon v-if="i < h.levels.length - 1" name="chevronRight" :size="14" class="rel-arrow" />
-              </template>
+              <VipButton
+                variant="tertiary"
+                size="sm"
+                :disabled="!isEditable"
+                @click="remove(tab === 'dimensions' ? 'dimension' : 'measure', item.id, item.name)"
+                >Delete</VipButton
+              >
             </div>
           </VipCard>
-        </div>
-
-        <!-- Dimensions / Measures / Metrics tables -->
-        <div v-else-if="tab === 'dimensions' || tab === 'measures' || tab === 'metrics'" class="list">
-          <div
-            v-for="f in tab === 'dimensions' ? dimensions : tab === 'measures' ? measures : metrics"
-            :key="f.id"
-            class="list-row"
-            :class="{ 'is-selected': f.id === selectedId }"
-            @click="selectField(f)"
-          >
-            <VipIcon :name="TYPE_ICON[f.dataType]" :size="15" class="list-row__type" />
-            <div class="list-row__main">
-              <div class="list-row__label">{{ configFor(f).label }}</div>
-              <div class="list-row__id">{{ f.id }} · {{ f.dataType }}</div>
-            </div>
-            <VipBadge v-if="f.folder" tone="neutral" variant="soft" size="sm">{{ f.folder }}</VipBadge>
-            <VipBadge :tone="ROLE_TONE[f.role]" variant="soft" size="sm">{{ configFor(f).aggregation }}</VipBadge>
-          </div>
-        </div>
-
-        <!-- Version history -->
-        <div v-else class="history">
-          <div v-for="v in versions" :key="v.id" class="ver">
-            <span class="ver__dot" :class="{ 'is-current': v.current }" />
-            <div class="ver__body">
-              <div class="ver__row">
-                <span class="ver__label">{{ v.label }}</span>
-                <VipBadge v-if="v.current" tone="brand" variant="soft" size="sm">Current</VipBadge>
-                <span class="ver__time">{{ relativeTime(v.when) }}</span>
-              </div>
-              <div class="ver__note">{{ v.note }}</div>
-              <div class="ver__author">{{ v.author }}</div>
-            </div>
-          </div>
         </div>
       </section>
 
-      <!-- RIGHT: inspector -->
-      <aside class="panel panel--right">
-        <div class="panel__head">Field inspector</div>
-        <div v-if="selected" class="panel__body inspector">
-          <VipInput
-            :model-value="configFor(selected).label"
-            label="Display label"
-            @update:model-value="(v) => (configFor(selected!).label = String(v))"
-          />
-          <VipSelect
-            :model-value="configFor(selected).role"
-            :options="roleOptions"
-            label="Role"
-            @update:model-value="(v) => (configFor(selected!).role = v as SemanticField['role'])"
-          />
-          <VipSelect
-            v-if="configFor(selected).role === 'measure' || configFor(selected).role === 'metric'"
-            :model-value="configFor(selected).aggregation"
-            :options="aggOptions"
-            label="Default aggregation"
-            @update:model-value="(v) => (configFor(selected!).aggregation = v as Aggregation)"
-          />
-          <VipSelect
-            :model-value="configFor(selected).format"
-            :options="formatOptions"
-            label="Number format"
-            @update:model-value="(v) => (configFor(selected!).format = v)"
-          />
-          <div class="inspector__meta">
-            <span class="inspector__key">Field id</span>
-            <code>{{ selected.id }}</code>
+      <section v-else-if="tab === 'metrics' || tab === 'kpis'" class="collection">
+        <div class="collection__head">
+          <div>
+            <h2>{{ tab === 'metrics' ? 'Metrics' : 'KPIs' }}</h2>
+            <p>Manage these definitions in the dedicated Metrics &amp; KPIs workspace.</p>
           </div>
-          <div class="inspector__meta">
-            <span class="inspector__key">Data type</span>
-            <VipBadge tone="neutral" variant="soft" size="sm">{{ selected.dataType }}</VipBadge>
-          </div>
-          <div class="inspector__switch">
-            <div>
-              <div class="inspector__switch-label">Visible in explore</div>
-              <div class="inspector__switch-help">Hide internal or deprecated fields from consumers.</div>
+          <VipButton variant="primary" @click="router.push('/semantic/metrics')">Open metrics workspace</VipButton>
+        </div>
+        <div class="cards">
+          <VipCard v-for="item in tab === 'metrics' ? definition.metrics : definition.kpis" :key="item.id">
+            <div class="item-head">
+              <h3>{{ item.name }}</h3>
+              <VipBadge variant="soft">{{ item.status }}</VipBadge>
             </div>
-            <VipSwitch
-              :model-value="configFor(selected).visible"
-              @update:model-value="(v) => (configFor(selected!).visible = v)"
-            />
+            <p>{{ item.description || 'No description provided.' }}</p>
+          </VipCard>
+        </div>
+      </section>
+
+      <section v-else-if="tab === 'settings'" class="settings">
+        <VipCard>
+          <div class="form">
+            <VipInput v-model="settings.name" label="Model name" required :disabled="!isEditable" />
+            <VipTextarea v-model="settings.description" label="Description" :disabled="!isEditable" />
+            <div class="form-row">
+              <VipInput v-model="settings.timezone" label="Timezone" required :disabled="!isEditable" />
+              <VipInput v-model="settings.currency" label="Currency" maxlength="3" required :disabled="!isEditable" />
+            </div>
           </div>
-        </div>
-        <div v-else class="panel__body">
+        </VipCard>
+      </section>
+
+      <section v-else class="history">
+        <VipCard>
+          <h2>Version history</h2>
           <VipEmptyState
-            icon="target"
-            title="No field selected"
-            description="Select a field from the canvas to configure it."
+            v-if="!versions?.length"
+            icon="clock"
+            title="No published versions"
+            description="Publish this model to create its first immutable version."
           />
+          <template v-else>
+            <VipSelect
+              v-model="selectedVersionId"
+              label="Published version"
+              :options="
+                versions.map((item) => ({
+                  value: item.id,
+                  label: `Version ${item.version_number} · ${new Date(item.published_at).toLocaleString()}`,
+                }))
+              "
+            />
+            <div v-if="selectedVersion" class="version">
+              <div>
+                <strong>Version {{ selectedVersion.version_number }}</strong>
+                <p>Immutable publication · {{ new Date(selectedVersion.published_at).toLocaleString() }}</p>
+                <p>
+                  {{ selectedVersion.definition.dimensions?.length ?? 0 }} dimensions ·
+                  {{ selectedVersion.definition.measures?.length ?? 0 }} measures ·
+                  {{ selectedVersion.definition.metrics?.length ?? 0 }} metrics ·
+                  {{ selectedVersion.definition.kpis?.length ?? 0 }} KPIs
+                </p>
+              </div>
+              <VipBadge tone="success">Published</VipBadge>
+            </div>
+          </template>
+        </VipCard>
+      </section>
+    </template>
+
+    <VipDialog
+      :open="editorOpen"
+      :title="`${editingId ? 'Edit' : 'Add'} ${editorKind}`"
+      description="Bind this definition to a real field in the primary dataset."
+      @close="editorOpen = false"
+    >
+      <div class="form">
+        <VipInput v-model="editor.name" label="Name" required @blur="editor.key ||= keyFor(editor.name)" />
+        <VipInput v-model="editor.key" label="Stable key" required />
+        <VipSelect v-model="editor.fieldId" :options="fieldOptions" label="Dataset field" required />
+        <VipTextarea v-model="editor.description" label="Description" />
+        <VipSelect
+          v-if="editorKind === 'dimension'"
+          v-model="editor.dimensionType"
+          :options="dimensionTypeOptions"
+          label="Dimension type"
+        />
+        <VipSelect v-else v-model="editor.aggregation" :options="aggregationOptions" label="Aggregation" />
+        <div v-if="editorKind === 'dimension'" class="switch-row">
+          <span>Time dimension</span><VipSwitch v-model="editor.isTime" />
         </div>
-      </aside>
-    </div>
+        <VipInput
+          v-if="editorKind === 'dimension' && editor.isTime"
+          v-model="editor.granularities"
+          label="Granularities"
+          help="Comma-separated: day, week, month, quarter, year"
+        />
+        <div class="switch-row"><span>Hidden from consumers</span><VipSwitch v-model="editor.hidden" /></div>
+        <p v-if="editorError" class="form-error" role="alert">{{ editorError }}</p>
+      </div>
+      <template #footer>
+        <VipButton variant="tertiary" @click="editorOpen = false">Cancel</VipButton>
+        <VipButton variant="primary" :disabled="!isEditable" :loading="editorBusy" @click="saveEditor">Save</VipButton>
+      </template>
+    </VipDialog>
   </div>
 </template>
 
 <style scoped>
-.wrap {
-  max-width: 1360px;
+.semantic-builder {
+  max-width: 1280px;
 }
-.issues {
-  margin: 0;
-  padding-left: var(--vip-sp-6);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.loading {
+.state {
   display: flex;
   align-items: center;
   gap: var(--vip-sp-4);
-  color: var(--vip-text-muted);
   padding: var(--vip-sp-9);
-}
-
-.builder {
-  display: grid;
-  grid-template-columns: 220px 1fr 300px;
-  gap: var(--vip-sp-6);
-  margin-top: var(--vip-sp-6);
-  align-items: start;
-}
-.panel {
-  background: var(--vip-surface-1);
-  border: 1px solid var(--vip-border-subtle);
-  border-radius: var(--vip-radius-lg);
-  overflow: hidden;
-}
-.panel__head {
-  padding: var(--vip-sp-4) var(--vip-sp-6);
-  font-size: var(--vip-fs-xs);
-  font-weight: var(--vip-fw-semibold);
-  text-transform: uppercase;
-  letter-spacing: var(--vip-ls-wide);
-  color: var(--vip-text-muted);
-  border-bottom: 1px solid var(--vip-border-subtle);
-}
-.panel__body {
-  padding: var(--vip-sp-5);
-}
-.panel__sub {
-  font-size: var(--vip-fs-2xs);
-  text-transform: uppercase;
-  letter-spacing: var(--vip-ls-wide);
-  color: var(--vip-text-disabled);
-  margin: var(--vip-sp-6) 0 var(--vip-sp-3);
-}
-
-.entity-row {
-  display: flex;
-  align-items: center;
-  gap: var(--vip-sp-4);
-  width: 100%;
-  padding: var(--vip-sp-4) var(--vip-sp-4);
-  background: none;
-  border: none;
-  border-radius: var(--vip-radius-sm);
-  color: var(--vip-text-secondary);
-  font-size: var(--vip-fs-sm);
-  text-align: left;
-}
-.entity-row:hover {
-  background: var(--vip-surface-hover);
-  color: var(--vip-text-primary);
-}
-.entity-row--sub {
   color: var(--vip-text-muted);
 }
-.entity-row__label {
-  flex: 1;
-}
-.entity-row__count {
-  font-size: var(--vip-fs-2xs);
-  color: var(--vip-text-muted);
-  background: var(--vip-surface-3);
-  padding: 1px 6px;
-  border-radius: var(--vip-radius-full);
-}
-
-.canvas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--vip-sp-6);
-  padding: var(--vip-sp-6);
-}
-.entity-card {
-  width: 300px;
-}
-.entity-card__head {
-  display: flex;
-  align-items: center;
-  gap: var(--vip-sp-4);
-  padding: var(--vip-sp-5) var(--vip-sp-6);
-  border-bottom: 1px solid var(--vip-border-subtle);
-  background: var(--vip-surface-2);
-}
-.entity-card__icon {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--vip-brand-soft);
-  color: var(--vip-brand-text);
-  border-radius: var(--vip-radius-sm);
-}
-.entity-card__title {
-  font-size: var(--vip-fs-md);
-  font-weight: var(--vip-fw-semibold);
-  color: var(--vip-text-primary);
-}
-.entity-card__sub {
-  font-size: var(--vip-fs-2xs);
-  color: var(--vip-text-muted);
-}
-.field-list {
-  list-style: none;
-  margin: 0;
-  padding: var(--vip-sp-2);
-}
-.field {
-  display: flex;
-  align-items: center;
-  gap: var(--vip-sp-4);
-  padding: var(--vip-sp-3) var(--vip-sp-4);
-  border-radius: var(--vip-radius-sm);
-  cursor: pointer;
-}
-.field:hover {
-  background: var(--vip-surface-hover);
-}
-.field.is-selected {
-  background: var(--vip-brand-soft);
-}
-.field__type {
-  color: var(--vip-text-muted);
-  flex: none;
-}
-.field__label {
-  flex: 1;
-  font-size: var(--vip-fs-sm);
-  color: var(--vip-text-secondary);
-}
-
-.rel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--vip-sp-5);
-  padding: var(--vip-sp-6);
-}
-.rel-card__title {
-  display: flex;
-  align-items: center;
-  gap: var(--vip-sp-3);
-  font-size: var(--vip-fs-md);
-  font-weight: var(--vip-fw-medium);
-  color: var(--vip-text-primary);
-  margin-bottom: var(--vip-sp-5);
-}
-.rel-chain {
-  display: flex;
-  align-items: center;
-  gap: var(--vip-sp-4);
-  flex-wrap: wrap;
-}
-.rel-node {
-  padding: var(--vip-sp-3) var(--vip-sp-5);
-  background: var(--vip-surface-2);
-  border: 1px solid var(--vip-border);
-  border-radius: var(--vip-radius-md);
-  font-size: var(--vip-fs-sm);
-  color: var(--vip-text-secondary);
-}
-.rel-arrow {
-  color: var(--vip-text-disabled);
-}
-
-.list {
-  padding: var(--vip-sp-3);
-}
-.list-row {
-  display: flex;
-  align-items: center;
-  gap: var(--vip-sp-5);
-  padding: var(--vip-sp-4) var(--vip-sp-5);
-  border-radius: var(--vip-radius-md);
-  cursor: pointer;
-}
-.list-row:hover {
-  background: var(--vip-surface-hover);
-}
-.list-row.is-selected {
-  background: var(--vip-brand-soft);
-}
-.list-row__type {
-  color: var(--vip-text-muted);
-  flex: none;
-}
-.list-row__main {
-  flex: 1;
-  min-width: 0;
-}
-.list-row__label {
-  font-size: var(--vip-fs-md);
-  color: var(--vip-text-primary);
-}
-.list-row__id {
-  font-size: var(--vip-fs-2xs);
-  color: var(--vip-text-muted);
-  font-family: var(--vip-font-mono);
-}
-
+.collection,
+.settings,
 .history {
-  padding: var(--vip-sp-7);
+  margin-top: var(--vip-sp-6);
 }
-.ver {
+.collection__head {
   display: flex;
+  justify-content: space-between;
+  gap: var(--vip-sp-6);
+  align-items: center;
+  margin-bottom: var(--vip-sp-6);
+}
+.collection__head h2,
+.history h2 {
+  font-size: var(--vip-fs-xl);
+  color: var(--vip-text-primary);
+}
+.collection__head p,
+.version p {
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-sm);
+  margin-top: var(--vip-sp-2);
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--vip-sp-5);
-  padding-bottom: var(--vip-sp-6);
-  position: relative;
 }
-.ver:not(:last-child)::before {
-  content: '';
-  position: absolute;
-  left: 4px;
-  top: 14px;
-  bottom: 0;
-  width: 1px;
-  background: var(--vip-border);
-}
-.ver__dot {
-  width: 9px;
-  height: 9px;
-  flex: none;
-  margin-top: 4px;
-  border-radius: 50%;
-  background: var(--vip-border-strong);
-  z-index: 1;
-}
-.ver__dot.is-current {
-  background: var(--vip-brand-500);
-}
-.ver__row {
+.item-head,
+.item-actions,
+.version {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: var(--vip-sp-4);
 }
-.ver__label {
-  font-size: var(--vip-fs-md);
-  font-weight: var(--vip-fw-semibold);
+.item-head h3 {
   color: var(--vip-text-primary);
+  font-size: var(--vip-fs-md);
 }
-.ver__time {
-  font-size: var(--vip-fs-xs);
-  color: var(--vip-text-disabled);
-  margin-left: auto;
-}
-.ver__note {
-  font-size: var(--vip-fs-sm);
-  color: var(--vip-text-secondary);
-  margin-top: 2px;
-}
-.ver__author {
-  font-size: var(--vip-fs-xs);
+.item-head code {
   color: var(--vip-text-muted);
-  margin-top: 2px;
+  font-size: var(--vip-fs-xs);
 }
-
-.inspector {
+.cards p {
+  color: var(--vip-text-secondary);
+  margin-top: var(--vip-sp-4);
+  min-height: 2.5em;
+}
+.item-actions {
+  justify-content: flex-end;
+  margin-top: var(--vip-sp-5);
+  border-top: 1px solid var(--vip-border-subtle);
+  padding-top: var(--vip-sp-3);
+}
+.form {
   display: flex;
   flex-direction: column;
   gap: var(--vip-sp-5);
 }
-.inspector__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 140px;
   gap: var(--vip-sp-4);
-  font-size: var(--vip-fs-sm);
 }
-.inspector__key {
-  color: var(--vip-text-muted);
-}
-.inspector__meta code {
-  font-family: var(--vip-font-mono);
-  font-size: var(--vip-fs-xs);
-  color: var(--vip-text-secondary);
-}
-.inspector__switch {
+.switch-row {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
-  gap: var(--vip-sp-5);
-  padding-top: var(--vip-sp-5);
-  border-top: 1px solid var(--vip-border-subtle);
-}
-.inspector__switch-label {
-  font-size: var(--vip-fs-sm);
+  align-items: center;
   color: var(--vip-text-secondary);
-  font-weight: var(--vip-fw-medium);
 }
-.inspector__switch-help {
-  font-size: var(--vip-fs-xs);
-  color: var(--vip-text-muted);
-  margin-top: 2px;
+.form-error {
+  color: var(--vip-danger-text);
+  font-size: var(--vip-fs-sm);
+}
+.version {
+  margin-top: var(--vip-sp-5);
+}
+@media (max-width: 720px) {
+  .collection__head,
+  .version {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

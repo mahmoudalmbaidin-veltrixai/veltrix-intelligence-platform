@@ -1,153 +1,157 @@
-/**
- * Dashboard delivery + snapshot service (mock + local persistence).
- *
- * INTEGRATION POINT
- *   GET/POST /api/v1/dashboards/:id/deliveries   -> ScheduledDelivery[]
- *   POST     /api/v1/dashboards/:id/snapshots     -> Snapshot
- *   POST     /api/v1/dashboards/:id/export        -> { url } (server-rendered PDF/PNG)
- *   permission: dashboard:share
- *
- * Email sending, PDF/PNG rendering and scheduling run server-side; the UI
- * captures configuration and shows history. No email is actually sent here.
- */
-import { LocalStore, latency, nowIso, isoAhead, isoAgo } from '@/shared/lib/mock'
+/** Live B6.5 dashboard export and delivery API adapter. */
 import { apiClient } from '@/shared/lib/apiClient'
-import { defineService } from '@/shared/services/serviceFactory'
+import { downloadBlob } from '@/shared/lib/download'
 
-export type DeliveryFormat = 'pdf' | 'png' | 'csv' | 'excel'
-export type DeliveryCadence = 'once' | 'daily' | 'weekly' | 'monthly'
+const API = '/api/v1'
+
+export type ExportFormat = 'pdf' | 'png' | 'json' | 'csv'
+export type DeliveryFormat = 'pdf' | 'png' | 'csv'
+export type DeliveryCadence = 'one_time' | 'daily' | 'weekly' | 'monthly' | 'cron'
+export type ExportStatus = 'queued' | 'rendering' | 'completed' | 'failed' | 'cancelled' | 'expired'
+
+export interface DashboardExport {
+  id: string
+  dashboard_id: string
+  dashboard_version_id: string
+  format: ExportFormat
+  status: ExportStatus
+  progress: number
+  attempts: number
+  max_attempts: number
+  cancellation_requested: boolean
+  artifact_content_type: string | null
+  artifact_size_bytes: number | null
+  safe_error_code: string | null
+  safe_error_message: string | null
+  row_version: number
+  created_at: string
+  started_at: string | null
+  completed_at: string | null
+  cancelled_at: string | null
+  expires_at: string | null
+}
 
 export interface ScheduledDelivery {
   id: string
-  dashboardId: string
-  dashboardName: string
+  dashboard_id: string
+  dashboard_version_id: string
+  name: string
   recipients: string[]
-  format: DeliveryFormat
-  cadence: DeliveryCadence
+  cc: string[]
+  bcc: string[]
   subject: string
-  nextRun: string
-  createdAt: string
-  active: boolean
-  lastStatus?: 'sent' | 'failed' | 'pending'
+  format: DeliveryFormat
+  filters: Record<string, unknown>
+  schedule_type: DeliveryCadence
+  schedule_expression: string | null
+  timezone: string
+  include_dashboard_link: boolean
+  enabled: boolean
+  status: string
+  retry_count: number
+  max_retries: number
+  row_version: number
+  created_at: string
+  updated_at: string
+  last_run_at: string | null
+  next_run_at: string | null
 }
 
-export interface Snapshot {
+export interface DeliveryRun {
   id: string
-  dashboardId: string
-  label: string
-  createdAt: string
-  pageCount: number
+  schedule_id: string
+  export_id: string | null
+  status: string
+  attempt: number
+  safe_error_code: string | null
+  safe_error_message: string | null
+  created_at: string
+  sent_at: string | null
+  completed_at: string | null
 }
 
-const deliveryStore = new LocalStore<ScheduledDelivery[]>('vip.dashboard.deliveries', { scoped: true })
-const snapshotStore = new LocalStore<Snapshot[]>('vip.dashboard.snapshots', { scoped: true })
-
-const SEED_DELIVERIES: ScheduledDelivery[] = [
-  {
-    id: 'del_seed1',
-    dashboardId: 'db_exec',
-    dashboardName: 'Executive Overview',
-    recipients: ['leadership@veltrix.com'],
-    format: 'pdf',
-    cadence: 'weekly',
-    subject: 'Weekly Executive Overview',
-    nextRun: isoAhead(60 * 24 * 2),
-    createdAt: isoAgo(60 * 24 * 20),
-    active: true,
-    lastStatus: 'sent',
-  },
-  {
-    id: 'del_seed2',
-    dashboardId: 'db_revops',
-    dashboardName: 'Revenue Operations',
-    recipients: ['revops@veltrix.com', 'finance@veltrix.com'],
-    format: 'excel',
-    cadence: 'daily',
-    subject: 'Daily RevOps snapshot',
-    nextRun: isoAhead(60 * 8),
-    createdAt: isoAgo(60 * 24 * 5),
-    active: true,
-    lastStatus: 'sent',
-  },
-]
-
-function nextRunFor(cadence: DeliveryCadence): string {
-  const map: Record<DeliveryCadence, number> = { once: 60, daily: 60 * 24, weekly: 60 * 24 * 7, monthly: 60 * 24 * 30 }
-  return isoAhead(map[cadence])
+export interface CreateDeliveryInput {
+  name: string
+  recipients: string[]
+  cc?: string[]
+  bcc?: string[]
+  subject: string
+  format: DeliveryFormat
+  filters?: Record<string, unknown>
+  schedule_type: DeliveryCadence
+  schedule_expression?: string | null
+  run_at?: string | null
+  timezone: string
+  include_dashboard_link?: boolean
+  enabled?: boolean
+  max_retries?: number
 }
 
-export type CreateDeliveryInput = Omit<ScheduledDelivery, 'id' | 'createdAt' | 'nextRun' | 'active' | 'lastStatus'>
-
-export interface DeliveryService {
-  list(): Promise<ScheduledDelivery[]>
-  create(input: CreateDeliveryInput): Promise<ScheduledDelivery>
-  toggle(id: string): Promise<void>
-  remove(id: string): Promise<void>
-  listSnapshots(dashboardId: string): Promise<Snapshot[]>
-  createSnapshot(dashboardId: string, label: string, pageCount: number): Promise<Snapshot>
+export interface EmailPreview {
+  subject: string
+  html: string
+  recipients: number
+  attachments: string[]
 }
 
-const mockDeliveryService: DeliveryService = {
-  async list(): Promise<ScheduledDelivery[]> {
-    await latency()
-    const stored = deliveryStore.read([])
-    return stored.length ? stored : SEED_DELIVERIES
-  },
-
-  async create(input: CreateDeliveryInput): Promise<ScheduledDelivery> {
-    await latency(200, 420)
-    const current = deliveryStore.read(SEED_DELIVERIES.slice())
-    const delivery: ScheduledDelivery = {
+export const deliveryService = {
+  list: (dashboardId?: string) =>
+    apiClient.get<ScheduledDelivery[]>(
+      dashboardId ? `${API}/dashboards/${dashboardId}/deliveries` : `${API}/dashboard-deliveries`,
+    ),
+  create: (dashboardId: string, input: CreateDeliveryInput) =>
+    apiClient.post<ScheduledDelivery>(`${API}/dashboards/${dashboardId}/deliveries`, input),
+  update: (delivery: ScheduledDelivery, input: CreateDeliveryInput) =>
+    apiClient.put<ScheduledDelivery>(`${API}/dashboard-deliveries/${delivery.id}`, {
       ...input,
-      id: `del_${Math.random().toString(36).slice(2, 9)}`,
-      createdAt: nowIso(),
-      nextRun: nextRunFor(input.cadence),
-      active: true,
-      lastStatus: 'pending',
-    }
-    deliveryStore.write([delivery, ...current])
-    return delivery
-  },
-
-  async toggle(id: string): Promise<void> {
-    await latency(80, 160)
-    const current = deliveryStore.read(SEED_DELIVERIES.slice())
-    deliveryStore.write(current.map((d) => (d.id === id ? { ...d, active: !d.active } : d)))
-  },
-
-  async remove(id: string): Promise<void> {
-    await latency(80, 160)
-    const current = deliveryStore.read(SEED_DELIVERIES.slice())
-    deliveryStore.write(current.filter((d) => d.id !== id))
-  },
-
-  async listSnapshots(dashboardId: string): Promise<Snapshot[]> {
-    await latency()
-    return snapshotStore.read([]).filter((s) => s.dashboardId === dashboardId)
-  },
-
-  async createSnapshot(dashboardId: string, label: string, pageCount: number): Promise<Snapshot> {
-    await latency(200, 400)
-    const snap: Snapshot = {
-      id: `snap_${Math.random().toString(36).slice(2, 9)}`,
-      dashboardId,
-      label,
-      createdAt: nowIso(),
-      pageCount,
-    }
-    snapshotStore.write([snap, ...snapshotStore.read([])])
-    return snap
+      expected_version: delivery.row_version,
+    }),
+  toggle: (delivery: ScheduledDelivery) =>
+    apiClient.put<ScheduledDelivery>(`${API}/dashboard-deliveries/${delivery.id}`, {
+      name: delivery.name,
+      recipients: delivery.recipients,
+      cc: delivery.cc,
+      bcc: delivery.bcc,
+      subject: delivery.subject,
+      format: delivery.format,
+      filters: delivery.filters,
+      schedule_type: delivery.schedule_type,
+      schedule_expression: delivery.schedule_expression,
+      run_at: delivery.schedule_type === 'one_time' ? delivery.next_run_at : null,
+      timezone: delivery.timezone,
+      include_dashboard_link: delivery.include_dashboard_link,
+      enabled: !delivery.enabled,
+      max_retries: delivery.max_retries,
+      expected_version: delivery.row_version,
+    }),
+  remove: (delivery: ScheduledDelivery) =>
+    apiClient.delete<void>(`${API}/dashboard-deliveries/${delivery.id}`, {
+      query: { expected_version: delivery.row_version },
+    }),
+  history: (id: string) => apiClient.get<DeliveryRun[]>(`${API}/dashboard-deliveries/${id}/history`),
+  test: (id: string) => apiClient.post<DeliveryRun>(`${API}/dashboard-deliveries/${id}/test`),
+  preview: (
+    dashboardId: string,
+    input: { recipients: string[]; cc?: string[]; bcc?: string[]; subject: string; include_dashboard_link?: boolean },
+  ) => apiClient.post<EmailPreview>(`${API}/dashboards/${dashboardId}/deliveries/preview-email`, input),
+  exports: (dashboardId: string) => apiClient.get<DashboardExport[]>(`${API}/dashboards/${dashboardId}/exports`),
+  createExport: (dashboardId: string, format: ExportFormat, filters: Record<string, unknown> = {}) =>
+    apiClient.post<DashboardExport>(`${API}/dashboards/${dashboardId}/exports`, {
+      format,
+      filters,
+      locale: navigator.language || 'en-US',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    }),
+  exportStatus: (id: string) => apiClient.get<DashboardExport>(`${API}/dashboard-exports/${id}`),
+  cancelExport: (job: DashboardExport) =>
+    apiClient.post<DashboardExport>(`${API}/dashboard-exports/${job.id}/cancel`, {
+      expected_version: job.row_version,
+    }),
+  retryExport: (job: DashboardExport) =>
+    apiClient.post<DashboardExport>(`${API}/dashboard-exports/${job.id}/retry`, { expected_version: job.row_version }),
+  async downloadExport(job: DashboardExport): Promise<void> {
+    const signed = await apiClient.post<{ url: string }>(`${API}/dashboard-exports/${job.id}/download-token`)
+    const artifact = await apiClient.downloadWithMetadata(signed.url)
+    downloadBlob(artifact.fileName, artifact.blob)
   },
 }
-
-const apiDeliveryService: DeliveryService = {
-  list: () => apiClient.get<ScheduledDelivery[]>('/deliveries'),
-  create: (input) => apiClient.post<ScheduledDelivery>('/deliveries', input),
-  toggle: (id) => apiClient.post<void>(`/deliveries/${id}/toggle`),
-  remove: (id) => apiClient.delete<void>(`/deliveries/${id}`),
-  listSnapshots: (dashboardId) => apiClient.get<Snapshot[]>(`/dashboards/${dashboardId}/snapshots`),
-  createSnapshot: (dashboardId, label, pageCount) =>
-    apiClient.post<Snapshot>(`/dashboards/${dashboardId}/snapshots`, { label, pageCount }),
-}
-
-export const deliveryService: DeliveryService = defineService(mockDeliveryService, () => apiDeliveryService)

@@ -2,14 +2,46 @@
 import { watch, onBeforeUnmount, ref, nextTick } from 'vue'
 import VipIcon from './VipIcon.vue'
 
-const props = withDefaults(defineProps<{ open: boolean; title?: string; side?: 'right' | 'left'; width?: number }>(), {
-  side: 'right',
-  width: 440,
-})
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    title?: string
+    side?: 'right' | 'left'
+    width?: number
+    /** Allow closing by swiping toward the anchored edge (touch). */
+    swipeToClose?: boolean
+  }>(),
+  {
+    side: 'right',
+    width: 440,
+    swipeToClose: true,
+  },
+)
 const emit = defineEmits<{ close: [] }>()
 
 const panel = ref<HTMLElement>()
 let lastFocused: HTMLElement | null = null
+
+// Swipe-to-dismiss: a horizontal drag toward the anchored edge closes the drawer.
+let touchStartX = 0
+let touchStartY = 0
+let tracking = false
+function onTouchStart(e: TouchEvent) {
+  if (!props.swipeToClose || e.touches.length !== 1) return
+  tracking = true
+  touchStartX = e.touches[0].clientX
+  touchStartY = e.touches[0].clientY
+}
+function onTouchEnd(e: TouchEvent) {
+  if (!tracking) return
+  tracking = false
+  const t = e.changedTouches[0]
+  const dx = t.clientX - touchStartX
+  const dy = t.clientY - touchStartY
+  if (Math.abs(dx) < 56 || Math.abs(dx) <= Math.abs(dy)) return
+  // Left drawer closes on swipe-left; right drawer closes on swipe-right.
+  if ((props.side === 'left' && dx < 0) || (props.side === 'right' && dx > 0)) emit('close')
+}
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
@@ -62,6 +94,8 @@ onBeforeUnmount(() => {
           role="dialog"
           aria-modal="true"
           :aria-label="title"
+          @touchstart.passive="onTouchStart"
+          @touchend="onTouchEnd"
         >
           <header class="vip-drawer__header">
             <h2 class="vip-drawer__title">{{ title }}</h2>

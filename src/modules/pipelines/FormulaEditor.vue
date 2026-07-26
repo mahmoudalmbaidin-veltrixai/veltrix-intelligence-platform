@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { FORMULA_FUNCTIONS, validateFormula, type FormulaFn } from './formulaFunctions'
+import { ref, computed, onMounted, watch } from 'vue'
+import {
+  FORMULA_FUNCTIONS,
+  loadFormulaLanguage,
+  validateFormula,
+  validateFormulaRemote,
+  type FormulaFn,
+  type FormulaValidation,
+} from './formulaFunctions'
 import type { SchemaColumn } from '@/shared/types/pipeline'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipInput from '@/shared/ui/VipInput.vue'
@@ -13,15 +20,7 @@ const search = ref('')
 const activeCat = ref<'All' | FormulaFn['category']>('All')
 const taRef = ref<HTMLTextAreaElement>()
 
-const categories: ('All' | FormulaFn['category'])[] = [
-  'All',
-  'Aggregate',
-  'Math',
-  'Text',
-  'Logical',
-  'Date',
-  'Conversion',
-]
+const categories: ('All' | FormulaFn['category'])[] = ['All', 'Math', 'Text', 'Logical']
 
 const fns = computed(() => {
   const q = search.value.trim().toLowerCase()
@@ -32,7 +31,40 @@ const fns = computed(() => {
   )
 })
 
-const validation = computed(() => validateFormula(props.modelValue))
+const validation = ref<FormulaValidation>(validateFormula(props.modelValue))
+let validationToken = 0
+onMounted(async () => {
+  try {
+    await loadFormulaLanguage()
+  } finally {
+    validation.value = validateFormula(props.modelValue)
+  }
+})
+watch(
+  () => props.modelValue,
+  async (expression) => {
+    const token = ++validationToken
+    validation.value = validateFormula(expression)
+    if (!expression.trim()) return
+    try {
+      const result = await validateFormulaRemote(
+        expression,
+        (props.columns ?? []).map((column) => column.name),
+      )
+      if (token === validationToken) validation.value = result
+    } catch (cause) {
+      if (token === validationToken) {
+        validation.value = {
+          valid: false,
+          errors: [(cause as Error).message],
+          usedFunctions: [],
+          usedColumns: [],
+        }
+      }
+    }
+  },
+  { immediate: true },
+)
 
 function insertAtCursor(text: string) {
   const ta = taRef.value
@@ -76,7 +108,7 @@ function insertColumn(name: string) {
         :value="modelValue"
         rows="4"
         spellcheck="false"
-        placeholder="e.g. IF([revenue] > 0, ROUND([profit] / [revenue], 2), 0)"
+        placeholder="e.g. round([profit] / [revenue] * 100, 2)"
         aria-label="Formula expression"
         @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
       />

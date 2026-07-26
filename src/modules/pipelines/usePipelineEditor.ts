@@ -39,6 +39,7 @@ export function usePipelineEditor(initial: Pipeline) {
     return JSON.stringify({
       nodes: pipeline.nodes,
       edges: pipeline.edges,
+      canvas: pipeline.canvas,
       name: pipeline.name,
       description: pipeline.description,
     })
@@ -54,12 +55,48 @@ export function usePipelineEditor(initial: Pipeline) {
   }
 
   function restore(snap: string) {
-    const parsed = JSON.parse(snap) as Pick<Pipeline, 'nodes' | 'edges' | 'name' | 'description'>
+    const parsed = JSON.parse(snap) as Pick<Pipeline, 'nodes' | 'edges' | 'canvas' | 'name' | 'description'>
     pipeline.nodes = parsed.nodes
     pipeline.edges = parsed.edges
+    Object.assign(pipeline.canvas, parsed.canvas)
     pipeline.name = parsed.name
     pipeline.description = parsed.description
+    propagateSchemas()
     dirty.value = snapshot() !== lastSavedSnapshot.value
+  }
+
+  function propagateSchemas() {
+    const byId = new Map(pipeline.nodes.map((node) => [node.id, node]))
+    for (let pass = 0; pass < pipeline.nodes.length; pass += 1) {
+      for (const node of pipeline.nodes) {
+        if (NODE_TYPES[node.kind].category === 'source') continue
+        const incoming = pipeline.edges
+          .filter((edge) => edge.targetNode === node.id)
+          .flatMap((edge) => byId.get(edge.sourceNode)?.outputSchema ?? [])
+        const unique = [...new Map(incoming.map((column) => [column.name, column])).values()]
+        node.inputSchema = clone(unique)
+        let output = clone(unique)
+        if (node.kind === 'select-columns' && Array.isArray(node.config.columns)) {
+          const selected = new Set(node.config.columns)
+          output = output.filter((column) => selected.has(column.name))
+        } else if (node.kind === 'rename-columns' && node.config.renames && typeof node.config.renames === 'object') {
+          const renames = node.config.renames as Record<string, string>
+          output = output.map((column) => ({ ...column, name: renames[column.name] ?? column.name }))
+        } else if (node.kind === 'formula' && typeof node.config.field === 'string' && node.config.field) {
+          output = [
+            ...output.filter((column) => column.name !== node.config.field),
+            { name: node.config.field, dataType: 'number' },
+          ]
+        } else if (node.kind === 'type-convert' && typeof node.config.field === 'string') {
+          output = output.map((column) =>
+            column.name === node.config.field
+              ? { ...column, dataType: (node.config.target_type as typeof column.dataType) ?? column.dataType }
+              : column,
+          )
+        }
+        node.outputSchema = output
+      }
+    }
   }
 
   const canUndo = computed(() => undoStack.value.length > 0)
@@ -121,6 +158,16 @@ export function usePipelineEditor(initial: Pipeline) {
     if (!n) return
     commit()
     n.config = { ...n.config, [key]: value }
+    propagateSchemas()
+  }
+
+  function updateNodeSource(id: string, config: Record<string, unknown>, outputSchema: PipelineNode['outputSchema']) {
+    const n = pipeline.nodes.find((x) => x.id === id)
+    if (!n) return
+    commit()
+    n.config = { ...n.config, ...config }
+    n.outputSchema = clone(outputSchema ?? [])
+    propagateSchemas()
   }
 
   function renameNode(id: string, title: string) {
@@ -178,11 +225,13 @@ export function usePipelineEditor(initial: Pipeline) {
     if (pipeline.edges.some((e) => e.sourceNode === targetNode && e.targetNode === sourceNode)) return false
     commit()
     pipeline.edges.push({ id: genId('e'), sourceNode, sourcePort, targetNode, targetPort })
+    propagateSchemas()
     return true
   }
   function deleteEdge(id: string) {
     commit()
     pipeline.edges = pipeline.edges.filter((e) => e.id !== id)
+    propagateSchemas()
     if (selectedEdge.value === id) selectedEdge.value = null
   }
 
@@ -267,6 +316,16 @@ export function usePipelineEditor(initial: Pipeline) {
           })
         }
       })
+      if (n.kind === 'source-dataset' && !n.config.dataset_id) {
+        issues.push({
+          id: genId('iss'),
+          level: 'error',
+          scope: 'node',
+          nodeId: n.id,
+          code: 'REQ',
+          message: `${n.title}: a governed dataset is required.`,
+        })
+      }
       // disconnected (non-source with no input edge)
       if (spec.inputs.length > 0) {
         const incoming = pipeline.edges.filter((e) => e.targetNode === n.id)
@@ -334,6 +393,7 @@ export function usePipelineEditor(initial: Pipeline) {
     addNode,
     moveNodes,
     updateNodeConfig,
+    updateNodeSource,
     renameNode,
     deleteNodes,
     duplicateNodes,

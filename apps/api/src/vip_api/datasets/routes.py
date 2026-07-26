@@ -1,0 +1,446 @@
+"""Live Dataset Studio APIs."""
+
+from functools import lru_cache
+from typing import Annotated, Literal
+from uuid import UUID, uuid4
+
+from fastapi import APIRouter, Depends, Query, Request, Response
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from vip_api.auth.dependencies import require_csrf
+from vip_api.connections.dependencies import get_secret_provider
+from vip_api.connections.secrets import DatabaseEncryptedSecretProvider
+from vip_api.core.config import Settings, get_settings
+from vip_api.database.session import get_db_session
+from vip_api.datasets.dependencies import RequireB5Governance
+from vip_api.datasets.discovery import MetadataDiscoveryAdapterRegistry
+from vip_api.datasets.ingestion import ingest_csv, ingest_csv_file
+from vip_api.datasets.preview import preview_dataset, profile_dataset
+from vip_api.datasets.schemas import (
+    CsvIngestRequest,
+    DatasetCreate,
+    DatasetFieldResponse,
+    DatasetFieldUpdate,
+    DatasetListResponse,
+    DatasetPreviewResponse,
+    DatasetProfileResponse,
+    DatasetResponse,
+    DatasetUpdate,
+    DiscoveryRequest,
+    DiscoveryResult,
+    FileCsvIngestRequest,
+    LineageCreate,
+    LineageEdgeResponse,
+    LineageGraph,
+    QualityEvaluationResponse,
+    QualityResultResponse,
+    QualityRuleCreate,
+    QualityRuleResponse,
+    QualitySummary,
+)
+from vip_api.datasets.services import (
+    archive_dataset,
+    create_dataset,
+    create_lineage,
+    create_quality_evaluation,
+    create_quality_rule,
+    delete_lineage,
+    delete_quality_rule,
+    discover,
+    get_dataset,
+    lineage_graph,
+    list_datasets,
+    list_fields,
+    list_quality_evaluations,
+    list_quality_results,
+    list_quality_rules,
+    quality_summary,
+    update_dataset,
+    update_field,
+    update_quality_rule,
+)
+from vip_api.governance.context import AuthorizationContext
+from vip_api.jobs import handlers as _handlers  # noqa: F401
+from vip_api.jobs.queue import RedisJobQueue
+from vip_api.jobs.registry import registry
+from vip_api.jobs.schemas import JobCreate, JobResponse
+from vip_api.jobs.services import create_job
+from vip_api.redis.client import RedisClient
+
+router = APIRouter(prefix="/datasets", tags=["datasets"])
+
+
+def _policy(
+    permission: str, *, feature: str = "dataset_studio", quota: str | None = None
+) -> object:
+    return RequireB5Governance(permission, feature=feature, quota=quota)
+
+
+@lru_cache(maxsize=1)
+def get_discovery_registry() -> MetadataDiscoveryAdapterRegistry:
+    return MetadataDiscoveryAdapterRegistry(get_settings())
+
+
+def _queue(request: Request) -> RedisJobQueue:
+    settings: Settings = request.app.state.settings
+    client: RedisClient = request.app.state.redis
+    return RedisJobQueue(client.client, settings.JOB_QUEUE_PREFIX)
+
+
+@router.get("", response_model=DatasetListResponse)
+async def datasets_index(
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(_policy("dataset.read"))],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+    search: Annotated[str | None, Query(max_length=200)] = None,
+    status_filter: Annotated[
+        Literal["active", "inactive", "archived"] | None, Query(alias="status")
+    ] = None,
+) -> DatasetListResponse:
+    return await list_datasets(
+        db, context, page=page, page_size=page_size, search=search, status=status_filter
+    )
+
+
+@router.post(
+    "", response_model=DatasetResponse, status_code=201, dependencies=[Depends(require_csrf)]
+)
+async def datasets_create(
+    payload: DatasetCreate,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.create", quota="datasets.max"))
+    ],
+) -> DatasetResponse:
+    return await create_dataset(db, context, payload)
+
+
+@router.post("/discover", response_model=DiscoveryResult, dependencies=[Depends(require_csrf)])
+async def datasets_discover(
+    payload: DiscoveryRequest,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(_policy("dataset.discover"))],
+    provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
+    registry: Annotated[MetadataDiscoveryAdapterRegistry, Depends(get_discovery_registry)],
+) -> DiscoveryResult:
+    return await discover(db, context, payload, provider, registry)
+
+
+@router.post("/ingest-csv", response_model=DiscoveryResult, dependencies=[Depends(require_csrf)])
+async def datasets_ingest_csv(
+    payload: CsvIngestRequest,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.create", quota="datasets.max"))
+    ],
+    provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
+    registry: Annotated[MetadataDiscoveryAdapterRegistry, Depends(get_discovery_registry)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> DiscoveryResult:
+    return await ingest_csv(db, context, payload, provider, registry, settings)
+
+
+@router.post(
+    "/ingest-file",
+    response_model=DiscoveryResult,
+    dependencies=[Depends(require_csrf)],
+)
+async def datasets_ingest_file(
+    payload: FileCsvIngestRequest,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.create", quota="datasets.max"))
+    ],
+    provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
+    registry: Annotated[MetadataDiscoveryAdapterRegistry, Depends(get_discovery_registry)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> DiscoveryResult:
+    return await ingest_csv_file(
+        db,
+        context,
+        payload.file_id,
+        payload.connection_id,
+        payload.source_schema,
+        payload.source_name,
+        payload.display_name,
+        payload.description,
+        provider,
+        registry,
+        settings,
+    )
+
+
+@router.get("/{dataset_id}", response_model=DatasetResponse)
+async def datasets_detail(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(_policy("dataset.read"))],
+) -> DatasetResponse:
+    return await get_dataset(db, context, dataset_id)
+
+
+@router.patch("/{dataset_id}", response_model=DatasetResponse, dependencies=[Depends(require_csrf)])
+async def datasets_update(
+    dataset_id: UUID,
+    payload: DatasetUpdate,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(_policy("dataset.update"))],
+) -> DatasetResponse:
+    return await update_dataset(db, context, dataset_id, payload)
+
+
+@router.post("/{dataset_id}/archive", status_code=204, dependencies=[Depends(require_csrf)])
+async def datasets_archive(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(_policy("dataset.archive"))],
+) -> Response:
+    await archive_dataset(db, context, dataset_id)
+    return Response(status_code=204)
+
+
+@router.delete("/{dataset_id}", status_code=204, dependencies=[Depends(require_csrf)])
+async def datasets_delete(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(_policy("dataset.delete"))],
+) -> Response:
+    await archive_dataset(db, context, dataset_id)
+    return Response(status_code=204)
+
+
+@router.get("/{dataset_id}/fields", response_model=list[DatasetFieldResponse])
+async def fields_index(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(_policy("dataset.fields.read"))],
+) -> list[DatasetFieldResponse]:
+    return await list_fields(db, context, dataset_id)
+
+
+@router.get("/{dataset_id}/preview", response_model=DatasetPreviewResponse)
+async def preview_show(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(_policy("dataset.read"))],
+    provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    page: Annotated[int, Query(ge=1, le=1000)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> DatasetPreviewResponse:
+    return await preview_dataset(db, context, dataset_id, page, page_size, provider, settings)
+
+
+@router.get("/{dataset_id}/profile", response_model=DatasetProfileResponse)
+async def profile_show(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(_policy("dataset.read"))],
+    provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> DatasetProfileResponse:
+    return await profile_dataset(db, context, dataset_id, provider, settings)
+
+
+@router.patch(
+    "/{dataset_id}/fields/{field_id}",
+    response_model=DatasetFieldResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def fields_update(
+    dataset_id: UUID,
+    field_id: UUID,
+    payload: DatasetFieldUpdate,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(_policy("dataset.fields.update"))],
+) -> DatasetFieldResponse:
+    return await update_field(db, context, dataset_id, field_id, payload)
+
+
+@router.get("/{dataset_id}/quality", response_model=QualitySummary)
+async def quality_detail(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.quality.read", feature="data_quality"))
+    ],
+) -> QualitySummary:
+    return await quality_summary(db, context, dataset_id)
+
+
+@router.post(
+    "/{dataset_id}/quality-evaluations",
+    response_model=JobResponse,
+    status_code=202,
+    dependencies=[Depends(require_csrf)],
+)
+async def quality_evaluations_create(
+    request: Request,
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.quality.manage", feature="data_quality"))
+    ],
+) -> JobResponse:
+    evaluation = await create_quality_evaluation(db, context, dataset_id)
+    settings: Settings = request.app.state.settings
+    job = await create_job(
+        db,
+        context,
+        JobCreate(
+            job_type="system",
+            handler="dataset.quality",
+            name="Evaluate dataset quality",
+            payload={"quality_evaluation_id": str(evaluation.id)},
+            idempotency_key=f"quality-{evaluation.id}-{uuid4().hex[:12]}",
+            max_attempts=3,
+            timeout_seconds=settings.PIPELINE_RUN_TIMEOUT_SECONDS,
+        ),
+        settings,
+        _queue(request),
+        registry,
+    )
+    evaluation.job_id = job.id
+    await db.commit()
+    return job
+
+
+@router.get(
+    "/{dataset_id}/quality-evaluations",
+    response_model=list[QualityEvaluationResponse],
+)
+async def quality_evaluations_index(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.quality.read", feature="data_quality"))
+    ],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[QualityEvaluationResponse]:
+    return await list_quality_evaluations(db, context, dataset_id, limit=limit)
+
+
+@router.get("/{dataset_id}/quality-rules", response_model=list[QualityRuleResponse])
+async def quality_rules_index(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.quality.read", feature="data_quality"))
+    ],
+) -> list[QualityRuleResponse]:
+    return await list_quality_rules(db, context, dataset_id)
+
+
+@router.post(
+    "/{dataset_id}/quality-rules",
+    response_model=QualityRuleResponse,
+    status_code=201,
+    dependencies=[Depends(require_csrf)],
+)
+async def quality_rules_create(
+    dataset_id: UUID,
+    payload: QualityRuleCreate,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.quality.manage", feature="data_quality"))
+    ],
+) -> QualityRuleResponse:
+    return await create_quality_rule(db, context, dataset_id, payload)
+
+
+@router.patch(
+    "/{dataset_id}/quality-rules/{rule_id}",
+    response_model=QualityRuleResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def quality_rules_update(
+    dataset_id: UUID,
+    rule_id: UUID,
+    payload: QualityRuleCreate,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.quality.manage", feature="data_quality"))
+    ],
+) -> QualityRuleResponse:
+    return await update_quality_rule(db, context, dataset_id, rule_id, payload)
+
+
+@router.get("/{dataset_id}/quality-results", response_model=list[QualityResultResponse])
+async def quality_results_index(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.quality.read", feature="data_quality"))
+    ],
+) -> list[QualityResultResponse]:
+    return await list_quality_results(db, context, dataset_id)
+
+
+@router.delete(
+    "/{dataset_id}/quality-rules/{rule_id}", status_code=204, dependencies=[Depends(require_csrf)]
+)
+async def quality_rules_delete(
+    dataset_id: UUID,
+    rule_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.quality.manage", feature="data_quality"))
+    ],
+) -> Response:
+    await delete_quality_rule(db, context, dataset_id, rule_id)
+    return Response(status_code=204)
+
+
+@router.get("/{dataset_id}/lineage", response_model=LineageGraph)
+async def lineage_detail(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.lineage.read", feature="data_lineage"))
+    ],
+    direction: Literal["upstream", "downstream", "both"] = "both",
+    depth: Annotated[int, Query(ge=1)] = 3,
+    max_nodes: Annotated[int, Query(ge=1)] = 100,
+) -> LineageGraph:
+    settings = get_settings()
+    return await lineage_graph(
+        db,
+        context,
+        dataset_id,
+        direction=direction,
+        depth=min(depth, settings.LINEAGE_MAX_DEPTH),
+        max_nodes=min(max_nodes, settings.LINEAGE_MAX_NODES),
+    )
+
+
+@router.post(
+    "/{dataset_id}/lineage",
+    response_model=LineageEdgeResponse,
+    status_code=201,
+    dependencies=[Depends(require_csrf)],
+)
+async def lineage_create(
+    dataset_id: UUID,
+    payload: LineageCreate,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.lineage.manage", feature="data_lineage"))
+    ],
+) -> LineageEdgeResponse:
+    return await create_lineage(db, context, dataset_id, payload)
+
+
+@router.delete(
+    "/{dataset_id}/lineage/{edge_id}", status_code=204, dependencies=[Depends(require_csrf)]
+)
+async def lineage_delete(
+    dataset_id: UUID,
+    edge_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[
+        AuthorizationContext, Depends(_policy("dataset.lineage.manage", feature="data_lineage"))
+    ],
+) -> Response:
+    await delete_lineage(db, context, dataset_id, edge_id)
+    return Response(status_code=204)

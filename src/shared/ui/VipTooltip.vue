@@ -1,7 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-withDefaults(defineProps<{ text: string; placement?: 'top' | 'right' | 'bottom' | 'left' }>(), { placement: 'top' })
+import { computed, ref } from 'vue'
+const props = withDefaults(
+  defineProps<{
+    text: string
+    /** Optional secondary line rendered beneath the title (richer tooltip). */
+    description?: string
+    /** Optional keyboard shortcut rendered as a kbd chip. */
+    shortcut?: string
+    placement?: 'top' | 'right' | 'bottom' | 'left'
+  }>(),
+  { placement: 'top' },
+)
 const show = ref(false)
+// Show whenever there is any content to display.
+const hasContent = computed(() => !!(props.text || props.description || props.shortcut))
+const isRich = computed(() => !!(props.description || props.shortcut))
 </script>
 
 <template>
@@ -13,7 +26,19 @@ const show = ref(false)
     @focusout="show = false"
   >
     <slot />
-    <span v-if="show && text" class="vip-tt__bubble" :class="`is-${placement}`" role="tooltip">{{ text }}</span>
+    <span
+      v-if="show && hasContent"
+      class="vip-tt__bubble"
+      :class="[`is-${placement}`, { 'is-rich': isRich }]"
+      role="tooltip"
+    >
+      <template v-if="isRich">
+        <span v-if="text" class="vip-tt__title">{{ text }}</span>
+        <span v-if="description" class="vip-tt__desc">{{ description }}</span>
+        <kbd v-if="shortcut" class="vip-tt__kbd">{{ shortcut }}</kbd>
+      </template>
+      <template v-else>{{ text }}</template>
+    </span>
   </span>
 </template>
 
@@ -34,6 +59,36 @@ const show = ref(false)
   white-space: nowrap;
   box-shadow: var(--vip-shadow-md);
   pointer-events: none;
+}
+.vip-tt__bubble.is-rich {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--vip-sp-2);
+  white-space: normal;
+  width: max-content;
+  max-width: 240px;
+  padding: var(--vip-sp-4) var(--vip-sp-5);
+}
+.vip-tt__title {
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+}
+.vip-tt__desc {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  line-height: 1.4;
+}
+.vip-tt__kbd {
+  margin-top: 2px;
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-2xs);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border);
+  color: var(--vip-text-secondary);
+  padding: 1px 6px;
+  border-radius: var(--vip-radius-xs);
 }
 .is-top {
   bottom: calc(100% + 6px);

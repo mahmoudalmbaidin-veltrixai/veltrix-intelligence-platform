@@ -57,7 +57,7 @@ const invColumns: Column<Invoice>[] = [
   <div>
     <VipPageHeader
       title="Billing"
-      :description="`${platform.organization.name} · ${platform.organization.plan} plan`"
+      :description="`${platform.organization?.name ?? 'No organization'} · ${platform.organization?.plan ?? 'trial'} plan`"
     />
     <VipTabs v-model="tab" :tabs="tabs" />
     <div class="bill">

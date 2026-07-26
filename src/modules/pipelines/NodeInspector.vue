@@ -12,6 +12,7 @@ import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
 import FormulaEditor from './FormulaEditor.vue'
+import SourceConfigurationPanel from './SourceConfigurationPanel.vue'
 
 const props = defineProps<{ editor: PipelineEditor }>()
 
@@ -119,6 +120,7 @@ const columnsModel = (key: string) => ({
       <div class="insp__body">
         <!-- CONFIG -->
         <div v-if="tab === 'config'" class="insp__fields">
+          <SourceConfigurationPanel v-if="node.kind === 'source-dataset'" :editor="editor" :node="node" />
           <template v-for="f in visibleFields" :key="f.key">
             <VipInput
               v-if="f.type === 'text'"

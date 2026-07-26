@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '@/shared/stores/ui'
 import { relativeTime } from '@/shared/lib/format'
-import { isoAgo as agoIso } from '@/shared/lib/mock'
+import { operationsService, type Notification } from '@/modules/operations/operations.service'
 import VipDrawer from '@/shared/ui/VipDrawer.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
@@ -12,72 +12,41 @@ import VipIcon from '@/shared/ui/VipIcon.vue'
 const ui = useUiStore()
 const router = useRouter()
 
-interface Notif {
-  id: string
-  severity: 'info' | 'success' | 'warning' | 'danger'
-  title: string
-  body: string
-  ts: string
-  to: string
-  read: boolean
+const items = ref<Notification[]>([])
+const loading = ref(false)
+const loadError = ref('')
+const unread = computed(() => items.value.filter((item) => !item.read).length)
+
+async function load(): Promise<void> {
+  loading.value = true
+  loadError.value = ''
+  try {
+    items.value = await operationsService.listNotifications()
+    ui.unreadNotifications = unread.value
+  } catch (cause) {
+    loadError.value = (cause as Error).message
+  } finally {
+    loading.value = false
+  }
 }
-const items = ref<Notif[]>([
-  {
-    id: 'n1',
-    severity: 'danger',
-    title: 'Pipeline failed',
-    body: 'Revenue Nightly ETL failed at node "Join Orders".',
-    ts: agoIso(18),
-    to: '/pipelines/pl_revenue/runs',
-    read: false,
+
+watch(
+  () => ui.notificationDrawerOpen,
+  (open) => {
+    if (open) void load()
   },
-  {
-    id: 'n2',
-    severity: 'success',
-    title: 'Dataset refreshed',
-    body: 'fct_orders refreshed — 2.4M rows, quality 98%.',
-    ts: agoIso(52),
-    to: '/datasets/ds_orders',
-    read: false,
-  },
-  {
-    id: 'n3',
-    severity: 'warning',
-    title: 'Quota approaching',
-    body: 'AI agent runs at 82% of monthly entitlement.',
-    ts: agoIso(140),
-    to: '/usage',
-    read: false,
-  },
-  {
-    id: 'n4',
-    severity: 'info',
-    title: 'Approval requested',
-    body: 'Q3 Board Report awaiting your approval.',
-    ts: agoIso(220),
-    to: '/automation/approvals',
-    read: false,
-  },
-  {
-    id: 'n5',
-    severity: 'info',
-    title: 'Dashboard shared',
-    body: 'A. Rahman shared "Executive Overview" with Analytics.',
-    ts: agoIso(600),
-    to: '/dashboards',
-    read: true,
-  },
-])
+  { immediate: true },
+)
 
 function markAll() {
   items.value = items.value.map((n) => ({ ...n, read: true }))
   ui.unreadNotifications = 0
 }
-function open(n: Notif) {
+function open(n: Notification) {
   n.read = true
   ui.unreadNotifications = items.value.filter((x) => !x.read).length
   ui.notificationDrawerOpen = false
-  router.push(n.to)
+  if (n.resource) router.push(n.resource.to)
 }
 </script>
 
@@ -99,6 +68,11 @@ function open(n: Notif) {
           >Open center</VipButton
         >
       </div>
+      <p v-if="loading" role="status">Loading notifications…</p>
+      <p v-else-if="loadError" role="alert">
+        {{ loadError }} <VipButton variant="ghost" size="sm" @click="load">Retry</VipButton>
+      </p>
+      <p v-else-if="!items.length">No operational notifications.</p>
       <ul class="ndrawer__list">
         <li v-for="n in items" :key="n.id" class="ndrawer__item" :class="{ 'is-unread': !n.read }" @click="open(n)">
           <VipBadge :tone="n.severity" variant="dot" size="sm" />

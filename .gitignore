@@ -12,3 +12,53 @@ coverage
 .vscode/*
 !.vscode/extensions.json
 .idea
+playwright-report/
+test-results/
+blob-report/
+
+# Local runtime data, test evidence, and temporary workspaces
+artifacts/
+.uat-artifacts/
+tmp/
+logs/
+cache/
+.cache/
+*.cache
+*.bkp
+
+# Local credentials and secret material
+credentials/
+.credentials/
+*.credentials
+*.token
+*.tokens
+*.pem
+*.key
+
+# Non-canonical package-manager state (this repository uses npm)
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+# Local QA/certification evidence and working design assets
+QA Files/
+Logo/
+/*_REPORT.md
+/*_SUMMARY.md
+/PRODUCTION_READINESS_CHECKLIST.md
+/RELEASE_CERTIFICATION_*.md
+/FRONTEND_BACKEND_INTEGRATION_BASELINE.md
+/FRONTEND_BASELINE_SHA256.txt
+/live_uat_data_dictionary.md
+/live_uat_expected_results.json
+/PHASE_B9_RELEASE_CERTIFICATION.md
+
+# Python backend
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/

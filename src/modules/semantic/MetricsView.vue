@@ -4,7 +4,7 @@ import { useQuery, useMutation } from '@/shared/lib/query'
 import { formatNumber } from '@/shared/lib/format'
 import { useUiStore } from '@/shared/stores/ui'
 import { usePlatformStore } from '@/shared/stores/platform'
-import { MODELS, semanticService } from '@/shared/services/semanticModels'
+import { semanticService } from '@/shared/services/semanticModels'
 import { semanticStudioService, type Metric, type MetricFormat } from './semantic.service'
 import type { Aggregation } from '@/shared/types/semantic'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
@@ -20,12 +20,17 @@ import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 
 const ui = useUiStore()
 const platform = usePlatformStore()
-const canWrite = computed(() => platform.can('semantic:write'))
+const canWrite = computed(() => platform.can('semantic_metric.manage'))
 
 const { data, isLoading, refetch } = useQuery(
   () => 'semantic:metrics',
   () => semanticStudioService.listMetrics(),
 )
+const { data: models } = useQuery('semantic:metric-models', () => semanticStudioService.listModels())
+const { data: definitions } = useQuery('semantic:metric-definitions', async () => {
+  const rows = await semanticStudioService.listModels()
+  return Promise.all(rows.map((model) => semanticStudioService.getDefinition(model.id)))
+})
 
 const columns: Column<Metric>[] = [
   { key: 'name', label: 'Metric' },
@@ -37,9 +42,9 @@ const columns: Column<Metric>[] = [
 ]
 
 function measureLabel(measureId: string): string {
-  for (const m of MODELS) {
-    const f = m.fields.find((x) => x.id === measureId)
-    if (f) return f.label
+  for (const definition of definitions.value ?? []) {
+    const measure = definition.measures.find((item) => item.key === measureId)
+    if (measure) return measure.name
   }
   return measureId
 }
@@ -55,7 +60,7 @@ const statusTone = (s: Metric['status']) => (s === 'published' ? 'success' : 'wa
 
 /* ---- create dialog ---- */
 const dialogOpen = ref(false)
-const measureModels = computed(() => MODELS.map((m) => ({ value: m.id, label: m.label })))
+const measureModels = computed(() => (models.value ?? []).map((m) => ({ value: m.id, label: m.label })))
 
 interface Draft {
   name: string
@@ -71,7 +76,7 @@ interface Draft {
 const draft = reactive<Draft>({
   name: '',
   description: '',
-  modelId: MODELS[0].id,
+  modelId: '',
   measureId: '',
   aggregation: 'sum',
   format: 'plain',
@@ -80,11 +85,14 @@ const draft = reactive<Draft>({
   critical: null,
 })
 
-const activeModel = computed(() => MODELS.find((m) => m.id === draft.modelId) ?? MODELS[0])
+const activeDefinition = computed(
+  () => (definitions.value ?? []).find((item) => item.model.id === draft.modelId) ?? definitions.value?.[0],
+)
 const measureOptions = computed(() =>
-  activeModel.value.fields
-    .filter((f) => f.role === 'measure' || f.role === 'metric')
-    .map((f) => ({ value: f.id, label: f.label })),
+  (activeDefinition.value?.measures ?? []).map((measure) => ({
+    value: measure.key,
+    label: measure.name,
+  })),
 )
 const aggOptions = [
   { value: 'sum', label: 'Sum' },
@@ -105,10 +113,9 @@ watch(
   () => draft.modelId,
   () => {
     draft.measureId = measureOptions.value[0]?.value ?? ''
-    const f = activeModel.value.fields.find((x) => x.id === draft.measureId)
-    if (f) {
-      draft.aggregation = f.defaultAggregation ?? 'sum'
-      draft.format = f.format?.style ?? 'plain'
+    const measure = activeDefinition.value?.measures.find((item) => item.key === draft.measureId)
+    if (measure) {
+      draft.aggregation = measure.aggregation as Aggregation
     }
   },
 )
@@ -116,11 +123,11 @@ watch(
 function openDialog() {
   draft.name = ''
   draft.description = ''
-  draft.modelId = MODELS[0].id
+  draft.modelId = models.value?.[0]?.id ?? ''
   draft.measureId = measureOptions.value[0]?.value ?? ''
-  const f = activeModel.value.fields.find((x) => x.id === draft.measureId)
-  draft.aggregation = f?.defaultAggregation ?? 'sum'
-  draft.format = f?.format?.style ?? 'plain'
+  const measure = activeDefinition.value?.measures.find((item) => item.key === draft.measureId)
+  draft.aggregation = (measure?.aggregation as Aggregation) ?? 'sum'
+  draft.format = 'plain'
   draft.target = null
   draft.warning = null
   draft.critical = null
@@ -152,6 +159,8 @@ watch(
       const row = result.rows[0]
       const v = row ? row[draft.measureId] : null
       previewValue.value = typeof v === 'number' ? v : null
+    } catch {
+      previewValue.value = null
     } finally {
       if (token === previewToken) previewLoading.value = false
     }
@@ -179,6 +188,7 @@ async function submit() {
   if (!canSubmit.value) return
   await mutate({
     name: draft.name.trim(),
+    modelId: draft.modelId,
     description: draft.description.trim(),
     measureId: draft.measureId,
     aggregation: draft.aggregation,
@@ -284,7 +294,7 @@ async function submit() {
           <div v-if="draft.target != null" class="preview__target">
             Target {{ formatNumber(draft.target, { style: draft.format }) }}
           </div>
-          <div class="preview__note">Simulated from the semantic query engine.</div>
+          <div class="preview__note">Live value from the governed semantic query engine.</div>
         </aside>
       </div>
       <template #footer>

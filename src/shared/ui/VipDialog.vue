@@ -21,8 +21,10 @@ function close() {
   if (props.closable) emit('close')
 }
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') close()
   if (e.key === 'Tab') trapFocus(e)
+}
+function onDocumentKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && props.open) close()
 }
 function trapFocus(e: KeyboardEvent) {
   if (!panel.value) return
@@ -47,16 +49,19 @@ watch(
     if (v) {
       lastFocused = document.activeElement as HTMLElement
       document.body.style.overflow = 'hidden'
+      document.addEventListener('keydown', onDocumentKeydown)
       await nextTick()
       panel.value?.querySelector<HTMLElement>('[data-autofocus], button, input, textarea, select')?.focus()
     } else {
       document.body.style.overflow = ''
+      document.removeEventListener('keydown', onDocumentKeydown)
       lastFocused?.focus()
     }
   },
 )
 onBeforeUnmount(() => {
   document.body.style.overflow = ''
+  document.removeEventListener('keydown', onDocumentKeydown)
 })
 </script>
 

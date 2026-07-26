@@ -5,16 +5,7 @@
 
 export type Id = string
 
-export type RoleKey =
-  | 'platform-admin'
-  | 'org-owner'
-  | 'org-admin'
-  | 'workspace-admin'
-  | 'data-engineer'
-  | 'analyst'
-  | 'report-author'
-  | 'business-viewer'
-  | 'developer'
+export type RoleKey = string
 
 export interface RoleDefinition {
   key: RoleKey
@@ -28,52 +19,7 @@ export interface RoleDefinition {
  * Permission keys follow `domain:action` convention. Kept as a string union
  * for autocompletion while remaining open to backend-driven extension.
  */
-export type Permission =
-  | 'connection:read'
-  | 'connection:write'
-  | 'connection:delete'
-  | 'pipeline:read'
-  | 'pipeline:write'
-  | 'pipeline:run'
-  | 'pipeline:publish'
-  | 'pipeline:delete'
-  | 'dataset:read'
-  | 'dataset:write'
-  | 'dataset:certify'
-  | 'semantic:read'
-  | 'semantic:write'
-  | 'semantic:publish'
-  | 'dashboard:read'
-  | 'dashboard:write'
-  | 'dashboard:publish'
-  | 'dashboard:share'
-  | 'report:read'
-  | 'report:write'
-  | 'report:approve'
-  | 'report:publish'
-  | 'insight:read'
-  | 'insight:write'
-  | 'ai:use'
-  | 'ai:configure'
-  | 'automation:read'
-  | 'automation:write'
-  | 'automation:approve'
-  | 'notification:read'
-  | 'audit:read'
-  | 'usage:read'
-  | 'marketplace:read'
-  | 'marketplace:install'
-  | 'developer:read'
-  | 'developer:write'
-  | 'billing:read'
-  | 'billing:manage'
-  | 'admin:platform'
-  | 'admin:org'
-  | 'admin:workspace'
-  | 'governance:read'
-  | 'governance:write'
-  | 'featureflag:read'
-  | 'featureflag:write'
+export type Permission = string
 
 export type PermissionMatcher = Permission | '*'
 
@@ -87,7 +33,7 @@ export interface UserProfile {
   locale: string
 }
 
-export type TenantStatus = 'trial' | 'active' | 'suspended' | 'disabled' | 'pending-deletion'
+export type TenantStatus = 'trial' | 'active' | 'suspended' | 'archived' | 'deleted' | 'disabled' | 'pending-deletion'
 
 export interface Organization {
   id: Id
@@ -95,6 +41,7 @@ export interface Organization {
   slug: string
   status: TenantStatus
   plan: PlanKey
+  membershipRole: string
 }
 
 export interface Workspace {
@@ -102,22 +49,14 @@ export interface Workspace {
   orgId: Id
   name: string
   slug: string
-  archived: boolean
+  status: 'active' | 'archived' | 'deleted'
+  isDefault: boolean
 }
 
 export type PlanKey = 'trial' | 'team' | 'business' | 'enterprise'
 
 /** Entitlement keys gate features behind plans/limits. */
-export type EntitlementKey =
-  | 'pipelines'
-  | 'dashboards'
-  | 'ai-assistant'
-  | 'ai-agents'
-  | 'automation'
-  | 'developer-api'
-  | 'marketplace'
-  | 'advanced-governance'
-  | 'sso'
+export type EntitlementKey = string
 
 export interface Entitlement {
   key: EntitlementKey
@@ -127,13 +66,7 @@ export interface Entitlement {
   used?: number
 }
 
-export type FeatureFlagKey =
-  | 'pipeline-python-node'
-  | 'dashboard-map-widget'
-  | 'insights-nlq'
-  | 'ai-agents-beta'
-  | 'marketplace-extensions'
-  | 'report-approvals'
+export type FeatureFlagKey = string
 
 export interface AuthContext {
   user: UserProfile

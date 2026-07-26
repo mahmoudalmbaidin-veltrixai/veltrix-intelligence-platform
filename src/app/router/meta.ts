@@ -8,6 +8,8 @@ declare module 'vue-router' {
     title?: string
     layout?: LayoutType
     requiresAuth?: boolean
+    requiresOrganization?: boolean
+    requiresWorkspace?: boolean
     /** Guest-only route (e.g. login); redirects authenticated users to home. */
     publicOnly?: boolean
     permission?: Permission

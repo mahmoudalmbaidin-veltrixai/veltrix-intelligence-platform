@@ -1,48 +1,56 @@
-/**
- * Live authentication adapter (placeholder wiring). Uses the centralized API
- * client and prefers secure http-only cookie sessions (credentials: 'include').
- * Endpoint paths reflect the expected backend contract; see BACKEND_INTEGRATION.
- *
- *   POST /auth/login        -> Session
- *   POST /auth/logout       -> 204
- *   GET  /auth/me           -> AuthContext
- *   POST /auth/refresh      -> Session
- */
+/** Real cookie-session authentication adapter. */
 import type { AuthService, LoginCredentials, Session } from './types'
-import type { AuthContext } from '@/shared/types/identity'
 import { apiClient } from '@/shared/lib/apiClient'
 import { ApiError } from '@/shared/types/api'
+import { authenticationResponseSchema, parseContract } from '@/shared/contracts/apiContracts'
+
+function parseSession(value: unknown): Session {
+  const dto = parseContract(authenticationResponseSchema, value, 'authentication session')
+  return {
+    expiresAt: dto.session.expires_at,
+    user: {
+      id: dto.user.id,
+      email: dto.user.email,
+      displayName: dto.user.display_name,
+      status: dto.user.status,
+    },
+  }
+}
 
 export const apiAuthService: AuthService = {
   async bootstrap() {
     try {
-      const context = await apiClient.get<AuthContext>('/auth/me')
-      return { expiresAt: '', context }
-    } catch (e) {
-      if (e instanceof ApiError && e.kind === 'unauthorized') return null
-      throw e
+      return parseSession(await apiClient.get<unknown>('/auth/me'))
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'unauthorized') return null
+      throw error
     }
   },
   async login(credentials: LoginCredentials) {
-    return apiClient.post<Session>('/auth/login', credentials)
+    return parseSession(
+      await apiClient.post<unknown>('/auth/login', credentials, {
+        skipAuthRefresh: true,
+        notifyOnUnauthorized: false,
+      }),
+    )
   },
   async logout() {
-    await apiClient.post<void>('/auth/logout')
+    await apiClient.post<void>('/auth/logout', undefined, { skipAuthRefresh: true })
   },
   async currentUser() {
     try {
-      return await apiClient.get<AuthContext>('/auth/me')
-    } catch (e) {
-      if (e instanceof ApiError && e.kind === 'unauthorized') return null
-      throw e
+      return parseSession(await apiClient.get<unknown>('/auth/me'))
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'unauthorized') return null
+      throw error
     }
   },
   async refresh() {
     try {
-      return await apiClient.post<Session>('/auth/refresh')
-    } catch (e) {
-      if (e instanceof ApiError && e.kind === 'unauthorized') return null
-      throw e
+      return parseSession(await apiClient.post<unknown>('/auth/refresh', undefined, { skipAuthRefresh: true }))
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'unauthorized') return null
+      throw error
     }
   },
 }

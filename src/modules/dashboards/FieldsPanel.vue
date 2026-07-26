@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { MODELS } from '@/shared/services/semanticModels'
-import type { SemanticField } from '@/shared/types/semantic'
+import type { SemanticField, SemanticModel } from '@/shared/types/semantic'
 import { WIDGET_CATALOG } from './widgetFactory'
 import type { WidgetType } from '@/shared/types/dashboard'
 import VipIcon from '@/shared/ui/VipIcon.vue'
@@ -9,17 +8,17 @@ import VipInput from '@/shared/ui/VipInput.vue'
 import VipSegmented from '@/shared/ui/VipSegmented.vue'
 import VipSelect from '@/shared/ui/VipSelect.vue'
 
-const props = defineProps<{ modelId: string }>()
+const props = defineProps<{ modelId: string; models: SemanticModel[] }>()
 const emit = defineEmits<{ addWidget: [WidgetType]; 'update:modelId': [string] }>()
 
 const mode = ref<'visuals' | 'fields'>('visuals')
 const search = ref('')
 
-const model = computed(() => MODELS.find((m) => m.id === props.modelId) ?? MODELS[0])
+const model = computed(() => props.models.find((m) => m.id === props.modelId) ?? props.models[0])
 const folders = computed(() => {
   const q = search.value.trim().toLowerCase()
   const map = new Map<string, SemanticField[]>()
-  model.value.fields
+  ;(model.value?.fields ?? [])
     .filter((f) => !q || f.label.toLowerCase().includes(q))
     .forEach((f) => {
       const folder = f.folder ?? 'Fields'
@@ -88,7 +87,7 @@ function onWidgetDrag(e: DragEvent, t: WidgetType) {
       <div class="fpanel__model">
         <VipSelect
           :model-value="modelId"
-          :options="MODELS.map((m) => ({ value: m.id, label: m.label }))"
+          :options="models.map((m) => ({ value: m.id, label: m.label }))"
           size="sm"
           @update:model-value="emit('update:modelId', $event)"
         />

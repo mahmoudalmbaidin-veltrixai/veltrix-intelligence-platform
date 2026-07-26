@@ -16,7 +16,7 @@ import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
 
 const ui = useUiStore()
 const platform = usePlatformStore()
-const canWrite = computed(() => platform.can('semantic:write'))
+const canWrite = computed(() => platform.can('glossary.create') || platform.can('glossary.update'))
 
 const { data, isLoading, refetch } = useQuery(
   () => 'semantic:glossary',

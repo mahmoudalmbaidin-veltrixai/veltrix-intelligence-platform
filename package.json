@@ -14,14 +14,22 @@
     "format": "prettier --write \"src/**/*.{ts,vue,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,vue,css}\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:contract": "vitest run src/shared/lib/apiClient.contract.spec.ts src/shared/contracts/apiContracts.spec.ts",
+    "test:e2e": "node ./node_modules/@playwright/test/cli.js test --grep-invert @a11y",
+    "test:e2e:ui": "node ./node_modules/@playwright/test/cli.js test --ui",
+    "test:e2e:report": "node ./node_modules/@playwright/test/cli.js show-report",
+    "test:a11y": "node ./node_modules/@playwright/test/cli.js test --grep @a11y"
   },
   "dependencies": {
     "pinia": "^2.2.6",
     "vue": "^3.5.13",
-    "vue-router": "^4.5.0"
+    "vue-router": "^4.5.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.61.1",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.7.0",
@@ -32,7 +40,11 @@
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.18.1",
     "vite": "^6.0.5",
-    "vitest": "^2.1.8",
+    "vitest": "^4.1.10",
     "vue-tsc": "^2.2.0"
+  },
+  "overrides": {
+    "brace-expansion": "5.0.8",
+    "minimatch": "10.2.5"
   }
 }

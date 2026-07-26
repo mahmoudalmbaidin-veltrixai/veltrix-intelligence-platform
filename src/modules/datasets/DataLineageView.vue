@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
+import { useQuery } from '@/shared/lib/query'
+import { datasetService } from './datasets.service'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
@@ -8,9 +10,10 @@ import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 
 const router = useRouter()
+const { data: lineage } = useQuery('datasets:lineage', () => datasetService.getLineage())
 
 /* ---- graph model ---- */
-type Stage = 'source' | 'pipeline' | 'dataset' | 'semantic' | 'dashboard'
+type Stage = 'dataset'
 
 interface LineageNode {
   id: string
@@ -23,47 +26,17 @@ interface Edge {
   to: string
 }
 
-const STAGES: { key: Stage; label: string; icon: string }[] = [
-  { key: 'source', label: 'Sources', icon: 'plug' },
-  { key: 'pipeline', label: 'Pipelines', icon: 'workflow' },
-  { key: 'dataset', label: 'Datasets', icon: 'database' },
-  { key: 'semantic', label: 'Semantic Models', icon: 'layers' },
-  { key: 'dashboard', label: 'Dashboards', icon: 'chart' },
-]
+const STAGES: { key: Stage; label: string; icon: string }[] = [{ key: 'dataset', label: 'Datasets', icon: 'database' }]
 
-const NODES: LineageNode[] = [
-  { id: 'src_pg', label: 'Core Warehouse', stage: 'source', detail: 'PostgreSQL connection' },
-  { id: 'src_erp', label: 'ERP (SQL Server)', stage: 'source', detail: 'SQL Server connection' },
-  { id: 'src_s3', label: 'Data Lake (S3)', stage: 'source', detail: 'S3 object storage' },
-
-  { id: 'pl_revenue', label: 'Revenue ETL', stage: 'pipeline', detail: 'Nightly incremental build' },
-  { id: 'pl_events', label: 'Events Staging', stage: 'pipeline', detail: 'Streaming micro-batch' },
-
-  { id: 'ds_orders', label: 'fct_orders', stage: 'dataset', detail: '1.28M rows · certified' },
-  { id: 'ds_customers', label: 'dim_customers', stage: 'dataset', detail: '84K rows · PII' },
-  { id: 'ds_events', label: 'stg_web_events', stage: 'dataset', detail: '42.8M rows · building' },
-
-  { id: 'sm_sales', label: 'Sales Analytics', stage: 'semantic', detail: 'Certified semantic model' },
-  { id: 'sm_web', label: 'Web Engagement', stage: 'semantic', detail: 'Clickstream metrics' },
-
-  { id: 'db_exec', label: 'Executive Overview', stage: 'dashboard', detail: 'Board dashboard' },
-  { id: 'db_growth', label: 'Growth Dashboard', stage: 'dashboard', detail: 'Marketing funnel' },
-]
-
-const EDGES: Edge[] = [
-  { from: 'src_pg', to: 'pl_revenue' },
-  { from: 'src_erp', to: 'pl_revenue' },
-  { from: 'src_s3', to: 'pl_events' },
-  { from: 'pl_revenue', to: 'ds_orders' },
-  { from: 'pl_revenue', to: 'ds_customers' },
-  { from: 'pl_events', to: 'ds_events' },
-  { from: 'ds_orders', to: 'sm_sales' },
-  { from: 'ds_customers', to: 'sm_sales' },
-  { from: 'ds_events', to: 'sm_web' },
-  { from: 'sm_sales', to: 'db_exec' },
-  { from: 'sm_web', to: 'db_growth' },
-  { from: 'sm_sales', to: 'db_growth' },
-]
+const NODES = computed<LineageNode[]>(() =>
+  (lineage.value?.nodes ?? []).map((dataset) => ({
+    id: dataset.id,
+    label: dataset.name,
+    stage: 'dataset',
+    detail: `${dataset.status} · ${dataset.source}`,
+  })),
+)
+const EDGES = computed<Edge[]>(() => lineage.value?.edges ?? [])
 
 /* ---- layout ---- */
 const NODE_W = 150
@@ -82,7 +55,7 @@ interface Placed extends LineageNode {
 const placed = computed<Placed[]>(() => {
   const out: Placed[] = []
   STAGES.forEach((stage, col) => {
-    const inStage = NODES.filter((n) => n.stage === stage.key)
+    const inStage = NODES.value.filter((n) => n.stage === stage.key)
     inStage.forEach((n, i) => {
       out.push({
         ...n,
@@ -101,7 +74,7 @@ const placedById = computed<Record<string, Placed>>(() => {
   return map
 })
 
-const maxRows = computed(() => Math.max(...STAGES.map((s) => NODES.filter((n) => n.stage === s.key).length)))
+const maxRows = computed(() => Math.max(1, ...STAGES.map((s) => NODES.value.filter((n) => n.stage === s.key).length)))
 const svgWidth = computed(() => MARGIN_X * 2 + (STAGES.length - 1) * COL_GAP + NODE_W)
 const svgHeight = computed(() => MARGIN_Y + maxRows.value * ROW_GAP)
 
@@ -109,7 +82,7 @@ interface DrawnEdge extends Edge {
   d: string
 }
 const edgePaths = computed<DrawnEdge[]>(() =>
-  EDGES.map((e) => {
+  EDGES.value.map((e) => {
     const a = placedById.value[e.from]
     const b = placedById.value[e.to]
     const x1 = a.x + NODE_W
@@ -122,13 +95,16 @@ const edgePaths = computed<DrawnEdge[]>(() =>
 )
 
 /* ---- interaction ---- */
-const selectedId = ref<string>('ds_orders')
+const selectedId = ref<string>('')
+watchEffect(() => {
+  selectedId.value ||= NODES.value[0]?.id ?? ''
+})
 
 const upstream = computed<Placed[]>(() =>
-  EDGES.filter((e) => e.to === selectedId.value).map((e) => placedById.value[e.from]),
+  EDGES.value.filter((e) => e.to === selectedId.value).map((e) => placedById.value[e.from]),
 )
 const downstream = computed<Placed[]>(() =>
-  EDGES.filter((e) => e.from === selectedId.value).map((e) => placedById.value[e.to]),
+  EDGES.value.filter((e) => e.from === selectedId.value).map((e) => placedById.value[e.to]),
 )
 const selectedNode = computed<Placed | undefined>(() => placedById.value[selectedId.value])
 

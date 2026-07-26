@@ -1,8 +1,4 @@
-/**
- * Platform store: the authenticated context (user, org, workspace, role,
- * permissions, entitlements, feature flags). Development role-switching lets
- * reviewers see permission/entitlement-aware UI without a real backend.
- */
+/** Authenticated identity plus server-validated organization/workspace navigation context. */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type {
@@ -16,171 +12,221 @@ import type {
   UserProfile,
   Workspace,
 } from '@/shared/types/identity'
-import { hasPermission, permissionsFor } from '@/shared/permissions/roles'
+import type { AuthenticatedUser } from '@/shared/services/auth'
+import {
+  tenancyService,
+  type AuthorizedOrganizationDto,
+  type AuthorizedWorkspaceDto,
+} from '@/shared/services/tenancy/apiTenancyService'
+import { useAuthorizationStore } from '@/shared/stores/authorization'
 import { LocalStore, setStorageScope } from '@/shared/lib/mock'
 import { invalidateQueries } from '@/shared/lib/query'
+import { ApiError } from '@/shared/types/api'
 
-const USER: UserProfile = {
-  id: 'usr_veltrix_01',
-  name: 'Mahmoud Almbaidin',
-  email: 'mahmoud.almbaidin@shabakkatksa.com',
+export type TenancyStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
+
+const EMPTY_USER: UserProfile = {
+  id: '',
+  name: '',
+  email: '',
   avatarColor: '#6d5efc',
-  jobTitle: 'Principal Data Platform Lead',
-  timezone: 'Asia/Riyadh',
-  locale: 'en-US',
+  jobTitle: '',
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  locale: navigator.language || 'en-US',
 }
 
-const ORGS: Organization[] = [
-  { id: 'org_veltrix', name: 'Veltrix Global', slug: 'veltrix', status: 'active', plan: 'enterprise' },
-  { id: 'org_northwind', name: 'Northwind Trading', slug: 'northwind', status: 'trial', plan: 'trial' },
-]
-
-const WORKSPACES: Workspace[] = [
-  { id: 'ws_analytics', orgId: 'org_veltrix', name: 'Analytics', slug: 'analytics', archived: false },
-  { id: 'ws_revops', orgId: 'org_veltrix', name: 'Revenue Ops', slug: 'revops', archived: false },
-  { id: 'ws_platform', orgId: 'org_veltrix', name: 'Platform', slug: 'platform', archived: false },
-  { id: 'ws_sandbox', orgId: 'org_northwind', name: 'Sandbox', slug: 'sandbox', archived: false },
-]
-
-const ENTITLEMENTS: Record<'enterprise' | 'trial', Entitlement[]> = {
-  enterprise: [
-    { key: 'pipelines', enabled: true, limit: 500, used: 42 },
-    { key: 'dashboards', enabled: true, limit: 1000, used: 128 },
-    { key: 'ai-assistant', enabled: true },
-    { key: 'ai-agents', enabled: true, limit: 50, used: 6 },
-    { key: 'automation', enabled: true },
-    { key: 'developer-api', enabled: true },
-    { key: 'marketplace', enabled: true },
-    { key: 'advanced-governance', enabled: true },
-    { key: 'sso', enabled: true },
-  ],
-  trial: [
-    { key: 'pipelines', enabled: true, limit: 5, used: 2 },
-    { key: 'dashboards', enabled: true, limit: 10, used: 3 },
-    { key: 'ai-assistant', enabled: true },
-    { key: 'ai-agents', enabled: false },
-    { key: 'automation', enabled: false },
-    { key: 'developer-api', enabled: true, limit: 1, used: 0 },
-    { key: 'marketplace', enabled: false },
-    { key: 'advanced-governance', enabled: false },
-    { key: 'sso', enabled: false },
-  ],
+interface TenantPreference {
+  userId: string
+  orgId: string | null
+  wsId: string | null
 }
 
-const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
-  'pipeline-python-node': true,
-  'dashboard-map-widget': true,
-  'insights-nlq': true,
-  'ai-agents-beta': true,
-  'marketplace-extensions': true,
-  'report-approvals': true,
+const prefStore = new LocalStore<TenantPreference>('vip.tenancy.preference')
+
+function mapOrganization(value: AuthorizedOrganizationDto): Organization {
+  return {
+    id: value.id,
+    name: value.name,
+    slug: value.slug,
+    status: value.status,
+    membershipRole: value.membership.role,
+    // Billing is intentionally outside B2; this remains a UI capability default, not authorization.
+    plan: 'enterprise',
+  }
 }
 
-const prefStore = new LocalStore<{ role: RoleKey; orgId: string; wsId: string }>('vip.platform.prefs')
+function mapWorkspace(value: AuthorizedWorkspaceDto): Workspace {
+  return {
+    id: value.id,
+    orgId: value.organization_id,
+    name: value.name,
+    slug: value.slug,
+    status: value.status,
+    isDefault: value.is_default,
+  }
+}
 
 export const usePlatformStore = defineStore('platform', () => {
-  const saved = prefStore.read({ role: 'workspace-admin', orgId: 'org_veltrix', wsId: 'ws_analytics' })
+  const authorization = useAuthorizationStore()
+  const user = ref<UserProfile>({ ...EMPTY_USER })
+  const organizations = ref<Organization[]>([])
+  const workspaces = ref<Workspace[]>([])
+  const orgId = ref<string | null>(null)
+  const workspaceId = ref<string | null>(null)
+  const status = ref<TenancyStatus>('idle')
+  const initialized = ref(false)
+  const error = ref<ApiError | null>(null)
+  let bootstrapPromise: Promise<void> | null = null
 
-  const user = ref<UserProfile>(USER)
-  const role = ref<RoleKey>(saved.role)
-  const orgId = ref<string>(saved.orgId)
-  const workspaceId = ref<string>(saved.wsId)
-  const featureFlags = ref<Record<FeatureFlagKey, boolean>>({ ...DEFAULT_FLAGS })
-
-  // Partition all scoped local storage by tenant + workspace (QA VIP-FE-C002).
-  function applyScope() {
-    setStorageScope(`${orgId.value}:${workspaceId.value}`)
-  }
-  applyScope()
-
-  const organizations = computed(() => ORGS)
-  const organization = computed(() => ORGS.find((o) => o.id === orgId.value) ?? ORGS[0])
-  const workspaces = computed(() => WORKSPACES.filter((w) => w.orgId === orgId.value))
-  const workspace = computed(() => WORKSPACES.find((w) => w.id === workspaceId.value) ?? workspaces.value[0])
-  const permissions = computed(() => permissionsFor(role.value))
+  const organization = computed(() => organizations.value.find((item) => item.id === orgId.value) ?? null)
+  const workspace = computed(() => workspaces.value.find((item) => item.id === workspaceId.value) ?? null)
+  const role = computed<RoleKey>(() => authorization.role || organization.value?.membershipRole || '')
+  const permissions = computed(() => authorization.permissions)
   const entitlements = computed<Entitlement[]>(() =>
-    organization.value.plan === 'enterprise' ? ENTITLEMENTS.enterprise : ENTITLEMENTS.trial,
+    authorization.entitlements.map((key) => {
+      const quota = authorization.quota(`${key}.max`)
+      return { key, enabled: true, limit: quota?.limit, used: quota?.used }
+    }),
   )
+  const featureFlags = computed<Record<FeatureFlagKey, boolean>>(() => authorization.features)
 
-  const authContext = computed<AuthContext>(() => ({
-    user: user.value,
-    organization: organization.value,
-    workspace: workspace.value,
-    role: role.value,
-    permissions: permissions.value,
-    entitlements: entitlements.value,
-    featureFlags: featureFlags.value,
-  }))
+  const authContext = computed<AuthContext | null>(() => {
+    if (!organization.value || !workspace.value) return null
+    return {
+      user: user.value,
+      organization: organization.value,
+      workspace: workspace.value,
+      role: role.value,
+      permissions: permissions.value,
+      entitlements: entitlements.value,
+      featureFlags: featureFlags.value,
+    }
+  })
 
-  function persist() {
-    prefStore.write({ role: role.value, orgId: orgId.value, wsId: workspaceId.value })
+  function applyScope(): void {
+    setStorageScope(`${user.value.id || 'anonymous'}:${orgId.value ?? 'none'}:${workspaceId.value ?? 'none'}`)
+  }
+
+  function persist(): void {
+    prefStore.write({ userId: user.value.id, orgId: orgId.value, wsId: workspaceId.value })
+  }
+
+  function invalidateTenantState(): void {
+    invalidateQueries('')
+    applyScope()
+  }
+
+  async function fetchWorkspaces(organizationId: string, preferredWorkspaceId?: string | null): Promise<void> {
+    workspaces.value = (await tenancyService.listWorkspaces(organizationId)).map(mapWorkspace)
+    const selected = workspaces.value.find((item) => item.id === preferredWorkspaceId)
+    workspaceId.value =
+      selected?.id ?? workspaces.value.find((item) => item.isDefault)?.id ?? workspaces.value[0]?.id ?? null
+  }
+
+  async function bootstrapTenancy(force = false): Promise<void> {
+    if (bootstrapPromise) return bootstrapPromise
+    if (initialized.value && !force) return
+    status.value = 'loading'
+    error.value = null
+    bootstrapPromise = (async () => {
+      try {
+        const saved = prefStore.read({ userId: '', orgId: null, wsId: null })
+        organizations.value = (await tenancyService.listOrganizations()).map(mapOrganization)
+        const preferredOrg = saved.userId === user.value.id ? saved.orgId : null
+        orgId.value =
+          organizations.value.find((item) => item.id === preferredOrg)?.id ?? organizations.value[0]?.id ?? null
+        if (orgId.value) {
+          await fetchWorkspaces(orgId.value, saved.userId === user.value.id ? saved.wsId : null)
+          status.value = 'ready'
+        } else {
+          workspaces.value = []
+          workspaceId.value = null
+          status.value = 'empty'
+        }
+        initialized.value = true
+        persist()
+        invalidateTenantState()
+        if (orgId.value && workspaceId.value) await authorization.bootstrap(true)
+      } catch (cause) {
+        organizations.value = []
+        workspaces.value = []
+        orgId.value = null
+        workspaceId.value = null
+        error.value = ApiError.from(cause)
+        status.value = 'error'
+        initialized.value = true
+        invalidateTenantState()
+      } finally {
+        bootstrapPromise = null
+      }
+    })()
+    return bootstrapPromise
+  }
+
+  async function switchOrg(id: string): Promise<void> {
+    const target = organizations.value.find((item) => item.id === id)
+    if (!target || target.id === orgId.value) return
+    orgId.value = target.id
+    workspaceId.value = null
+    workspaces.value = []
+    authorization.clear()
+    persist()
+    invalidateTenantState()
+    try {
+      await fetchWorkspaces(target.id)
+      status.value = 'ready'
+      persist()
+      invalidateTenantState()
+      if (workspaceId.value) await authorization.bootstrap(true)
+    } catch (cause) {
+      error.value = ApiError.from(cause)
+      await bootstrapTenancy(true)
+    }
+  }
+
+  async function switchWorkspace(id: string): Promise<void> {
+    if (!workspaces.value.some((item) => item.id === id) || id === workspaceId.value) return
+    workspaceId.value = id
+    authorization.clear()
+    persist()
+    invalidateTenantState()
+    await authorization.bootstrap(true)
+  }
+
+  function hydrateAuthenticatedUser(authenticatedUser: AuthenticatedUser): void {
+    if (user.value.id && user.value.id !== authenticatedUser.id) clearTenantContext()
+    user.value = {
+      ...user.value,
+      id: authenticatedUser.id,
+      email: authenticatedUser.email,
+      name: authenticatedUser.displayName,
+    }
+  }
+
+  function clearTenantContext(): void {
+    organizations.value = []
+    workspaces.value = []
+    orgId.value = null
+    workspaceId.value = null
+    initialized.value = false
+    status.value = 'idle'
+    error.value = null
+    authorization.clear()
+    prefStore.clear()
+    invalidateTenantState()
   }
 
   function can(permission?: Permission): boolean {
-    return hasPermission(permissions.value, permission)
+    return authorization.can(permission)
   }
-
   function entitled(key: EntitlementKey): boolean {
-    return entitlements.value.find((e) => e.key === key)?.enabled ?? false
+    return authorization.entitled(key)
   }
-
   function entitlement(key: EntitlementKey): Entitlement | undefined {
-    return entitlements.value.find((e) => e.key === key)
+    return entitlements.value.find((item) => item.key === key)
   }
-
   function flagEnabled(key: FeatureFlagKey): boolean {
-    return featureFlags.value[key] ?? false
-  }
-
-  function setRole(r: RoleKey) {
-    role.value = r
-    persist()
-  }
-
-  /**
-   * Tenant scoping: switching org/workspace invalidates all cached server
-   * state so no data leaks across tenants. Live adapters also re-issue requests
-   * with the new X-Organization-Id / X-Workspace-Id headers.
-   */
-  function switchOrg(id: string) {
-    orgId.value = id
-    const firstWs = WORKSPACES.find((w) => w.orgId === id)
-    if (firstWs) workspaceId.value = firstWs.id
-    persist()
-    applyScope()
-    invalidateQueries('')
-  }
-
-  function switchWorkspace(id: string) {
-    workspaceId.value = id
-    persist()
-    applyScope()
-    invalidateQueries('')
-  }
-
-  /**
-   * Hydrate platform context from the authoritative authenticated session
-   * (QA VIP-FE-H001). Called by the auth store on bootstrap/login. The session
-   * — not persisted defaults — is the source of truth for user/org/workspace.
-   */
-  function hydrate(context: AuthContext) {
-    user.value = context.user
-    orgId.value = context.organization.id
-    workspaceId.value = context.workspace.id
-    role.value = context.role
-    featureFlags.value = { ...context.featureFlags }
-    persist()
-    applyScope()
-    invalidateQueries('')
-  }
-
-  /** Clear context on logout / session expiry so no stale tenant data remains. */
-  function clearContext() {
-    invalidateQueries('')
-  }
-
-  function toggleFlag(key: FeatureFlagKey, value?: boolean) {
-    featureFlags.value[key] = value ?? !featureFlags.value[key]
+    return authorization.flagEnabled(key)
   }
 
   return {
@@ -188,24 +234,28 @@ export const usePlatformStore = defineStore('platform', () => {
     role,
     orgId,
     workspaceId,
-    featureFlags,
     organizations,
-    organization,
     workspaces,
+    organization,
     workspace,
     permissions,
     entitlements,
     authContext,
+    featureFlags,
+    status,
+    initialized,
+    error,
     can,
     entitled,
     entitlement,
     flagEnabled,
-    setRole,
+    bootstrapTenancy,
+    fetchWorkspaces,
     switchOrg,
     switchWorkspace,
-    toggleFlag,
-    hydrate,
-    clearContext,
+    hydrateAuthenticatedUser,
+    clearContext: clearTenantContext,
+    clearTenantContext,
     applyScope,
   }
 })

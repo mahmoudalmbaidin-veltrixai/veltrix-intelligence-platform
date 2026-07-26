@@ -10,6 +10,7 @@ const props = defineProps<{
   editor: DashboardEditor
   crossFilters: QueryFilter[]
   editable?: boolean
+  draftPreview?: boolean
   rowHeight?: number
 }>()
 
@@ -129,9 +130,11 @@ function onEnd() {
       @keydown.space.prevent="editable && editor.select(w.id)"
     >
       <WidgetFrame
+        :dashboard="editor.dashboard"
         :widget="w"
         :cross-filters="crossFilters"
         :editable="editable"
+        :draft-preview="draftPreview"
         :selected="selectedId === w.id"
         @cross-filter="emit('crossFilter', $event)"
         @duplicate="editor.duplicateWidget(w.id)"

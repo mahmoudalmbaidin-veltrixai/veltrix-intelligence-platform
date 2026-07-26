@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import { useThemeStore } from '@/shared/stores/theme'
 import { useUiStore } from '@/shared/stores/ui'
 import { usePlatformStore } from '@/shared/stores/platform'
 import { NAV_GROUPS, QUICK_CREATE, type NavItem } from '@/app/navigation'
@@ -60,7 +61,7 @@ const actionCommands = computed<Cmd[]>(() => [
     title: 'Toggle theme',
     icon: 'moon',
     group: 'Actions',
-    run: () => import('@/shared/stores/theme').then((m) => m.useThemeStore().cycle()),
+    run: () => useThemeStore().cycle(),
   },
 ])
 
@@ -102,11 +103,24 @@ function run(cmd: Cmd) {
   cmd.run()
   ui.closeCommand()
 }
+function isEditableTarget(): boolean {
+  const el = document.activeElement as HTMLElement | null
+  if (!el) return false
+  const tag = el.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable
+}
+
 function onKey(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault()
     if (ui.commandOpen) ui.closeCommand()
     else ui.openCommand()
+    return
+  }
+  // Slash opens search — GitHub / Notion style — unless typing in a field.
+  if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey && !ui.commandOpen && !isEditableTarget()) {
+    e.preventDefault()
+    ui.openCommand()
     return
   }
   if (!ui.commandOpen) return

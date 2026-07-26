@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, reactive } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import type { PipelineEditor } from './usePipelineEditor'
 import type { NodeExecStatus, PipelineNodeKind } from '@/shared/types/pipeline'
 import { NODE_TYPES } from './nodeTypes'
@@ -17,8 +17,15 @@ const NODE_W = 176
 const NODE_H = 62
 
 const root = ref<HTMLElement>()
-const view = reactive({ scale: 1, x: 40, y: 40 })
-const snapGrid = ref(true)
+const view = props.editor.pipeline.canvas
+const snapGrid = computed({
+  get: () => view.snapGrid,
+  set: (value: boolean) => {
+    props.editor.commit()
+    view.snapGrid = value
+    view.initialized = true
+  },
+})
 
 /* ---- coordinate helpers ---- */
 function screenToCanvas(clientX: number, clientY: number): { x: number; y: number } {
@@ -110,12 +117,14 @@ let mode: 'idle' | 'pan' | 'drag' | 'connect' | 'marquee' = 'idle'
 let dragStart = { x: 0, y: 0 }
 let panStart = { x: 0, y: 0 }
 let movedIds: string[] = []
+let graphMoved = false
 
 function onNodePointerDown({ id, event }: { id: string; event: PointerEvent }) {
   const additive = event.shiftKey || event.metaKey || event.ctrlKey
   if (!props.editor.selection.value.has(id)) props.editor.selectNode(id, additive)
   else if (additive) props.editor.selectNode(id, true)
   mode = 'drag'
+  graphMoved = false
   movedIds = [...props.editor.selection.value]
   dragStart = screenToCanvas(event.clientX, event.clientY)
   window.addEventListener('pointermove', onPointerMove)
@@ -159,6 +168,7 @@ function onBackgroundPointerDown(event: PointerEvent) {
       mode = 'marquee'
     } else {
       mode = 'pan'
+      graphMoved = false
       panStart = { x: event.clientX - view.x, y: event.clientY - view.y }
       props.editor.clearSelection()
     }
@@ -169,8 +179,13 @@ function onBackgroundPointerDown(event: PointerEvent) {
 
 function onPointerMove(event: PointerEvent) {
   if (mode === 'pan') {
+    if (!graphMoved) {
+      props.editor.commit()
+      graphMoved = true
+    }
     view.x = event.clientX - panStart.x
     view.y = event.clientY - panStart.y
+    view.initialized = true
   } else if (mode === 'drag') {
     const c = screenToCanvas(event.clientX, event.clientY)
     let dx = c.x - dragStart.x
@@ -180,6 +195,10 @@ function onPointerMove(event: PointerEvent) {
       dy = Math.round(dy / 16) * 16
     }
     if (dx || dy) {
+      if (!graphMoved) {
+        props.editor.commit()
+        graphMoved = true
+      }
       props.editor.moveNodes(movedIds, dx, dy)
       dragStart = { x: dragStart.x + dx, y: dragStart.y + dy }
     }
@@ -195,7 +214,6 @@ function onPointerMove(event: PointerEvent) {
 }
 
 function onPointerUp() {
-  if (mode === 'drag') props.editor.commit()
   if (mode === 'marquee' && marquee.value) {
     const { x0, y0, x1, y1 } = marquee.value
     const minX = Math.min(x0, x1),
@@ -217,6 +235,7 @@ function onPointerUp() {
 /* ---- zoom ---- */
 function onWheel(event: WheelEvent) {
   event.preventDefault()
+  props.editor.commit()
   const rect = root.value!.getBoundingClientRect()
   const mx = event.clientX - rect.left
   const my = event.clientY - rect.top
@@ -226,9 +245,11 @@ function onWheel(event: WheelEvent) {
   view.x = mx - (mx - view.x) * ratio
   view.y = my - (my - view.y) * ratio
   view.scale = next
+  view.initialized = true
 }
 
 function zoomBy(factor: number) {
+  props.editor.commit()
   const rect = root.value!.getBoundingClientRect()
   const mx = rect.width / 2
   const my = rect.height / 2
@@ -237,14 +258,17 @@ function zoomBy(factor: number) {
   view.x = mx - (mx - view.x) * ratio
   view.y = my - (my - view.y) * ratio
   view.scale = next
+  view.initialized = true
 }
 
 function fitToScreen() {
+  props.editor.commit()
   const nodes = props.editor.pipeline.nodes
   if (!nodes.length || !root.value) {
     view.scale = 1
     view.x = 40
     view.y = 40
+    view.initialized = true
     return
   }
   const minX = Math.min(...nodes.map((n) => n.x)) - 40
@@ -256,6 +280,7 @@ function fitToScreen() {
   view.scale = scale
   view.x = -minX * scale + (rect.width - (maxX - minX) * scale) / 2
   view.y = -minY * scale + (rect.height - (maxY - minY) * scale) / 2
+  view.initialized = true
 }
 
 /* ---- drop from palette ---- */
@@ -278,7 +303,9 @@ const bounds = computed(() => {
   return { minX, minY, w: Math.max(400, maxX - minX), h: Math.max(300, maxY - minY) }
 })
 
-onMounted(() => setTimeout(fitToScreen, 60))
+onMounted(() => {
+  if (!view.initialized) setTimeout(fitToScreen, 60)
+})
 onBeforeUnmount(() => {
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)

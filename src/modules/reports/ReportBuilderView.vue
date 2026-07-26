@@ -21,7 +21,7 @@ const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
 const platform = usePlatformStore()
-const canWrite = computed(() => platform.can('report:write'))
+const canWrite = computed(() => platform.can('report.create') || platform.can('report.update'))
 
 const reportId = computed(() => (route.params.id ? String(route.params.id) : null))
 const isNew = computed(() => reportId.value === null)

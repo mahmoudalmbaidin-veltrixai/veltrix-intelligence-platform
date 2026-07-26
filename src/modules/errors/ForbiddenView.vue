@@ -1,19 +1,22 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { usePlatformStore } from '@/shared/stores/platform'
-import { ROLES } from '@/shared/permissions/roles'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
+import VipLogo from '@/shared/ui/VipLogo.vue'
 const router = useRouter()
 const platform = usePlatformStore()
 </script>
 
 <template>
   <div class="err">
+    <RouterLink to="/home" class="err__brand" aria-label="VIP home"
+      ><VipLogo variant="full" size="md" decorative
+    /></RouterLink>
     <div class="err__icon"><VipIcon name="lock" :size="28" /></div>
     <h1 class="err__title">Access denied</h1>
     <p class="err__desc">
-      Your current role (<strong>{{ ROLES[platform.role].label }}</strong
+      Your current role (<strong>{{ platform.role.replace(/_/g, ' ') || 'unavailable' }}</strong
       >) doesn’t have permission to view this page. Switch roles from the top bar to explore permission-aware behavior,
       or contact an administrator.
     </p>
@@ -29,6 +32,13 @@ const platform = usePlatformStore()
 <style scoped>
 .err {
   text-align: center;
+}
+.err__brand {
+  display: inline-flex;
+  margin-bottom: var(--vip-sp-8);
+  color: var(--vip-text-primary);
+  text-decoration: none;
+  border-radius: var(--vip-radius-sm);
 }
 .err__icon {
   width: 64px;

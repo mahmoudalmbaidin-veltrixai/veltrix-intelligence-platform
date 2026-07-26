@@ -7,6 +7,8 @@ declare module '*.vue' {
 }
 
 interface ImportMetaEnv {
+  readonly VITE_AUTH_CSRF_COOKIE_NAME?: string
+  readonly VITE_AUTH_CSRF_HEADER_NAME?: string
   readonly VITE_API_MODE?: 'mock' | 'live'
   readonly VITE_API_BASE_URL?: string
   readonly VITE_API_TIMEOUT_MS?: string

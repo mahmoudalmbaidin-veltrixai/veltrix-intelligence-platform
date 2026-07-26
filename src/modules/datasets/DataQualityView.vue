@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useQuery, useMutation } from '@/shared/lib/query'
 import { useUiStore } from '@/shared/stores/ui'
 import { relativeTime } from '@/shared/lib/format'
@@ -7,7 +7,6 @@ import {
   datasetService,
   type QualityRule,
   type QualityRuleStatus,
-  type QualityDimension,
   type QualitySeverity,
   type QualityIncident,
   type IncidentStatus,
@@ -21,12 +20,12 @@ import VipDialog from '@/shared/ui/VipDialog.vue'
 import VipDrawer from '@/shared/ui/VipDrawer.vue'
 import VipInput from '@/shared/ui/VipInput.vue'
 import VipSelect from '@/shared/ui/VipSelect.vue'
-import VipTextarea from '@/shared/ui/VipTextarea.vue'
 import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 
 const ui = useUiStore()
 
 const { data: rules, isLoading: rulesLoading } = useQuery('quality:rules', () => datasetService.listQualityRules())
+const { data: datasets } = useQuery('quality:datasets', () => datasetService.list())
 const { data: incidents, isLoading: incidentsLoading } = useQuery('quality:incidents', () =>
   datasetService.listIncidents(),
 )
@@ -36,6 +35,8 @@ const RULE_TONE: Record<QualityRuleStatus, 'success' | 'warning' | 'danger'> = {
   passing: 'success',
   warning: 'warning',
   failing: 'danger',
+  unknown: 'warning',
+  not_evaluated: 'warning',
 }
 function severityTone(s: QualitySeverity): 'danger' | 'warning' | 'neutral' {
   return s === 'high' ? 'danger' : s === 'medium' ? 'warning' : 'neutral'
@@ -59,32 +60,67 @@ const ruleColumns: Column<QualityRule>[] = [
 /* ---- create rule dialog ---- */
 const dialogOpen = ref(false)
 interface RuleForm {
+  datasetId: string
+  fieldId: string
   name: string
-  dimension: QualityDimension
+  ruleType: CreateRulePayload['ruleType']
   severity: QualitySeverity
-  threshold: number
+  minimum: number | null
+  maximum: number | null
+  values: string
+  pattern: string
 }
-const ruleForm = reactive<RuleForm>({ name: '', dimension: 'completeness', severity: 'medium', threshold: 95 })
+const ruleForm = reactive<RuleForm>({
+  datasetId: '',
+  fieldId: '',
+  name: '',
+  ruleType: 'not_null',
+  severity: 'medium',
+  minimum: null,
+  maximum: null,
+  values: '',
+  pattern: '',
+})
 const formError = ref('')
 
-const dimensionOptions: { value: string; label: string }[] = [
-  { value: 'completeness', label: 'Completeness' },
-  { value: 'validity', label: 'Validity' },
-  { value: 'uniqueness', label: 'Uniqueness' },
+const ruleTypeOptions: { value: string; label: string }[] = [
+  { value: 'not_null', label: 'Not null' },
+  { value: 'unique', label: 'Unique' },
+  { value: 'accepted_values', label: 'Accepted values' },
+  { value: 'range', label: 'Numeric range' },
+  { value: 'regex', label: 'Regular expression' },
   { value: 'freshness', label: 'Freshness' },
-  { value: 'consistency', label: 'Consistency' },
+  { value: 'row_count', label: 'Row count' },
 ]
 const severityOptions: { value: string; label: string }[] = [
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
   { value: 'high', label: 'High' },
 ]
+const datasetOptions = computed(() => (datasets.value ?? []).map((item) => ({ value: item.id, label: item.name })))
+const historyDatasetId = computed(() => ruleForm.datasetId || datasetOptions.value[0]?.value || '')
+const { data: history, isLoading: historyLoading } = useQuery(
+  () => `quality:history:${historyDatasetId.value || 'none'}`,
+  () => (historyDatasetId.value ? datasetService.qualityHistory(historyDatasetId.value) : Promise.resolve([])),
+)
+const { data: fields } = useQuery(
+  () => `quality:fields:${ruleForm.datasetId || 'none'}`,
+  () => (ruleForm.datasetId ? datasetService.listFields(ruleForm.datasetId) : Promise.resolve([])),
+)
+const fieldOptions = computed(() =>
+  (fields.value ?? []).map((item) => ({ value: item.id ?? '', label: `${item.name} · ${item.type}` })),
+)
 
 function openDialog() {
+  ruleForm.datasetId = datasetOptions.value[0]?.value ?? ''
+  ruleForm.fieldId = ''
   ruleForm.name = ''
-  ruleForm.dimension = 'completeness'
+  ruleForm.ruleType = 'not_null'
   ruleForm.severity = 'medium'
-  ruleForm.threshold = 95
+  ruleForm.minimum = null
+  ruleForm.maximum = null
+  ruleForm.values = ''
+  ruleForm.pattern = ''
   formError.value = ''
   dialogOpen.value = true
 }
@@ -103,17 +139,60 @@ async function submitRule() {
     formError.value = 'A rule name is required.'
     return
   }
-  if (ruleForm.threshold < 0 || ruleForm.threshold > 100) {
-    formError.value = 'Threshold must be between 0 and 100.'
+  if (!ruleForm.datasetId) {
+    formError.value = 'Select a dataset.'
+    return
+  }
+  const fieldRequired = !['row_count'].includes(ruleForm.ruleType)
+  if (fieldRequired && !ruleForm.fieldId) {
+    formError.value = 'Select a dataset field.'
+    return
+  }
+  const configuration: Record<string, unknown> = {}
+  if (ruleForm.minimum != null) configuration.min = ruleForm.minimum
+  if (ruleForm.maximum != null) configuration.max = ruleForm.maximum
+  if (ruleForm.values.trim())
+    configuration.values = ruleForm.values
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+  if (ruleForm.pattern.trim()) configuration.pattern = ruleForm.pattern.trim()
+  if (ruleForm.ruleType === 'freshness' && ruleForm.maximum != null) {
+    delete configuration.max
+    configuration.max_age_hours = ruleForm.maximum
+  }
+  if (ruleForm.ruleType === 'range' && configuration.min == null && configuration.max == null) {
+    formError.value = 'Enter a minimum or maximum value.'
     return
   }
   formError.value = ''
   await createRule.mutate({
+    datasetId: ruleForm.datasetId,
+    fieldId: ruleForm.fieldId || undefined,
     name: ruleForm.name.trim(),
-    dimension: ruleForm.dimension,
+    ruleType: ruleForm.ruleType,
     severity: ruleForm.severity,
-    threshold: ruleForm.threshold,
+    configuration,
   })
+}
+
+const runQuality = useMutation((datasetId: string) => datasetService.runQuality(datasetId), {
+  invalidate: ['quality:rules', 'datasets:list'],
+  onSuccess: (job) =>
+    ui.pushToast({
+      kind: 'success',
+      title: 'Quality evaluation queued',
+      message: `Job ${job.id.slice(0, 8)} will update the quality history.`,
+    }),
+  onError: (err) => ui.pushToast({ kind: 'error', title: 'Evaluation could not start', message: err.message }),
+})
+async function runAll(): Promise<void> {
+  const selected = ruleForm.datasetId || datasetOptions.value[0]?.value
+  if (!selected) {
+    ui.pushToast({ kind: 'warning', title: 'No dataset', message: 'Create or discover a dataset first.' })
+    return
+  }
+  await runQuality.mutate(selected)
 }
 
 /* ---- incidents table + drawer ---- */
@@ -128,21 +207,14 @@ const incidentColumns: Column<QualityIncident>[] = [
 
 const drawerOpen = ref(false)
 const activeIncident = ref<QualityIncident | undefined>(undefined)
-const resolutionNotes = ref('')
 
 function openIncident(row: QualityIncident) {
   activeIncident.value = row
-  resolutionNotes.value = ''
   drawerOpen.value = true
 }
-function resolveIncident() {
-  if (!activeIncident.value) return
-  activeIncident.value.status = 'resolved'
-  ui.pushToast({
-    kind: 'success',
-    title: 'Incident resolved',
-    message: `${activeIncident.value.rule} marked as resolved.`,
-  })
+async function rerunIncident() {
+  if (!activeIncident.value?.datasetId) return
+  await runQuality.mutate(activeIncident.value.datasetId)
   drawerOpen.value = false
 }
 </script>
@@ -154,6 +226,9 @@ function resolveIncident() {
       description="Monitor quality rules and triage open incidents across your datasets."
     >
       <template #actions>
+        <VipButton variant="secondary" icon="refresh" :loading="runQuality.isPending.value" @click="runAll">
+          Run evaluation
+        </VipButton>
         <VipButton variant="primary" icon="plus" @click="openDialog">New rule</VipButton>
       </template>
     </VipPageHeader>
@@ -186,12 +261,49 @@ function resolveIncident() {
             ><VipBadge :tone="RULE_TONE[row.status]" variant="soft" size="sm">{{ row.status }}</VipBadge></template
           >
           <template #cell-passRate="{ row }"
-            ><span class="dq__num">{{ row.passRate }}%</span></template
+            ><span class="dq__num">{{ row.passRate == null ? 'Not evaluated' : `${row.passRate}%` }}</span></template
           >
           <template #cell-lastRun="{ row }"
             ><span class="dq__muted">{{ relativeTime(row.lastRun) }}</span></template
           >
         </VipTable>
+      </VipCard>
+    </section>
+
+    <section class="dq__section">
+      <div class="dq__section-head">
+        <h2 class="dq__section-title">Evaluation history</h2>
+        <VipSelect v-model="ruleForm.datasetId" :options="datasetOptions" size="sm" aria-label="History dataset" />
+      </div>
+      <VipCard>
+        <div v-if="historyLoading" class="dq__muted">Loading evaluation history…</div>
+        <div v-else-if="!history?.length" class="dq__muted">This dataset has not been evaluated.</div>
+        <div v-else class="dq__history">
+          <div v-for="evaluation in history" :key="evaluation.id" class="dq__history-row">
+            <div>
+              <strong>{{ evaluation.score == null ? 'Not scored' : `${evaluation.score}%` }}</strong>
+              <span>{{ relativeTime(evaluation.completedAt ?? evaluation.createdAt) }}</span>
+            </div>
+            <VipBadge
+              :tone="
+                evaluation.status === 'completed'
+                  ? evaluation.failing
+                    ? 'danger'
+                    : evaluation.warning
+                      ? 'warning'
+                      : 'success'
+                  : 'neutral'
+              "
+              size="sm"
+            >
+              {{ evaluation.status }}
+            </VipBadge>
+            <span>
+              {{ evaluation.passing }} pass · {{ evaluation.warning }} warning · {{ evaluation.failing }} fail ·
+              {{ evaluation.unknown }} unknown
+            </span>
+          </div>
+        </div>
       </VipCard>
     </section>
 
@@ -240,17 +352,41 @@ function resolveIncident() {
       @close="dialogOpen = false"
     >
       <div class="dq__form">
+        <VipSelect
+          v-model="ruleForm.datasetId"
+          :options="datasetOptions"
+          label="Dataset"
+          required
+          @update:model-value="ruleForm.fieldId = ''"
+        />
         <VipInput v-model="ruleForm.name" label="Rule name" required placeholder="e.g. orders.amount >= 0" />
         <div class="dq__form-row">
-          <VipSelect v-model="ruleForm.dimension" :options="dimensionOptions" label="Dimension" />
+          <VipSelect v-model="ruleForm.ruleType" :options="ruleTypeOptions" label="Rule type" />
           <VipSelect v-model="ruleForm.severity" :options="severityOptions" label="Severity" />
         </div>
+        <VipSelect
+          v-if="ruleForm.ruleType !== 'row_count'"
+          v-model="ruleForm.fieldId"
+          :options="fieldOptions"
+          label="Dataset field"
+          required
+        />
+        <div v-if="ruleForm.ruleType === 'range' || ruleForm.ruleType === 'row_count'" class="dq__form-row">
+          <VipInput v-model.number="ruleForm.minimum" type="number" label="Minimum" />
+          <VipInput v-model.number="ruleForm.maximum" type="number" label="Maximum" />
+        </div>
         <VipInput
-          v-model.number="ruleForm.threshold"
+          v-if="ruleForm.ruleType === 'accepted_values'"
+          v-model="ruleForm.values"
+          label="Accepted values"
+          help="Comma-separated values."
+        />
+        <VipInput v-if="ruleForm.ruleType === 'regex'" v-model="ruleForm.pattern" label="Regular expression" />
+        <VipInput
+          v-if="ruleForm.ruleType === 'freshness'"
+          v-model.number="ruleForm.maximum"
           type="number"
-          label="Pass threshold (%)"
-          suffix="%"
-          help="Minimum pass rate before the rule is considered failing."
+          label="Maximum age (hours)"
         />
         <p v-if="formError" class="dq__form-error">{{ formError }}</p>
       </div>
@@ -290,33 +426,31 @@ function resolveIncident() {
             <dt>Incident ID</dt>
             <dd class="dq__mono">{{ activeIncident.id }}</dd>
           </div>
+          <div v-if="activeIncident.observed != null" class="dq__incident-fact">
+            <dt>Observed</dt>
+            <dd>{{ activeIncident.observed }}</dd>
+          </div>
+          <div v-if="activeIncident.expected != null" class="dq__incident-fact">
+            <dt>Expected</dt>
+            <dd>{{ activeIncident.expected }}</dd>
+          </div>
         </dl>
 
-        <div class="dq__workflow">
-          <span class="dq__workflow-title">Workflow</span>
-          <ol class="dq__workflow-steps">
-            <li :class="{ 'is-active': activeIncident.status !== 'resolved' }">Detected</li>
-            <li :class="{ 'is-active': activeIncident.status === 'investigating' }">Investigating</li>
-            <li :class="{ 'is-active': activeIncident.status === 'resolved' }">Resolved</li>
-          </ol>
+        <div v-if="activeIncident.message" class="dq__issue-message">{{ activeIncident.message }}</div>
+        <div v-if="activeIncident.issueDetails?.length" class="dq__issues">
+          <h4>Issue samples</h4>
+          <dl v-for="(issue, index) in activeIncident.issueDetails" :key="index">
+            <div v-for="(value, key) in issue" :key="key">
+              <dt>{{ String(key).replace(/_/g, ' ') }}</dt>
+              <dd>{{ value }}</dd>
+            </div>
+          </dl>
         </div>
-
-        <VipTextarea
-          v-model="resolutionNotes"
-          label="Resolution notes"
-          :rows="4"
-          placeholder="Describe the root cause and remediation…"
-        />
       </div>
       <template #footer>
         <VipButton variant="tertiary" @click="drawerOpen = false">Close</VipButton>
-        <VipButton
-          variant="primary"
-          icon="check"
-          :disabled="activeIncident?.status === 'resolved'"
-          @click="resolveIncident"
-        >
-          {{ activeIncident?.status === 'resolved' ? 'Resolved' : 'Mark resolved' }}
+        <VipButton variant="primary" icon="refresh" :loading="runQuality.isPending.value" @click="rerunIncident">
+          Re-run evaluation
         </VipButton>
       </template>
     </VipDrawer>
@@ -335,6 +469,30 @@ function resolveIncident() {
   font-size: var(--vip-fs-lg);
   font-weight: var(--vip-fw-semibold);
   margin-bottom: var(--vip-sp-5);
+}
+.dq__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-4);
+}
+.dq__history {
+  display: flex;
+  flex-direction: column;
+}
+.dq__history-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(260px, 2fr);
+  align-items: center;
+  gap: var(--vip-sp-4);
+  padding: var(--vip-sp-3) 0;
+  border-bottom: 1px solid var(--vip-border-subtle);
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-sm);
+}
+.dq__history-row > div {
+  display: flex;
+  flex-direction: column;
 }
 .dq__rule-name {
   font-size: var(--vip-fs-md);
@@ -406,6 +564,23 @@ function resolveIncident() {
   font-size: var(--vip-fs-md);
   color: var(--vip-text-primary);
   font-weight: var(--vip-fw-medium);
+}
+.dq__issue-message {
+  padding: var(--vip-sp-4);
+  color: var(--vip-danger-text);
+  background: var(--vip-danger-soft);
+  border-radius: var(--vip-radius-md);
+}
+.dq__issues dl {
+  margin-top: var(--vip-sp-3);
+  padding: var(--vip-sp-3);
+  background: var(--vip-surface-2);
+  border-radius: var(--vip-radius-md);
+}
+.dq__issues dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--vip-sp-4);
 }
 
 .dq__workflow {

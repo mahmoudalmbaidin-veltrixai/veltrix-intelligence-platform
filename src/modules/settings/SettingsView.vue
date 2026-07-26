@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlatformStore } from '@/shared/stores/platform'
@@ -44,7 +44,7 @@ const groups: NavGroup[] = [
   },
   {
     label: 'Workspace',
-    permission: 'admin:workspace',
+    permission: 'workspace.update',
     items: [
       { key: 'workspace', label: 'General' },
       { key: 'ws-features', label: 'Features' },
@@ -53,7 +53,7 @@ const groups: NavGroup[] = [
   },
   {
     label: 'Organization',
-    permission: 'admin:org',
+    permission: 'governance.read',
     items: [
       { key: 'organization', label: 'General' },
       { key: 'org-security', label: 'Security' },
@@ -62,7 +62,7 @@ const groups: NavGroup[] = [
   },
   {
     label: 'Platform',
-    permission: 'admin:platform',
+    permission: 'platform.admin',
     items: [
       { key: 'platform', label: 'Tenants' },
       { key: 'system-health', label: 'System health' },
@@ -79,9 +79,9 @@ function save() {
 }
 
 const sessions = [
-  { id: 's1', device: 'Chrome · Windows', location: 'Riyadh, SA', current: true, last: isoAgo(2) },
-  { id: 's2', device: 'Safari · iPhone', location: 'Riyadh, SA', current: false, last: isoAgo(180) },
-  { id: 's3', device: 'Edge · Windows', location: 'Dubai, AE', current: false, last: isoAgo(60 * 24 * 3) },
+  { id: 's1', device: 'Chrome Â· Windows', location: 'Riyadh, SA', current: true, last: isoAgo(2) },
+  { id: 's2', device: 'Safari Â· iPhone', location: 'Riyadh, SA', current: false, last: isoAgo(180) },
+  { id: 's3', device: 'Edge Â· Windows', location: 'Dubai, AE', current: false, last: isoAgo(60 * 24 * 3) },
 ]
 const notifPrefs = [
   { key: 'pipeline', label: 'Pipeline failures', on: true },
@@ -176,7 +176,7 @@ const notifPrefs = [
             <VipIcon name="monitor" :size="18" />
             <div class="settings__session-info">
               <div>{{ s.device }} <VipBadge v-if="s.current" tone="brand" size="sm">This device</VipBadge></div>
-              <div class="settings__session-meta">{{ s.location }} · {{ relativeTime(s.last) }}</div>
+              <div class="settings__session-meta">{{ s.location }} Â· {{ relativeTime(s.last) }}</div>
             </div>
             <VipButton
               v-if="!s.current"

@@ -14,7 +14,7 @@
  *   POST /api/v1/semantic/glossary               -> GlossaryTerm (create)
  * Swap the mock bodies for a live adapter; the return contracts are identical.
  */
-import { MODELS } from '@/shared/services/semanticModels'
+import { MODELS, semanticService } from '@/shared/services/semanticModels'
 import type { Aggregation, NumberFormat, SemanticModel } from '@/shared/types/semantic'
 import { latency } from '@/shared/lib/mock'
 import { apiClient } from '@/shared/lib/apiClient'
@@ -25,6 +25,7 @@ export type MetricFormat = NumberFormat['style']
 
 export interface Metric {
   id: string
+  modelId?: string
   name: string
   description: string
   /** References a measure field id inside one of the semantic MODELS. */
@@ -265,11 +266,156 @@ const TERMS: GlossaryTerm[] = [
 export interface SemanticStudioService {
   listModels(): Promise<SemanticModel[]>
   getModel(id: string): Promise<SemanticModel | undefined>
+  createModel(input: CreateSemanticModelInput): Promise<{ id: string }>
+  updateModel(id: string, input: UpdateSemanticModelInput): Promise<void>
+  archiveModel(id: string): Promise<void>
+  validateModel(id: string): Promise<SemanticValidation>
+  publishModel(id: string): Promise<void>
+  getDefinition(id: string): Promise<SemanticDefinition>
+  listVersions(id: string): Promise<SemanticModelVersion[]>
+  createDimension(id: string, input: DimensionInput): Promise<void>
+  updateDimension(id: string, dimensionId: string, input: DimensionInput): Promise<void>
+  deleteDimension(id: string, dimensionId: string): Promise<void>
+  createMeasure(id: string, input: MeasureInput): Promise<void>
+  updateMeasure(id: string, measureId: string, input: MeasureInput): Promise<void>
+  deleteMeasure(id: string, measureId: string): Promise<void>
   listMetrics(): Promise<Metric[]>
   listTerms(): Promise<GlossaryTerm[]>
   createMetric(input: Omit<Metric, 'id'>): Promise<Metric>
   createTerm(input: Omit<GlossaryTerm, 'id'>): Promise<GlossaryTerm>
-  modelForMeasure(measureId: string): SemanticModel | undefined
+}
+
+export interface CreateSemanticModelInput {
+  key: string
+  name: string
+  description: string
+  primary_dataset_id: string
+  timezone: string
+  currency: string
+}
+
+export interface UpdateSemanticModelInput {
+  name: string
+  description: string
+  timezone: string
+  currency: string
+  version: number
+}
+
+export interface StudioModel {
+  id: string
+  key: string
+  name: string
+  description: string
+  status: 'draft' | 'published' | 'archived'
+  primary_dataset_id: string
+  timezone: string
+  currency: string
+  version_number: number
+  published_version: number | null
+  updated_at: string
+  version: number
+}
+
+export interface StudioField {
+  id: string
+  source_name: string
+  display_name: string
+  physical_data_type: string
+  normalized_data_type: string
+}
+
+export interface StudioDimension {
+  id: string
+  dataset_id: string
+  field_id: string
+  key: string
+  name: string
+  description: string
+  dimension_type: string
+  is_time_dimension: boolean
+  time_granularities: string[]
+  is_hidden: boolean
+}
+
+export interface DimensionInput {
+  dataset_id: string
+  field_id: string
+  key: string
+  name: string
+  description: string
+  dimension_type: string
+  is_time_dimension: boolean
+  time_granularities: string[]
+  is_hidden: boolean
+}
+
+export interface StudioMeasure {
+  id: string
+  dataset_id: string
+  field_id: string | null
+  key: string
+  name: string
+  description: string
+  aggregation: string
+  is_hidden: boolean
+}
+
+export interface MeasureInput {
+  dataset_id: string
+  field_id: string | null
+  key: string
+  name: string
+  description: string
+  aggregation: string
+  is_hidden: boolean
+}
+
+export interface StudioMetric {
+  id: string
+  key: string
+  name: string
+  description: string
+  metric_type: string
+  status: string
+}
+
+export interface StudioKpi {
+  id: string
+  key: string
+  name: string
+  description: string
+  status: string
+}
+
+export interface SemanticDefinition {
+  model: StudioModel
+  fields: StudioField[]
+  dimensions: StudioDimension[]
+  measures: StudioMeasure[]
+  metrics: StudioMetric[]
+  kpis: StudioKpi[]
+}
+
+export interface SemanticValidation {
+  valid: boolean
+  errors: Array<{ code: string; message: string; resource?: string }>
+  warnings: Array<{ code: string; message: string; resource?: string }>
+}
+
+export interface SemanticModelVersion {
+  id: string
+  semantic_model_id: string
+  version_number: number
+  definition: {
+    model?: StudioModel
+    dimensions?: StudioDimension[]
+    measures?: StudioMeasure[]
+    metrics?: StudioMetric[]
+    kpis?: StudioKpi[]
+  }
+  published_by_user_id: string | null
+  published_at: string
 }
 
 const mockSemanticStudioService: SemanticStudioService = {
@@ -280,6 +426,70 @@ const mockSemanticStudioService: SemanticStudioService = {
   async getModel(id: string): Promise<SemanticModel | undefined> {
     await latency(100, 240)
     return MODELS.find((m) => m.id === id)
+  },
+  async createModel(): Promise<{ id: string }> {
+    await latency()
+    return { id: MODELS[0].id }
+  },
+  async updateModel(): Promise<void> {
+    await latency()
+  },
+  async archiveModel(): Promise<void> {
+    await latency()
+  },
+  async validateModel(): Promise<SemanticValidation> {
+    await latency()
+    return { valid: true, errors: [], warnings: [] }
+  },
+  async publishModel(): Promise<void> {
+    await latency()
+  },
+  async getDefinition(id: string): Promise<SemanticDefinition> {
+    await latency()
+    const source = MODELS.find((item) => item.id === id) ?? MODELS[0]
+    return {
+      model: {
+        id: source.id,
+        key: source.name,
+        name: source.label,
+        description: source.description,
+        status: source.certified ? 'published' : 'draft',
+        primary_dataset_id: source.entities[0]?.id ?? source.id,
+        timezone: 'UTC',
+        currency: 'USD',
+        version_number: 1,
+        published_version: source.certified ? 1 : null,
+        updated_at: source.freshness,
+        version: 1,
+      },
+      fields: [],
+      dimensions: [],
+      measures: [],
+      metrics: [],
+      kpis: [],
+    }
+  },
+  async listVersions(): Promise<SemanticModelVersion[]> {
+    await latency()
+    return []
+  },
+  async createDimension(): Promise<void> {
+    await latency()
+  },
+  async updateDimension(): Promise<void> {
+    await latency()
+  },
+  async deleteDimension(): Promise<void> {
+    await latency()
+  },
+  async createMeasure(): Promise<void> {
+    await latency()
+  },
+  async updateMeasure(): Promise<void> {
+    await latency()
+  },
+  async deleteMeasure(): Promise<void> {
+    await latency()
   },
   async listMetrics(): Promise<Metric[]> {
     await latency(140, 320)
@@ -303,21 +513,197 @@ const mockSemanticStudioService: SemanticStudioService = {
     TERMS.unshift(term)
     return term
   },
-  /** Resolve which model a measure field belongs to (used for live preview). */
-  modelForMeasure(measureId: string): SemanticModel | undefined {
-    return MODELS.find((m) => m.fields.some((f) => f.id === measureId))
-  },
+}
+
+interface LiveModel {
+  id: string
+}
+interface LiveMeasure {
+  id: string
+  key: string
+  aggregation: string
+}
+interface LiveMetric {
+  id: string
+  name: string
+  description: string
+  base_measure_id: string | null
+  status: string
+}
+interface LiveKpi {
+  id: string
+  metric_id: string
+  target_value: number | null
+  warning_threshold: number | null
+  critical_threshold: number | null
+}
+interface LiveTerm {
+  id: string
+  name: string
+  definition: string
+  status: GlossaryStatus
+  synonyms: string[]
+}
+interface LiveDomain {
+  id: string
+}
+
+async function listLiveMetrics(): Promise<Metric[]> {
+  const models = await apiClient.get<LiveModel[]>('/semantic-models')
+  const groups = await Promise.all(
+    models.map(async ({ id }) => {
+      const [metrics, measures, kpis] = await Promise.all([
+        apiClient.get<LiveMetric[]>(`/semantic-models/${id}/metrics`),
+        apiClient.get<LiveMeasure[]>(`/semantic-models/${id}/measures`),
+        apiClient.get<LiveKpi[]>(`/semantic-models/${id}/kpis`),
+      ])
+      const byId = new Map(measures.map((item) => [item.id, item]))
+      const kpiByMetric = new Map(kpis.map((item) => [item.metric_id, item]))
+      return metrics.map((item): Metric => {
+        const kpi = kpiByMetric.get(item.id)
+        return {
+          id: item.id,
+          modelId: id,
+          name: item.name,
+          description: item.description,
+          measureId: item.base_measure_id ? (byId.get(item.base_measure_id)?.key ?? '') : '',
+          aggregation: (item.base_measure_id ? byId.get(item.base_measure_id)?.aggregation : 'sum') as Aggregation,
+          format: 'plain',
+          target: kpi?.target_value ?? undefined,
+          thresholds:
+            kpi?.warning_threshold != null && kpi.critical_threshold != null
+              ? { warning: kpi.warning_threshold, critical: kpi.critical_threshold }
+              : undefined,
+          owner: 'Workspace',
+          status: item.status === 'draft' ? 'draft' : 'published',
+        }
+      })
+    }),
+  )
+  return groups.flat()
+}
+
+async function listLiveTerms(): Promise<GlossaryTerm[]> {
+  return (await apiClient.get<LiveTerm[]>('/glossary/terms')).map((item) => ({
+    id: item.id,
+    term: item.name,
+    definition: item.definition,
+    owner: 'Workspace',
+    steward: 'Workspace',
+    status: item.status,
+    synonyms: item.synonyms,
+    relatedTerms: [],
+    linkedDatasets: [],
+  }))
+}
+
+function keyFor(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+async function createLiveMetric(input: Omit<Metric, 'id'>): Promise<Metric> {
+  const models = await apiClient.get<LiveModel[]>('/semantic-models')
+  for (const model of input.modelId ? models.filter((item) => item.id === input.modelId) : models) {
+    const measures = await apiClient.get<LiveMeasure[]>(`/semantic-models/${model.id}/measures`)
+    const measure = measures.find((item) => item.key === input.measureId)
+    if (measure) {
+      const metric = await apiClient.post<LiveMetric>(`/semantic-models/${model.id}/metrics`, {
+        key: keyFor(input.name),
+        name: input.name,
+        description: input.description,
+        metric_type: 'measure',
+        base_measure_id: measure.id,
+      })
+      if (input.target != null || input.thresholds) {
+        await apiClient.post(`/semantic-models/${model.id}/kpis`, {
+          metric_id: metric.id,
+          key: `${keyFor(input.name)}_kpi`,
+          name: input.name,
+          description: input.description,
+          target_value: input.target ?? null,
+          warning_threshold: input.thresholds?.warning ?? null,
+          critical_threshold: input.thresholds?.critical ?? null,
+          comparison_operator: 'greater_than_or_equal',
+          target_period: null,
+        })
+      }
+      return (await listLiveMetrics()).find((item) => item.name === input.name)!
+    }
+  }
+  throw new Error('The selected measure is unavailable.')
+}
+
+async function createLiveTerm(input: Omit<GlossaryTerm, 'id'>): Promise<GlossaryTerm> {
+  let [domain] = await apiClient.get<LiveDomain[]>('/glossary/domains')
+  domain ??= await apiClient.post<LiveDomain>('/glossary/domains', {
+    key: 'business',
+    name: 'Business',
+    description: 'Business terminology',
+  })
+  const term = await apiClient.post<LiveTerm>('/glossary/terms', {
+    domain_id: domain.id,
+    key: keyFor(input.term),
+    name: input.term,
+    definition: input.definition,
+    synonyms: input.synonyms,
+    examples: [],
+  })
+  return { ...input, id: term.id, status: term.status }
+}
+
+async function getLiveDefinition(id: string): Promise<SemanticDefinition> {
+  const model = await apiClient.get<StudioModel>(`/semantic-models/${id}`)
+  const [fields, dimensions, measures, metrics, kpis] = await Promise.all([
+    apiClient.get<StudioField[]>(`/datasets/${model.primary_dataset_id}/fields`),
+    apiClient.get<StudioDimension[]>(`/semantic-models/${id}/dimensions`),
+    apiClient.get<StudioMeasure[]>(`/semantic-models/${id}/measures`),
+    apiClient.get<StudioMetric[]>(`/semantic-models/${id}/metrics`),
+    apiClient.get<StudioKpi[]>(`/semantic-models/${id}/kpis`),
+  ])
+  return { model, fields, dimensions, measures, metrics, kpis }
 }
 
 const apiSemanticStudioService: SemanticStudioService = {
-  listModels: () => apiClient.get<SemanticModel[]>('/semantic/models'),
-  getModel: (id) => apiClient.get<SemanticModel | undefined>(`/semantic/models/${id}`),
-  listMetrics: () => apiClient.get<Metric[]>('/semantic/metrics'),
-  listTerms: () => apiClient.get<GlossaryTerm[]>('/semantic/glossary'),
-  createMetric: (input) => apiClient.post<Metric>('/semantic/metrics', input),
-  createTerm: (input) => apiClient.post<GlossaryTerm>('/semantic/glossary', input),
-  // Client-side resolution against the loaded semantic models — no round-trip.
-  modelForMeasure: (measureId) => MODELS.find((m) => m.fields.some((f) => f.id === measureId)),
+  listModels: () => semanticService.listModels(),
+  getModel: (id) => semanticService.getModel(id),
+  createModel: (input) => apiClient.post<{ id: string }>('/semantic-models', input),
+  updateModel: async (id, input) => {
+    await apiClient.patch(`/semantic-models/${id}`, input)
+  },
+  archiveModel: async (id) => {
+    await apiClient.post(`/semantic-models/${id}/archive`)
+  },
+  validateModel: (id) => apiClient.post<SemanticValidation>(`/semantic-models/${id}/validate`),
+  publishModel: async (id) => {
+    await apiClient.post(`/semantic-models/${id}/publish`)
+  },
+  getDefinition: getLiveDefinition,
+  listVersions: (id) => apiClient.get<SemanticModelVersion[]>(`/semantic-models/${id}/versions`),
+  createDimension: async (id, input) => {
+    await apiClient.post(`/semantic-models/${id}/dimensions`, input)
+  },
+  updateDimension: async (id, dimensionId, input) => {
+    await apiClient.patch(`/semantic-models/${id}/dimensions/${dimensionId}`, input)
+  },
+  deleteDimension: async (id, dimensionId) => {
+    await apiClient.delete(`/semantic-models/${id}/dimensions/${dimensionId}`)
+  },
+  createMeasure: async (id, input) => {
+    await apiClient.post(`/semantic-models/${id}/measures`, input)
+  },
+  updateMeasure: async (id, measureId, input) => {
+    await apiClient.patch(`/semantic-models/${id}/measures/${measureId}`, input)
+  },
+  deleteMeasure: async (id, measureId) => {
+    await apiClient.delete(`/semantic-models/${id}/measures/${measureId}`)
+  },
+  listMetrics: listLiveMetrics,
+  listTerms: listLiveTerms,
+  createMetric: createLiveMetric,
+  createTerm: createLiveTerm,
 }
 
 export const semanticStudioService: SemanticStudioService = defineService(

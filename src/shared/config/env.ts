@@ -18,6 +18,8 @@ export interface AppConfig {
   appEnv: AppEnv
   enableDevtools: boolean
   enableMockLatency: boolean
+  authCsrfCookieName: string
+  authCsrfHeaderName: string
   isProd: boolean
 }
 
@@ -50,8 +52,19 @@ export function buildConfig(raw: Partial<Record<string, string>>): AppConfig {
   if (mode !== 'mock' && mode !== 'live') {
     throw new EnvConfigError(`Invalid VITE_API_MODE: "${raw.VITE_API_MODE}" (expected "mock" | "live")`)
   }
+  if ((isProd || appEnv === 'staging') && mode !== 'live') {
+    throw new EnvConfigError(`${appEnv} builds require VITE_API_MODE=live; mock services are development-only.`)
+  }
 
   const baseUrl = (raw.VITE_API_BASE_URL ?? '').trim()
+  if (baseUrl) {
+    try {
+      const parsed = new URL(baseUrl)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('unsupported protocol')
+    } catch {
+      throw new EnvConfigError('VITE_API_BASE_URL must be an absolute http(s) URL.')
+    }
+  }
   const allowMockFallback = raw.VITE_ALLOW_MOCK_FALLBACK === 'true'
   let resolvedMode: ApiMode = mode
   if (mode === 'live' && !baseUrl) {
@@ -77,6 +90,8 @@ export function buildConfig(raw: Partial<Record<string, string>>): AppConfig {
     appEnv,
     enableDevtools: parseBool(raw.VITE_ENABLE_DEVTOOLS, !isProd),
     enableMockLatency: parseBool(raw.VITE_ENABLE_MOCK_LATENCY, true),
+    authCsrfCookieName: raw.VITE_AUTH_CSRF_COOKIE_NAME || 'vip_csrf_token',
+    authCsrfHeaderName: raw.VITE_AUTH_CSRF_HEADER_NAME || 'X-CSRF-Token',
     isProd,
   })
 }

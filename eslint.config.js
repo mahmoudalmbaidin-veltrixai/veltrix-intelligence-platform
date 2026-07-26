@@ -3,7 +3,18 @@ import ts from 'typescript-eslint'
 import vue from 'eslint-plugin-vue'
 
 export default ts.config(
-  { ignores: ['dist/**', 'node_modules/**', '*.config.ts', '*.config.js'] },
+  {
+    ignores: [
+      'apps/**',
+      'dist/**',
+      'node_modules/**',
+      'playwright-report/**',
+      'test-results/**',
+      '.codex-runtime/**',
+      '*.config.ts',
+      '*.config.js',
+    ],
+  },
   js.configs.recommended,
   ...ts.configs.recommended,
   ...vue.configs['flat/recommended'],

@@ -75,7 +75,6 @@ function cellValue(col: Column<T>, row: T): unknown {
             :class="{ 'is-sortable': col.sortable }"
             :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"
             :tabindex="col.sortable ? 0 : undefined"
-            :role="col.sortable ? 'columnheader button' : undefined"
             :aria-label="col.sortable ? `Sort by ${col.label}` : undefined"
             @click="col.sortable && emit('sort', col.key)"
             @keydown.enter.prevent="col.sortable && emit('sort', col.key)"

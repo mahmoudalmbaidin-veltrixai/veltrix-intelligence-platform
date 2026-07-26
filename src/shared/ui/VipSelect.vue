@@ -9,6 +9,7 @@ const props = defineProps<{
   modelValue?: string
   options: Opt[]
   label?: string
+  ariaLabel?: string
   placeholder?: string
   error?: string
   help?: string
@@ -34,6 +35,7 @@ const id = useId()
         class="vip-select__el"
         :value="modelValue"
         :disabled="disabled"
+        :aria-label="label ? undefined : (ariaLabel ?? placeholder ?? 'Select option')"
         @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
       >
         <option v-if="placeholder" value="" disabled :selected="!modelValue">{{ placeholder }}</option>

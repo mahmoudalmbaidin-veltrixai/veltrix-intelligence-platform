@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, toRef } from 'vue'
-import type { DashboardWidget } from '@/shared/types/dashboard'
+import type { Dashboard, DashboardWidget } from '@/shared/types/dashboard'
 import type { QueryFilter } from '@/shared/types/semantic'
 import { useWidgetData } from './useWidgetData'
 import VisualRenderer from '@/shared/viz/VisualRenderer.vue'
@@ -9,8 +9,10 @@ import VipMenu from '@/shared/ui/VipMenu.vue'
 
 const props = defineProps<{
   widget: DashboardWidget
+  dashboard: Dashboard
   crossFilters: QueryFilter[]
   editable?: boolean
+  draftPreview?: boolean
   selected?: boolean
 }>()
 const emit = defineEmits<{
@@ -21,8 +23,10 @@ const emit = defineEmits<{
 }>()
 
 const widgetRef = toRef(props, 'widget')
+const dashboardRef = toRef(props, 'dashboard')
 const filtersRef = toRef(props, 'crossFilters')
-const { result, loading, error } = useWidgetData(widgetRef, filtersRef)
+const previewRef = computed(() => Boolean(props.draftPreview ?? props.editable))
+const { result, loading, error } = useWidgetData(dashboardRef, widgetRef, filtersRef, previewRef)
 
 const showChrome = computed(
   () => props.widget.format.showTitle && props.widget.type !== 'text' && props.widget.type !== 'image',

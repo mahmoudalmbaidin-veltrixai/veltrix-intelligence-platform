@@ -13,6 +13,10 @@ export default defineConfig({
   server: {
     port: 3009,
     strictPort: true,
+    proxy: {
+      '/auth': 'http://localhost:8000',
+      '/api': 'http://localhost:8000',
+    },
   },
   preview: {
     port: 3009,

@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { dashboardService } from './dashboards.service'
 import { usePlatformStore } from '@/shared/stores/platform'
+import { useUiStore } from '@/shared/stores/ui'
 import { relativeTime } from '@/shared/lib/format'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
@@ -13,10 +14,12 @@ import VipInput from '@/shared/ui/VipInput.vue'
 import VipSegmented from '@/shared/ui/VipSegmented.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipSkeleton from '@/shared/ui/VipSkeleton.vue'
+import VipMenu from '@/shared/ui/VipMenu.vue'
 
 const router = useRouter()
 const platform = usePlatformStore()
-const { data, isLoading } = useQuery('dashboards:list', () => dashboardService.list())
+const ui = useUiStore()
+const { data, isLoading, refetch } = useQuery('dashboards:list', () => dashboardService.list())
 
 const route = useRoute()
 const search = ref('')
@@ -30,6 +33,47 @@ const items = computed(() => {
   if (q) list = list.filter((d) => d.name.toLowerCase().includes(q) || d.tags.some((t) => t.includes(q)))
   return list
 })
+
+function menuFor() {
+  return [
+    ...(platform.can('dashboard.update')
+      ? [
+          { key: 'rename', label: 'Rename', icon: 'edit' },
+          { key: 'duplicate', label: 'Duplicate', icon: 'duplicate' },
+        ]
+      : []),
+    ...(platform.can('dashboard.archive')
+      ? [
+          { key: 'divider', label: '', divider: true },
+          { key: 'archive', label: 'Archive', icon: 'archive', danger: true },
+        ]
+      : []),
+    ...(platform.can('dashboard.delete') ? [{ key: 'delete', label: 'Delete', icon: 'trash', danger: true }] : []),
+  ]
+}
+async function onMenu(dashboard: (typeof items.value)[number], key: string) {
+  try {
+    if (key === 'rename') {
+      const name = window.prompt('Dashboard name', dashboard.name)?.trim()
+      if (!name || name === dashboard.name) return
+      await dashboardService.rename(dashboard.id, name)
+      ui.pushToast({ kind: 'success', title: 'Dashboard renamed' })
+    } else if (key === 'duplicate') {
+      const copy = await dashboardService.duplicate(dashboard.id)
+      ui.pushToast({ kind: 'success', title: 'Dashboard duplicated' })
+      await router.push(`/dashboards/${copy.id}/edit`)
+      return
+    } else if (key === 'archive' || key === 'delete') {
+      if (!window.confirm(`${key === 'delete' ? 'Delete' : 'Archive'} “${dashboard.name}”?`)) return
+      const version = await dashboardService.rowVersion(dashboard.id)
+      await dashboardService[key](dashboard.id, version)
+      ui.pushToast({ kind: 'success', title: key === 'delete' ? 'Dashboard deleted' : 'Dashboard archived' })
+    }
+    await refetch()
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Dashboard action failed', message: String(error) })
+  }
+}
 </script>
 
 <template>
@@ -41,7 +85,7 @@ const items = computed(() => {
           >Deliveries</VipButton
         >
         <VipButton
-          v-if="platform.can('dashboard:write')"
+          v-if="platform.can('dashboard.create')"
           variant="primary"
           icon="plus"
           @click="router.push('/dashboards/new')"
@@ -80,6 +124,15 @@ const items = computed(() => {
         <div class="dl-thumb">
           <VipIcon name="chart" :size="30" />
           <VipIcon v-if="d.favorite" name="star" :size="15" class="dl-fav" />
+          <div v-if="menuFor().length" class="dl-actions" @click.stop>
+            <VipMenu :items="menuFor()" align="end" @select="onMenu(d, $event)">
+              <template #trigger>
+                <button class="dl-menu" :aria-label="`Actions for ${d.name}`">
+                  <VipIcon name="dotsV" :size="16" />
+                </button>
+              </template>
+            </VipMenu>
+          </div>
         </div>
         <div class="dl-info">
           <div class="dl-name">{{ d.name }}</div>
@@ -126,6 +179,22 @@ const items = computed(() => {
   top: var(--vip-sp-4);
   right: var(--vip-sp-4);
   color: var(--vip-warning);
+}
+.dl-actions {
+  position: absolute;
+  top: var(--vip-sp-3);
+  left: var(--vip-sp-3);
+}
+.dl-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--vip-text-secondary);
+  background: var(--vip-surface-1);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-md);
 }
 .dl-info {
   padding: var(--vip-sp-5);

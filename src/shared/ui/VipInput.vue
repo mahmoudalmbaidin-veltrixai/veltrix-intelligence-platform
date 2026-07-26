@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed, ref, useId } from 'vue'
 import VipIcon from './VipIcon.vue'
 
 const props = withDefaults(
@@ -19,18 +19,37 @@ const props = withDefaults(
     prefix?: string
     suffix?: string
     size?: 'sm' | 'md'
+    /** Native autocomplete hint for password managers (e.g. "current-password"). */
+    autocomplete?: string
+    /** Native form field name — helps password managers map fields. */
+    name?: string
+    autofocus?: boolean
+    inputmode?: 'text' | 'email' | 'numeric' | 'tel' | 'url' | 'search'
   }>(),
   { type: 'text', size: 'md' },
 )
 
-const emit = defineEmits<{ 'update:modelValue': [string | number]; enter: [] }>()
+const emit = defineEmits<{
+  'update:modelValue': [string | number]
+  enter: []
+  keydown: [KeyboardEvent]
+  keyup: [KeyboardEvent]
+}>()
 const id = useId()
 const descId = computed(() => `${id}-desc`)
+const inputEl = ref<HTMLInputElement>()
 
 function onInput(e: Event) {
   const el = e.target as HTMLInputElement
   emit('update:modelValue', props.type === 'number' ? Number(el.value) : el.value)
 }
+
+// Exposed so callers can manage focus (e.g. keeping the caret when toggling
+// password visibility) without reaching into internals.
+defineExpose({
+  focus: () => inputEl.value?.focus(),
+  el: inputEl,
+})
 </script>
 
 <template>
@@ -52,6 +71,7 @@ function onInput(e: Event) {
       <span v-if="prefix" class="vip-input__affix">{{ prefix }}</span>
       <input
         :id="id"
+        ref="inputEl"
         class="vip-input__el"
         :type="type"
         :value="modelValue"
@@ -59,9 +79,15 @@ function onInput(e: Event) {
         :disabled="disabled"
         :readonly="readonly"
         :required="required"
+        :name="name"
+        :autocomplete="autocomplete"
+        :autofocus="autofocus"
+        :inputmode="inputmode"
         :aria-invalid="!!error"
         :aria-describedby="error || help ? descId : undefined"
         @input="onInput"
+        @keydown="emit('keydown', $event)"
+        @keyup="emit('keyup', $event)"
         @keyup.enter="emit('enter')"
       />
       <span v-if="suffix" class="vip-input__affix">{{ suffix }}</span>

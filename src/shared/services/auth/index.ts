@@ -1,9 +1,6 @@
-import { defineService } from '@/shared/services/serviceFactory'
-import { mockAuthService } from './mockAuthService'
 import { apiAuthService } from './apiAuthService'
 
-export type { AuthService, Session, LoginCredentials } from './types'
-export { seedMockSession } from './mockAuthService'
+export type { AuthenticatedUser, AuthService, Session, LoginCredentials, UserStatus } from './types'
 
-/** Selected at load time from VITE_API_MODE. */
-export const authService = defineService(mockAuthService, () => apiAuthService)
+/** Authentication is always backend-backed; domain modules may remain mock-selected independently. */
+export const authService = apiAuthService

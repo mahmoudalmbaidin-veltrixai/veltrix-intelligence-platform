@@ -3,12 +3,95 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0b1220" />
+    <meta
+      name="description"
+      content="VIP — Veltrix Intelligence Platform. Enterprise analytics, data pipelines and AI in one platform."
+    />
+    <meta property="og:title" content="VIP — Veltrix Intelligence Platform" />
+    <meta property="og:description" content="Enterprise analytics, data pipelines and AI in one platform." />
+    <meta property="og:image" content="/favicon.svg" />
+    <meta property="og:type" content="website" />
     <title>VIP — Veltrix Intelligence Platform</title>
+    <style>
+      /* Zero-JS branded boot splash — replaced when the Vue app mounts. */
+      #vip-boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        background: #0b1220;
+        color: #eef2ff;
+      }
+      #vip-boot .vip-boot__word {
+        font-family:
+          'Inter',
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        font-size: 22px;
+      }
+      #vip-boot .vip-boot__spin {
+        width: 22px;
+        height: 22px;
+        border: 2px solid rgba(238, 242, 255, 0.25);
+        border-top-color: #3a97ff;
+        border-radius: 50%;
+        animation: vip-boot-spin 0.7s linear infinite;
+      }
+      @keyframes vip-boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #vip-boot .vip-boot__spin {
+          animation-duration: 0.001ms;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div id="vip-boot">
+        <svg width="60" height="60" viewBox="0 0 48 48" aria-hidden="true">
+          <defs>
+            <linearGradient id="bootTop" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#3A97FF" />
+              <stop offset="1" stop-color="#1E73E6" />
+            </linearGradient>
+            <linearGradient id="bootRight" x1="0.2" y1="0" x2="0.8" y2="1">
+              <stop offset="0" stop-color="#2C7BE8" />
+              <stop offset="1" stop-color="#154FBE" />
+            </linearGradient>
+            <linearGradient id="bootLeft" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#163C8A" />
+              <stop offset="1" stop-color="#0B2258" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#bootTop)" d="M24 4 L41 14 L24 24 L7 14 Z" />
+          <path fill="url(#bootRight)" d="M41 14 L41 34 L24 44 L24 24 Z" />
+          <path fill="url(#bootLeft)" d="M7 14 L24 24 L24 44 L7 34 Z" />
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9">
+            <path stroke="#0B2258" stroke-opacity="0.55" d="M15.5 13.8 L24 18.8 L32.5 13.8" />
+            <path stroke="#7FB0F0" stroke-opacity="0.6" d="M11.6 20 L11.6 31 L20 36" />
+            <path stroke="#A9CCFF" stroke-opacity="0.6" d="M36.4 20 L36.4 31 L28 36" />
+          </g>
+          <circle cx="24" cy="10" r="1.6" fill="#CFE6FF" />
+        </svg>
+        <span class="vip-boot__word">VIP</span>
+        <span class="vip-boot__spin"></span>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

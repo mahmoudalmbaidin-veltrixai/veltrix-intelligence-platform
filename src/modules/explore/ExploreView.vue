@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, toRef } from 'vue'
+import { ref, computed, onMounted, toRef } from 'vue'
 import { useRouter } from 'vue-router'
-import { MODELS } from '@/shared/services/semanticModels'
+import { semanticStudioService } from '@/modules/semantic/semantic.service'
 import { createWidget } from '@/modules/dashboards/widgetFactory'
 import { useWidgetData } from '@/modules/dashboards/useWidgetData'
 import { useUiStore } from '@/shared/stores/ui'
 import type { DashboardWidget, WidgetType } from '@/shared/types/dashboard'
-import type { Aggregation, QueryFilter, SemanticField } from '@/shared/types/semantic'
+import type { Aggregation, QueryFilter, SemanticField, SemanticModel } from '@/shared/types/semantic'
 import VisualRenderer from '@/shared/viz/VisualRenderer.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
@@ -17,22 +17,31 @@ import VipBadge from '@/shared/ui/VipBadge.vue'
 const router = useRouter()
 const ui = useUiStore()
 
-const modelId = ref('sm_sales')
+const modelId = ref('')
+const models = ref<SemanticModel[]>([])
 const search = ref('')
 const widget = ref<DashboardWidget>(build('column'))
 const extraFilters = ref<QueryFilter[]>([])
 
 function build(type: WidgetType): DashboardWidget {
   const w = createWidget(type, 0, 0, modelId.value)
-  w.wells = { xAxis: ['region'], values: [{ fieldId: 'revenue', aggregation: 'sum' }] }
+  const selected = models.value.find((item) => item.id === modelId.value)
+  const dimension = selected?.fields.find((field) => field.role === 'dimension' || field.role === 'time')
+  const metric = selected?.fields.find((field) => field.role === 'metric' || field.role === 'measure')
+  w.wells = {
+    ...(dimension ? { xAxis: [dimension.id] } : {}),
+    ...(metric ? { values: [{ fieldId: metric.id, aggregation: 'sum' }] } : {}),
+  }
   w.format.showTitle = false
   return w
 }
 
-const model = computed(() => MODELS.find((m) => m.id === modelId.value) ?? MODELS[0])
-const dims = computed(() => model.value.fields.filter((f) => (f.role === 'dimension' || f.role === 'time') && match(f)))
+const model = computed(() => models.value.find((item) => item.id === modelId.value) ?? models.value[0])
+const dims = computed(() =>
+  (model.value?.fields ?? []).filter((f) => (f.role === 'dimension' || f.role === 'time') && match(f)),
+)
 const measures = computed(() =>
-  model.value.fields.filter((f) => (f.role === 'measure' || f.role === 'metric') && match(f)),
+  (model.value?.fields ?? []).filter((f) => (f.role === 'measure' || f.role === 'metric') && match(f)),
 )
 function match(f: SemanticField) {
   const q = search.value.trim().toLowerCase()
@@ -42,6 +51,16 @@ function match(f: SemanticField) {
 const widgetRef = toRef(widget)
 const filtersRef = toRef(extraFilters)
 const { result, loading, error } = useWidgetData(widgetRef, filtersRef)
+
+onMounted(async () => {
+  try {
+    models.value = (await semanticStudioService.listModels()).filter((item) => item.certified)
+    modelId.value = models.value[0]?.id ?? ''
+    widget.value = build(widget.value.type)
+  } catch (cause) {
+    ui.pushToast({ kind: 'error', title: 'Semantic models could not be loaded', message: String(cause) })
+  }
+})
 
 const chartTypes: { value: WidgetType; icon: string; label: string }[] = [
   { value: 'column', icon: 'chart', label: 'Column' },
@@ -123,7 +142,7 @@ function roleIcon(role: SemanticField['role']): string {
         <div class="explore__model">
           <VipSelect
             :model-value="modelId"
-            :options="MODELS.map((m) => ({ value: m.id, label: m.label }))"
+            :options="models.map((m) => ({ value: m.id, label: m.label }))"
             size="sm"
             @update:model-value="changeModel"
           />

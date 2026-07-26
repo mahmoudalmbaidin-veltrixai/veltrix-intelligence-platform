@@ -1,5 +1,5 @@
 /**
- * Datasets + Data Quality service (mock).
+ * Datasets + Data Quality service with explicit mock and live adapters.
  *
  * INTEGRATION POINT
  *   Live backend:
@@ -28,13 +28,19 @@ export interface Dataset {
   source: string
   rowCount: number
   freshness: string
-  qualityScore: number
+  qualityScore: number | null
   sensitive: boolean
+  version?: number
+  connectionId?: string
+  sourceType?: string
+  schema?: string
+  table?: string
+  readOnly?: boolean
 }
 
 export type QualityDimension = 'completeness' | 'validity' | 'uniqueness' | 'freshness' | 'consistency'
 export type QualitySeverity = 'low' | 'medium' | 'high'
-export type QualityRuleStatus = 'passing' | 'failing' | 'warning'
+export type QualityRuleStatus = 'passing' | 'failing' | 'warning' | 'unknown' | 'not_evaluated'
 
 export interface QualityRule {
   id: string
@@ -43,7 +49,8 @@ export interface QualityRule {
   severity: QualitySeverity
   status: QualityRuleStatus
   lastRun: string
-  passRate: number
+  passRate: number | null
+  datasetId?: string
   dataset?: string
 }
 
@@ -57,13 +64,75 @@ export interface QualityIncident {
   owner: string
   openedAt: string
   dataset: string
+  datasetId?: string
+  message?: string
+  observed?: string | null
+  expected?: string | null
+  issueDetails?: Array<Record<string, unknown>>
+}
+
+export interface QualityEvaluation {
+  id: string
+  status: string
+  score: number | null
+  totalRules: number
+  passing: number
+  warning: number
+  failing: number
+  unknown: number
+  createdAt: string
+  completedAt: string | null
 }
 
 export interface CreateRulePayload {
+  datasetId: string
+  fieldId?: string
   name: string
-  dimension: QualityDimension
+  ruleType: 'not_null' | 'unique' | 'accepted_values' | 'range' | 'regex' | 'freshness' | 'row_count'
   severity: QualitySeverity
-  threshold: number
+  configuration: Record<string, unknown>
+}
+
+export interface DatasetField {
+  id?: string
+  name: string
+  type: string
+  nullable: boolean
+  description: string
+}
+
+export interface DatasetLineage {
+  nodes: Dataset[]
+  edges: Array<{ from: string; to: string }>
+}
+
+export interface DatasetPreview {
+  columns: Array<{
+    name: string
+    displayName: string
+    physicalType: string
+    normalizedType: string
+    nullable: boolean
+    sensitive: boolean
+  }>
+  rows: Array<Record<string, unknown>>
+  page: number
+  pageSize: number
+  returnedRows: number
+  maskedFields: string[]
+  refreshedAt: string
+}
+
+export interface DatasetProfile {
+  fields: Array<{
+    name: string
+    nullCount: number
+    distinctCount: number
+    minimum: string | null
+    maximum: string | null
+  }>
+  sampleSize: number
+  refreshedAt: string
 }
 
 const DATASETS: Dataset[] = [
@@ -384,10 +453,37 @@ let createdRules: QualityRule[] = []
 
 export interface DatasetService {
   list(search?: string): Promise<Dataset[]>
+  discover(input: {
+    connectionId: string
+    schemas: string[]
+    includeNames: string[]
+  }): Promise<{ discovered: number; persisted: number; warnings: string[] }>
+  ingestCsv(input: {
+    connectionId: string
+    schema: string
+    table: string
+    displayName: string
+    description: string
+    csvContent: string
+  }): Promise<{ discovered: number; persisted: number; warnings: string[] }>
+  ingestFile(input: {
+    fileId: string
+    connectionId: string
+    schema: string
+    table: string
+    displayName: string
+    description: string
+  }): Promise<{ discovered: number; persisted: number; warnings: string[] }>
   get(id: string): Promise<Dataset | undefined>
+  listFields(id: string): Promise<DatasetField[]>
+  preview(id: string, page?: number, pageSize?: number): Promise<DatasetPreview>
+  profile(id: string): Promise<DatasetProfile>
+  getLineage(id?: string): Promise<DatasetLineage>
   listQualityRules(): Promise<QualityRule[]>
   listIncidents(): Promise<QualityIncident[]>
+  qualityHistory(datasetId: string): Promise<QualityEvaluation[]>
   createRule(payload: CreateRulePayload): Promise<QualityRule>
+  runQuality(datasetId: string): Promise<{ id: string; status: string }>
 }
 
 const mockDatasetService: DatasetService = {
@@ -403,10 +499,52 @@ const mockDatasetService: DatasetService = {
         d.tags.some((t) => t.toLowerCase().includes(q)),
     )
   },
+  async discover(): Promise<{ discovered: number; persisted: number; warnings: string[] }> {
+    await latency()
+    return { discovered: 0, persisted: 0, warnings: [] }
+  },
+  async ingestCsv(): Promise<{ discovered: number; persisted: number; warnings: string[] }> {
+    await latency()
+    return { discovered: 0, persisted: 0, warnings: [] }
+  },
+  async ingestFile(): Promise<{ discovered: number; persisted: number; warnings: string[] }> {
+    await latency()
+    return { discovered: 0, persisted: 0, warnings: [] }
+  },
 
   async get(id: string): Promise<Dataset | undefined> {
     await latency(120, 320)
     return DATASETS.find((d) => d.id === id)
+  },
+  async listFields(): Promise<DatasetField[]> {
+    await latency()
+    return []
+  },
+  async preview(): Promise<DatasetPreview> {
+    await latency()
+    return {
+      columns: [],
+      rows: [],
+      page: 1,
+      pageSize: 25,
+      returnedRows: 0,
+      maskedFields: [],
+      refreshedAt: new Date().toISOString(),
+    }
+  },
+  async profile(): Promise<DatasetProfile> {
+    await latency()
+    return { fields: [], sampleSize: 0, refreshedAt: new Date().toISOString() }
+  },
+  async getLineage(): Promise<DatasetLineage> {
+    await latency()
+    return {
+      nodes: DATASETS.slice(0, 3),
+      edges: [
+        { from: DATASETS[0].id, to: DATASETS[1].id },
+        { from: DATASETS[1].id, to: DATASETS[2].id },
+      ],
+    }
   },
 
   async listQualityRules(): Promise<QualityRule[]> {
@@ -418,29 +556,405 @@ const mockDatasetService: DatasetService = {
     await latency()
     return INCIDENTS
   },
+  async qualityHistory(): Promise<QualityEvaluation[]> {
+    return []
+  },
 
   async createRule(payload: CreateRulePayload): Promise<QualityRule> {
     await latency(400, 900)
     const rule: QualityRule = {
       id: `qr_new_${Math.random().toString(36).slice(2, 8)}`,
       name: payload.name,
-      dimension: payload.dimension,
+      dimension:
+        payload.ruleType === 'unique' ? 'uniqueness' : payload.ruleType === 'freshness' ? 'freshness' : 'completeness',
       severity: payload.severity,
       status: 'passing',
       lastRun: new Date().toISOString(),
-      passRate: payload.threshold,
+      passRate: null,
     }
     createdRules = [rule, ...createdRules]
     return rule
   },
+  async runQuality(): Promise<{ id: string; status: string }> {
+    await latency()
+    return { id: 'mock-quality-job', status: 'succeeded' }
+  },
+}
+
+interface ApiDataset {
+  id: string
+  connection_id: string
+  dataset_type: string
+  source_schema: string
+  source_name: string
+  source_object_type: string
+  is_read_only: boolean
+  display_name: string
+  description: string
+  tags: string[]
+  status: 'active' | 'inactive' | 'archived'
+  certification_status: string
+  qualified_name: string
+  row_count_estimate: number | null
+  last_discovered_at: string | null
+  quality_status: string
+  classification: string
+  version: number
+}
+
+interface ApiDatasetList {
+  items: ApiDataset[]
+  total: number
+}
+
+interface ApiQualityRule {
+  id: string
+  dataset_id: string
+  name: string
+  rule_type: string
+  severity: 'info' | 'warning' | 'error' | 'critical'
+  status: string
+  updated_at: string
+  field_id: string | null
+  configuration: Record<string, unknown>
+}
+
+interface ApiQualitySummary {
+  status: string
+  score: number | null
+}
+interface ApiQualityResult {
+  id: string
+  quality_rule_id: string
+  status: string
+  evaluated_at: string
+  observed_value: string | null
+  expected_value: string | null
+  safe_message: string | null
+  issue_details: Array<Record<string, unknown>>
+}
+interface ApiQualityEvaluation {
+  id: string
+  status: string
+  score: number | null
+  total_rules: number
+  passing: number
+  warning: number
+  failing: number
+  unknown: number
+  created_at: string
+  completed_at: string | null
+}
+
+interface ApiDatasetField {
+  id: string
+  source_name: string
+  display_name: string
+  description: string
+  physical_data_type: string
+  is_nullable: boolean
+}
+
+interface ApiLineageGraph {
+  nodes: ApiDataset[]
+  edges: Array<{ source_dataset_id: string; target_dataset_id: string }>
+}
+
+interface ApiDatasetPreview {
+  columns: Array<{
+    name: string
+    display_name: string
+    physical_type: string
+    normalized_type: string
+    nullable: boolean
+    sensitive: boolean
+  }>
+  rows: Array<Record<string, unknown>>
+  page: number
+  page_size: number
+  returned_rows: number
+  masked_fields: string[]
+  refreshed_at: string
+}
+
+interface ApiDatasetProfile {
+  fields: Array<{
+    name: string
+    null_count: number
+    distinct_count: number
+    minimum: string | null
+    maximum: string | null
+  }>
+  sample_size: number
+  refreshed_at: string
+}
+
+function mapDataset(item: ApiDataset, qualityScore: number | null = null): Dataset {
+  return {
+    id: item.id,
+    name: item.display_name,
+    description: item.description,
+    owner: 'Workspace',
+    workspace: 'Current workspace',
+    tags: item.tags,
+    status: item.status === 'archived' ? 'deprecated' : item.status === 'inactive' ? 'building' : 'active',
+    certified: item.certification_status === 'certified',
+    source: item.qualified_name,
+    rowCount: item.row_count_estimate ?? 0,
+    freshness: item.last_discovered_at ?? new Date(0).toISOString(),
+    qualityScore,
+    sensitive: ['personal', 'restricted', 'confidential'].includes(item.classification),
+    version: item.version,
+    connectionId: item.connection_id,
+    sourceType: item.dataset_type || item.source_object_type,
+    schema: item.source_schema,
+    table: item.source_name,
+    readOnly: item.is_read_only,
+  }
+}
+
+async function liveDatasets(search?: string): Promise<Dataset[]> {
+  const response = await apiClient.get<ApiDatasetList>('/datasets', { query: { search, page_size: 100 } })
+  const summaries = await Promise.all(
+    response.items.map((item) =>
+      apiClient.get<ApiQualitySummary>(`/datasets/${item.id}/quality`).catch(() => ({
+        status: 'unknown',
+        score: null,
+      })),
+    ),
+  )
+  return response.items.map((item, index) => mapDataset(item, summaries[index]?.score ?? null))
+}
+
+async function liveRules(): Promise<QualityRule[]> {
+  const datasets = await liveDatasets()
+  const groups = await Promise.all(
+    datasets.map(async (dataset) => {
+      const rules = await apiClient.get<ApiQualityRule[]>(`/datasets/${dataset.id}/quality-rules`)
+      return rules.map((rule): QualityRule => ({
+        id: rule.id,
+        name: rule.name,
+        dimension:
+          rule.rule_type === 'unique' ? 'uniqueness' : rule.rule_type === 'freshness' ? 'freshness' : 'completeness',
+        severity:
+          rule.severity === 'critical' || rule.severity === 'error'
+            ? 'high'
+            : rule.severity === 'warning'
+              ? 'medium'
+              : 'low',
+        status: ['passing', 'failing', 'warning', 'unknown'].includes(rule.status)
+          ? (rule.status as QualityRuleStatus)
+          : 'not_evaluated',
+        lastRun: rule.updated_at,
+        passRate: rule.status === 'passing' ? 100 : rule.status === 'not_evaluated' ? null : 0,
+        dataset: dataset.name,
+        datasetId: dataset.id,
+      }))
+    }),
+  )
+  return groups.flat()
+}
+
+async function liveIncidents(): Promise<QualityIncident[]> {
+  const datasets = await liveDatasets()
+  const groups = await Promise.all(
+    datasets.map(async (dataset) => {
+      const [rules, results] = await Promise.all([
+        apiClient.get<ApiQualityRule[]>(`/datasets/${dataset.id}/quality-rules`),
+        apiClient.get<ApiQualityResult[]>(`/datasets/${dataset.id}/quality-results`),
+      ])
+      const rulesById = new Map(rules.map((rule) => [rule.id, rule]))
+      const latest = new Map<string, ApiQualityResult>()
+      for (const result of results) {
+        if (!latest.has(result.quality_rule_id)) latest.set(result.quality_rule_id, result)
+      }
+      return [...latest.values()]
+        .filter((result) => ['failing', 'warning'].includes(result.status))
+        .map((result): QualityIncident => {
+          const rule = rulesById.get(result.quality_rule_id)
+          const severity: QualitySeverity =
+            rule?.severity === 'critical' || rule?.severity === 'error'
+              ? 'high'
+              : rule?.severity === 'warning'
+                ? 'medium'
+                : 'low'
+          return {
+            id: result.id,
+            rule: rule?.name ?? 'Quality rule',
+            severity,
+            status: 'open',
+            owner: 'Dataset owner',
+            openedAt: result.evaluated_at,
+            dataset: dataset.name,
+            datasetId: dataset.id,
+            message: result.safe_message ?? undefined,
+            observed: result.observed_value,
+            expected: result.expected_value,
+            issueDetails: result.issue_details,
+          }
+        })
+    }),
+  )
+  return groups.flat()
 }
 
 const apiDatasetService: DatasetService = {
-  list: (search) => apiClient.get<Dataset[]>('/datasets', { query: { search } }),
-  get: (id) => apiClient.get<Dataset | undefined>(`/datasets/${id}`),
-  listQualityRules: () => apiClient.get<QualityRule[]>('/quality/rules'),
-  listIncidents: () => apiClient.get<QualityIncident[]>('/quality/incidents'),
-  createRule: (payload) => apiClient.post<QualityRule>('/quality/rules', payload),
+  list: liveDatasets,
+  discover: async (input) => {
+    const result = await apiClient.post<{
+      discovered_count: number
+      persisted_count: number
+      warnings: string[]
+    }>('/datasets/discover', {
+      connection_id: input.connectionId,
+      schemas: input.schemas,
+      include_object_types: ['table', 'view', 'materialized_view'],
+      include_names: input.includeNames,
+      persist: true,
+    })
+    return {
+      discovered: result.discovered_count,
+      persisted: result.persisted_count,
+      warnings: result.warnings,
+    }
+  },
+  ingestCsv: async (input) => {
+    const result = await apiClient.post<{
+      discovered_count: number
+      persisted_count: number
+      warnings: string[]
+    }>('/datasets/ingest-csv', {
+      connection_id: input.connectionId,
+      source_schema: input.schema,
+      source_name: input.table,
+      display_name: input.displayName || null,
+      description: input.description,
+      csv_content: input.csvContent,
+    })
+    return {
+      discovered: result.discovered_count,
+      persisted: result.persisted_count,
+      warnings: result.warnings,
+    }
+  },
+  ingestFile: async (input) => {
+    const result = await apiClient.post<{
+      discovered_count: number
+      persisted_count: number
+      warnings: string[]
+    }>('/datasets/ingest-file', {
+      file_id: input.fileId,
+      connection_id: input.connectionId,
+      source_schema: input.schema,
+      source_name: input.table,
+      display_name: input.displayName || null,
+      description: input.description,
+    })
+    return {
+      discovered: result.discovered_count,
+      persisted: result.persisted_count,
+      warnings: result.warnings,
+    }
+  },
+  get: async (id) => {
+    const [dataset, summary] = await Promise.all([
+      apiClient.get<ApiDataset>(`/datasets/${id}`),
+      apiClient.get<ApiQualitySummary>(`/datasets/${id}/quality`),
+    ])
+    return mapDataset(dataset, summary.score)
+  },
+  listFields: async (id) =>
+    (await apiClient.get<ApiDatasetField[]>(`/datasets/${id}/fields`)).map((field) => ({
+      id: field.id,
+      name: field.display_name || field.source_name,
+      type: field.physical_data_type,
+      nullable: field.is_nullable,
+      description: field.description,
+    })),
+  preview: async (id, page = 1, pageSize = 25) => {
+    const result = await apiClient.get<ApiDatasetPreview>(`/datasets/${id}/preview`, {
+      query: { page, page_size: pageSize },
+    })
+    return {
+      columns: result.columns.map((column) => ({
+        name: column.name,
+        displayName: column.display_name,
+        physicalType: column.physical_type,
+        normalizedType: column.normalized_type,
+        nullable: column.nullable,
+        sensitive: column.sensitive,
+      })),
+      rows: result.rows,
+      page: result.page,
+      pageSize: result.page_size,
+      returnedRows: result.returned_rows,
+      maskedFields: result.masked_fields,
+      refreshedAt: result.refreshed_at,
+    }
+  },
+  profile: async (id) => {
+    const result = await apiClient.get<ApiDatasetProfile>(`/datasets/${id}/profile`)
+    return {
+      fields: result.fields.map((field) => ({
+        name: field.name,
+        nullCount: field.null_count,
+        distinctCount: field.distinct_count,
+        minimum: field.minimum,
+        maximum: field.maximum,
+      })),
+      sampleSize: result.sample_size,
+      refreshedAt: result.refreshed_at,
+    }
+  },
+  getLineage: async (id) => {
+    const datasets = await liveDatasets()
+    const target = id ?? datasets[0]?.id
+    if (!target) return { nodes: [], edges: [] }
+    const graph = await apiClient.get<ApiLineageGraph>(`/datasets/${target}/lineage`)
+    return {
+      nodes: graph.nodes.map((item) => mapDataset(item)),
+      edges: graph.edges.map((edge) => ({ from: edge.source_dataset_id, to: edge.target_dataset_id })),
+    }
+  },
+  listQualityRules: liveRules,
+  listIncidents: liveIncidents,
+  qualityHistory: async (datasetId) =>
+    (await apiClient.get<ApiQualityEvaluation[]>(`/datasets/${datasetId}/quality-evaluations`)).map((item) => ({
+      id: item.id,
+      status: item.status,
+      score: item.score,
+      totalRules: item.total_rules,
+      passing: item.passing,
+      warning: item.warning,
+      failing: item.failing,
+      unknown: item.unknown,
+      createdAt: item.created_at,
+      completedAt: item.completed_at,
+    })),
+  createRule: async (payload) => {
+    const dataset = await apiClient.get<ApiDataset>(`/datasets/${payload.datasetId}`)
+    const rule = await apiClient.post<ApiQualityRule>(`/datasets/${payload.datasetId}/quality-rules`, {
+      name: payload.name,
+      field_id: payload.fieldId || null,
+      rule_type: payload.ruleType,
+      severity: payload.severity === 'high' ? 'error' : payload.severity === 'medium' ? 'warning' : 'info',
+      configuration: payload.configuration,
+    })
+    return {
+      id: rule.id,
+      name: rule.name,
+      dimension:
+        rule.rule_type === 'unique' ? 'uniqueness' : rule.rule_type === 'freshness' ? 'freshness' : 'completeness',
+      severity: payload.severity,
+      status: 'not_evaluated',
+      lastRun: rule.updated_at,
+      passRate: null,
+      dataset: dataset.display_name,
+      datasetId: payload.datasetId,
+    }
+  },
+  runQuality: (datasetId) =>
+    apiClient.post<{ id: string; status: string }>(`/datasets/${datasetId}/quality-evaluations`),
 }
 
 export const datasetService: DatasetService = defineService(mockDatasetService, () => apiDatasetService)

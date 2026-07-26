@@ -14,9 +14,9 @@ describe('usePipelineEditor', () => {
   })
 
   it('creates a node on the canvas', () => {
-    const n = editor.addNode('source-database', 100, 120)
+    const n = editor.addNode('source-dataset', 100, 120)
     expect(editor.pipeline.nodes).toHaveLength(1)
-    expect(n.kind).toBe('source-database')
+    expect(n.kind).toBe('source-dataset')
     expect(editor.selection.value.has(n.id)).toBe(true)
   })
 
@@ -28,7 +28,7 @@ describe('usePipelineEditor', () => {
   })
 
   it('creates an edge between two nodes', () => {
-    const a = editor.addNode('source-database', 0, 0)
+    const a = editor.addNode('source-dataset', 0, 0)
     const b = editor.addNode('filter', 300, 0)
     const ok = editor.connect(a.id, 'out', b.id, 'in')
     expect(ok).toBe(true)
@@ -36,7 +36,7 @@ describe('usePipelineEditor', () => {
   })
 
   it('prevents duplicate edges into the same target port', () => {
-    const a = editor.addNode('source-database', 0, 0)
+    const a = editor.addNode('source-dataset', 0, 0)
     const b = editor.addNode('filter', 300, 0)
     editor.connect(a.id, 'out', b.id, 'in')
     const second = editor.connect(a.id, 'out', b.id, 'in')
@@ -45,7 +45,7 @@ describe('usePipelineEditor', () => {
   })
 
   it('selects nodes additively', () => {
-    const a = editor.addNode('source-database', 0, 0)
+    const a = editor.addNode('source-dataset', 0, 0)
     const b = editor.addNode('filter', 300, 0)
     editor.selectNode(a.id)
     editor.selectNode(b.id, true)
@@ -53,7 +53,7 @@ describe('usePipelineEditor', () => {
   })
 
   it('supports undo and redo', () => {
-    editor.addNode('source-database', 0, 0)
+    editor.addNode('source-dataset', 0, 0)
     expect(editor.pipeline.nodes).toHaveLength(1)
     editor.addNode('filter', 200, 0)
     expect(editor.pipeline.nodes).toHaveLength(2)
@@ -63,8 +63,27 @@ describe('usePipelineEditor', () => {
     expect(editor.pipeline.nodes).toHaveLength(2)
   })
 
+  it('restores edges and canvas state through undo and redo', () => {
+    const source = editor.addNode('source-dataset', 0, 0)
+    const target = editor.addNode('filter', 300, 0)
+    editor.connect(source.id, 'out', target.id, 'in')
+    editor.markSaved()
+    editor.commit()
+    editor.pipeline.canvas.x = 180
+    editor.pipeline.canvas.y = 90
+    editor.pipeline.canvas.scale = 1.4
+    editor.deleteEdge(editor.pipeline.edges[0].id)
+    expect(editor.pipeline.edges).toHaveLength(0)
+    editor.undo()
+    expect(editor.pipeline.edges).toHaveLength(1)
+    editor.undo()
+    expect(editor.pipeline.canvas.x).toBe(40)
+    editor.redo()
+    expect(editor.pipeline.canvas.x).toBe(180)
+  })
+
   it('deletes nodes and their connected edges', () => {
-    const a = editor.addNode('source-database', 0, 0)
+    const a = editor.addNode('source-dataset', 0, 0)
     const b = editor.addNode('filter', 300, 0)
     editor.connect(a.id, 'out', b.id, 'in')
     editor.deleteNodes([a.id])
@@ -97,13 +116,38 @@ describe('usePipelineEditor', () => {
   })
 
   it('flags missing required configuration', () => {
-    editor.addNode('source-file', 0, 0) // requires path
+    editor.addNode('source-dataset', 0, 0) // requires a dataset ID
     const report = editor.validate()
     expect(report.issues.some((i) => i.code === 'REQ')).toBe(true)
   })
 
+  it('persists a governed source reference and schema through undo and redo', () => {
+    const editor = usePipelineEditor(fresh())
+    const node = editor.addNode('source-dataset', 0, 0)
+    editor.updateNodeSource(
+      node.id,
+      {
+        source_type: 'dataset',
+        dataset_id: 'dataset-1',
+        dataset_version: 3,
+        columns: ['order_id'],
+        schema_snapshot: [{ name: 'order_id', type: 'bigint', nullable: false }],
+      },
+      [{ name: 'order_id', dataType: 'integer' }],
+    )
+    expect(editor.selectedNode.value?.config.dataset_id).toBe('dataset-1')
+    expect(editor.selectedNode.value?.outputSchema).toEqual([{ name: 'order_id', dataType: 'integer' }])
+
+    editor.undo()
+    expect(editor.selectedNode.value).toBeNull()
+    editor.redo()
+    const restored = editor.pipeline.nodes.find((item) => item.id === node.id)
+    expect(restored?.config.dataset_version).toBe(3)
+    expect(restored?.outputSchema?.[0]?.name).toBe('order_id')
+  })
+
   it('makes edge and node selection mutually exclusive (VIP-FE-H006)', () => {
-    const a = editor.addNode('source-database', 0, 0)
+    const a = editor.addNode('source-dataset', 0, 0)
     const b = editor.addNode('filter', 300, 0)
     const ok = editor.connect(a.id, 'out', b.id, 'in')
     expect(ok).toBe(true)

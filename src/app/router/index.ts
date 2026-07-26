@@ -1,10 +1,10 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+﻿import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { usePlatformStore } from '@/shared/stores/platform'
 import { useAuthStore } from '@/shared/stores/auth'
-import { hasPermission } from '@/shared/permissions/roles'
+import { useAuthorizationStore } from '@/shared/stores/authorization'
 import './meta'
 
-/* Lazy module chunks — route-level code splitting. */
+/* Lazy module chunks â€” route-level code splitting. */
 const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/home' },
 
@@ -21,7 +21,13 @@ const routes: RouteRecordRaw[] = [
     path: '/home',
     name: 'home',
     component: () => import('@/modules/home/HomeView.vue'),
-    meta: { title: 'Home', layout: 'app', requiresAuth: true },
+    meta: {
+      title: 'Home',
+      layout: 'app',
+      requiresAuth: true,
+      requiresOrganization: false,
+      requiresWorkspace: false,
+    },
   },
   {
     path: '/favorites',
@@ -41,25 +47,53 @@ const routes: RouteRecordRaw[] = [
     path: '/connections',
     name: 'connections',
     component: () => import('@/modules/connections/ConnectionListView.vue'),
-    meta: { title: 'Connections', layout: 'app', requiresAuth: true, permission: 'connection:read' },
+    meta: {
+      title: 'Connections',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'connection.read',
+      featureFlag: 'connection_studio',
+      entitlement: 'connection_studio',
+    },
   },
   {
     path: '/connections/catalog',
     name: 'connection-catalog',
     component: () => import('@/modules/connections/ConnectorCatalogView.vue'),
-    meta: { title: 'Connector Catalog', layout: 'app', requiresAuth: true, permission: 'connection:read' },
+    meta: {
+      title: 'Connector Catalog',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'connection.types.read',
+      featureFlag: 'connection_studio',
+      entitlement: 'connection_studio',
+    },
   },
   {
     path: '/connections/new',
     name: 'connection-new',
     component: () => import('@/modules/connections/ConnectionWizardView.vue'),
-    meta: { title: 'New Connection', layout: 'app', requiresAuth: true, permission: 'connection:write' },
+    meta: {
+      title: 'New Connection',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'connection.create',
+      featureFlag: 'connection_studio',
+      entitlement: 'connection_studio',
+    },
   },
   {
     path: '/connections/:id',
     name: 'connection-detail',
     component: () => import('@/modules/connections/ConnectionDetailView.vue'),
-    meta: { title: 'Connection', layout: 'app', requiresAuth: true, permission: 'connection:read' },
+    meta: {
+      title: 'Connection',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'connection.read',
+      featureFlag: 'connection_studio',
+      entitlement: 'connection_studio',
+    },
   },
 
   // Pipelines (priority studio)
@@ -71,8 +105,8 @@ const routes: RouteRecordRaw[] = [
       title: 'Pipelines',
       layout: 'app',
       requiresAuth: true,
-      permission: 'pipeline:read',
-      entitlement: 'pipelines',
+      permission: 'pipeline.read',
+      entitlement: 'pipeline_studio',
     },
   },
   {
@@ -83,8 +117,8 @@ const routes: RouteRecordRaw[] = [
       title: 'New Pipeline',
       layout: 'studio',
       requiresAuth: true,
-      permission: 'pipeline:write',
-      entitlement: 'pipelines',
+      permission: 'pipeline.create',
+      entitlement: 'pipeline_studio',
       fullBleed: true,
     },
   },
@@ -96,8 +130,8 @@ const routes: RouteRecordRaw[] = [
       title: 'Pipeline Studio',
       layout: 'studio',
       requiresAuth: true,
-      permission: 'pipeline:read',
-      entitlement: 'pipelines',
+      permission: 'pipeline.read',
+      entitlement: 'pipeline_studio',
       fullBleed: true,
     },
   },
@@ -105,7 +139,7 @@ const routes: RouteRecordRaw[] = [
     path: '/pipelines/:id/runs',
     name: 'pipeline-runs',
     component: () => import('@/modules/pipelines/PipelineRunsView.vue'),
-    meta: { title: 'Pipeline Runs', layout: 'app', requiresAuth: true, permission: 'pipeline:read' },
+    meta: { title: 'Pipeline Runs', layout: 'app', requiresAuth: true, permission: 'pipeline.read' },
   },
 
   // Datasets / semantic / quality / lineage
@@ -113,49 +147,49 @@ const routes: RouteRecordRaw[] = [
     path: '/datasets',
     name: 'datasets',
     component: () => import('@/modules/datasets/DatasetListView.vue'),
-    meta: { title: 'Datasets', layout: 'app', requiresAuth: true, permission: 'dataset:read' },
+    meta: { title: 'Datasets', layout: 'app', requiresAuth: true, permission: 'dataset.read' },
   },
   {
     path: '/datasets/quality',
     name: 'data-quality',
     component: () => import('@/modules/datasets/DataQualityView.vue'),
-    meta: { title: 'Data Quality', layout: 'app', requiresAuth: true, permission: 'dataset:read' },
+    meta: { title: 'Data Quality', layout: 'app', requiresAuth: true, permission: 'dataset.read' },
   },
   {
     path: '/datasets/lineage',
     name: 'data-lineage',
     component: () => import('@/modules/datasets/DataLineageView.vue'),
-    meta: { title: 'Data Lineage', layout: 'app', requiresAuth: true, permission: 'dataset:read' },
+    meta: { title: 'Data Lineage', layout: 'app', requiresAuth: true, permission: 'dataset.read' },
   },
   {
     path: '/datasets/:id',
     name: 'dataset-detail',
     component: () => import('@/modules/datasets/DatasetDetailView.vue'),
-    meta: { title: 'Dataset', layout: 'app', requiresAuth: true, permission: 'dataset:read' },
+    meta: { title: 'Dataset', layout: 'app', requiresAuth: true, permission: 'dataset.read' },
   },
   {
     path: '/semantic',
     name: 'semantic',
     component: () => import('@/modules/semantic/SemanticListView.vue'),
-    meta: { title: 'Semantic Models', layout: 'app', requiresAuth: true, permission: 'semantic:read' },
+    meta: { title: 'Semantic Models', layout: 'app', requiresAuth: true, permission: 'semantic_model.read' },
   },
   {
     path: '/semantic/metrics',
     name: 'metrics',
     component: () => import('@/modules/semantic/MetricsView.vue'),
-    meta: { title: 'Metrics & KPIs', layout: 'app', requiresAuth: true, permission: 'semantic:read' },
+    meta: { title: 'Metrics & KPIs', layout: 'app', requiresAuth: true, permission: 'semantic_model.read' },
   },
   {
     path: '/semantic/glossary',
     name: 'glossary',
     component: () => import('@/modules/semantic/GlossaryView.vue'),
-    meta: { title: 'Business Glossary', layout: 'app', requiresAuth: true, permission: 'semantic:read' },
+    meta: { title: 'Business Glossary', layout: 'app', requiresAuth: true, permission: 'glossary.read' },
   },
   {
     path: '/semantic/:id',
     name: 'semantic-detail',
     component: () => import('@/modules/semantic/SemanticBuilderView.vue'),
-    meta: { title: 'Semantic Model', layout: 'app', requiresAuth: true, permission: 'semantic:read' },
+    meta: { title: 'Semantic Model', layout: 'app', requiresAuth: true, permission: 'semantic_model.read' },
   },
 
   // Analytics (priority)
@@ -167,8 +201,8 @@ const routes: RouteRecordRaw[] = [
       title: 'Dashboards',
       layout: 'app',
       requiresAuth: true,
-      permission: 'dashboard:read',
-      entitlement: 'dashboards',
+      permission: 'dashboard.read',
+      entitlement: 'dashboard_studio',
     },
   },
   {
@@ -179,8 +213,8 @@ const routes: RouteRecordRaw[] = [
       title: 'Dashboard Templates',
       layout: 'app',
       requiresAuth: true,
-      permission: 'dashboard:read',
-      entitlement: 'dashboards',
+      permission: 'dashboard.read',
+      entitlement: 'dashboard_studio',
     },
   },
   {
@@ -191,8 +225,8 @@ const routes: RouteRecordRaw[] = [
       title: 'Published Dashboards',
       layout: 'app',
       requiresAuth: true,
-      permission: 'dashboard:read',
-      entitlement: 'dashboards',
+      permission: 'dashboard.read',
+      entitlement: 'dashboard_studio',
     },
   },
   {
@@ -203,8 +237,8 @@ const routes: RouteRecordRaw[] = [
       title: 'Scheduled Deliveries',
       layout: 'app',
       requiresAuth: true,
-      permission: 'dashboard:read',
-      entitlement: 'dashboards',
+      permission: 'dashboard.read',
+      entitlement: 'dashboard_studio',
     },
   },
   {
@@ -215,8 +249,8 @@ const routes: RouteRecordRaw[] = [
       title: 'New Dashboard',
       layout: 'studio',
       requiresAuth: true,
-      permission: 'dashboard:write',
-      entitlement: 'dashboards',
+      permission: 'dashboard.create',
+      entitlement: 'dashboard_studio',
       fullBleed: true,
     },
   },
@@ -228,8 +262,8 @@ const routes: RouteRecordRaw[] = [
       title: 'Dashboard Studio',
       layout: 'studio',
       requiresAuth: true,
-      permission: 'dashboard:write',
-      entitlement: 'dashboards',
+      permission: 'dashboard.create',
+      entitlement: 'dashboard_studio',
       fullBleed: true,
     },
   },
@@ -237,20 +271,20 @@ const routes: RouteRecordRaw[] = [
     path: '/dashboards/:id',
     name: 'dashboard-viewer',
     component: () => import('@/modules/dashboards/DashboardViewerView.vue'),
-    meta: { title: 'Dashboard', layout: 'app', requiresAuth: true, permission: 'dashboard:read', fullBleed: true },
+    meta: { title: 'Dashboard', layout: 'app', requiresAuth: true, permission: 'dashboard.read', fullBleed: true },
   },
 
   {
     path: '/insights',
     name: 'insights',
     component: () => import('@/modules/insights/InsightsView.vue'),
-    meta: { title: 'Insights', layout: 'app', requiresAuth: true, permission: 'insight:read' },
+    meta: { title: 'Insights', layout: 'app', requiresAuth: true, permission: 'dashboard.read' },
   },
   {
     path: '/explore',
     name: 'explore',
     component: () => import('@/modules/explore/ExploreView.vue'),
-    meta: { title: 'Explore', layout: 'studio', requiresAuth: true, permission: 'dashboard:read', fullBleed: true },
+    meta: { title: 'Explore', layout: 'studio', requiresAuth: true, permission: 'dashboard.read', fullBleed: true },
   },
 
   // Reports
@@ -258,25 +292,25 @@ const routes: RouteRecordRaw[] = [
     path: '/reports',
     name: 'reports',
     component: () => import('@/modules/reports/ReportListView.vue'),
-    meta: { title: 'Reports', layout: 'app', requiresAuth: true, permission: 'report:read' },
+    meta: { title: 'Reports', layout: 'app', requiresAuth: true, permission: 'report.read' },
   },
   {
     path: '/reports/new',
     name: 'report-new',
     component: () => import('@/modules/reports/ReportBuilderView.vue'),
-    meta: { title: 'New Report', layout: 'studio', requiresAuth: true, permission: 'report:write', fullBleed: true },
+    meta: { title: 'New Report', layout: 'studio', requiresAuth: true, permission: 'report.create', fullBleed: true },
   },
   {
     path: '/reports/deliveries',
     name: 'deliveries',
     component: () => import('@/modules/reports/DeliveriesView.vue'),
-    meta: { title: 'Scheduled Deliveries', layout: 'app', requiresAuth: true, permission: 'report:read' },
+    meta: { title: 'Scheduled Deliveries', layout: 'app', requiresAuth: true, permission: 'report.read' },
   },
   {
     path: '/reports/:id',
     name: 'report-builder',
     component: () => import('@/modules/reports/ReportBuilderView.vue'),
-    meta: { title: 'Report', layout: 'studio', requiresAuth: true, permission: 'report:read', fullBleed: true },
+    meta: { title: 'Report', layout: 'studio', requiresAuth: true, permission: 'report.read', fullBleed: true },
   },
 
   // AI
@@ -288,8 +322,9 @@ const routes: RouteRecordRaw[] = [
       title: 'AI Assistant',
       layout: 'app',
       requiresAuth: true,
-      permission: 'ai:use',
-      entitlement: 'ai-assistant',
+      permission: 'ai.use',
+      entitlement: 'ai_studio',
+      featureFlag: 'ai_studio',
       fullBleed: true,
     },
   },
@@ -297,13 +332,25 @@ const routes: RouteRecordRaw[] = [
     path: '/ai/studio',
     name: 'ai-studio',
     component: () => import('@/modules/ai/AiStudioView.vue'),
-    meta: { title: 'AI Studio', layout: 'app', requiresAuth: true, permission: 'ai:configure' },
+    meta: {
+      title: 'AI Studio',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'ai.configure',
+      featureFlag: 'ai_studio',
+    },
   },
   {
     path: '/ai/knowledge',
     name: 'ai-knowledge',
     component: () => import('@/modules/ai/KnowledgeView.vue'),
-    meta: { title: 'Knowledge Bases', layout: 'app', requiresAuth: true, permission: 'ai:configure' },
+    meta: {
+      title: 'Knowledge Bases',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'ai.configure',
+      featureFlag: 'ai_studio',
+    },
   },
   {
     path: '/ai/agents',
@@ -313,9 +360,9 @@ const routes: RouteRecordRaw[] = [
       title: 'AI Agents',
       layout: 'app',
       requiresAuth: true,
-      permission: 'ai:configure',
-      entitlement: 'ai-agents',
-      featureFlag: 'ai-agents-beta',
+      permission: 'ai.configure',
+      entitlement: 'ai_studio',
+      featureFlag: 'ai_studio',
     },
   },
   {
@@ -326,9 +373,9 @@ const routes: RouteRecordRaw[] = [
       title: 'Agent Runs',
       layout: 'app',
       requiresAuth: true,
-      permission: 'ai:configure',
-      entitlement: 'ai-agents',
-      featureFlag: 'ai-agents-beta',
+      permission: 'ai.configure',
+      entitlement: 'ai_studio',
+      featureFlag: 'ai_studio',
     },
   },
 
@@ -341,7 +388,7 @@ const routes: RouteRecordRaw[] = [
       title: 'Automations',
       layout: 'app',
       requiresAuth: true,
-      permission: 'automation:read',
+      permission: 'automation.read',
       entitlement: 'automation',
     },
   },
@@ -353,7 +400,7 @@ const routes: RouteRecordRaw[] = [
       title: 'New Automation',
       layout: 'studio',
       requiresAuth: true,
-      permission: 'automation:write',
+      permission: 'automation.write',
       entitlement: 'automation',
       fullBleed: true,
     },
@@ -362,19 +409,19 @@ const routes: RouteRecordRaw[] = [
     path: '/automation/runs',
     name: 'automation-runs',
     component: () => import('@/modules/automation/AutomationRunsView.vue'),
-    meta: { title: 'Automation Runs', layout: 'app', requiresAuth: true, permission: 'automation:read' },
+    meta: { title: 'Automation Runs', layout: 'app', requiresAuth: true, permission: 'automation.read' },
   },
   {
     path: '/automation/approvals',
     name: 'approvals',
     component: () => import('@/modules/automation/ApprovalsView.vue'),
-    meta: { title: 'Approvals', layout: 'app', requiresAuth: true, permission: 'automation:read' },
+    meta: { title: 'Approvals', layout: 'app', requiresAuth: true, permission: 'automation.read' },
   },
   {
     path: '/automation/:id',
     name: 'automation-builder',
     component: () => import('@/modules/automation/AutomationBuilderView.vue'),
-    meta: { title: 'Automation', layout: 'studio', requiresAuth: true, permission: 'automation:read', fullBleed: true },
+    meta: { title: 'Automation', layout: 'studio', requiresAuth: true, permission: 'automation.read', fullBleed: true },
   },
 
   // Operations
@@ -394,13 +441,13 @@ const routes: RouteRecordRaw[] = [
     path: '/audit',
     name: 'audit',
     component: () => import('@/modules/operations/AuditCenterView.vue'),
-    meta: { title: 'Audit Center', layout: 'app', requiresAuth: true, permission: 'audit:read' },
+    meta: { title: 'Audit Center', layout: 'app', requiresAuth: true, permission: 'audit.read' },
   },
   {
     path: '/usage',
     name: 'usage',
     component: () => import('@/modules/operations/UsageView.vue'),
-    meta: { title: 'Usage', layout: 'app', requiresAuth: true, permission: 'usage:read' },
+    meta: { title: 'Usage', layout: 'app', requiresAuth: true, permission: 'governance.read' },
   },
 
   // Platform
@@ -412,7 +459,7 @@ const routes: RouteRecordRaw[] = [
       title: 'Marketplace',
       layout: 'app',
       requiresAuth: true,
-      permission: 'marketplace:read',
+      permission: 'workspace.read',
       entitlement: 'marketplace',
     },
   },
@@ -420,7 +467,7 @@ const routes: RouteRecordRaw[] = [
     path: '/marketplace/:id',
     name: 'marketplace-detail',
     component: () => import('@/modules/marketplace/ExtensionDetailView.vue'),
-    meta: { title: 'Extension', layout: 'app', requiresAuth: true, permission: 'marketplace:read' },
+    meta: { title: 'Extension', layout: 'app', requiresAuth: true, permission: 'workspace.read' },
   },
   {
     path: '/developer',
@@ -430,8 +477,8 @@ const routes: RouteRecordRaw[] = [
       title: 'Developer Portal',
       layout: 'app',
       requiresAuth: true,
-      permission: 'developer:read',
-      entitlement: 'developer-api',
+      permission: 'developer.read',
+      entitlement: 'developer_api',
     },
   },
 
@@ -440,43 +487,43 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/platform',
     name: 'admin-platform',
     component: () => import('@/modules/admin/PlatformAdminView.vue'),
-    meta: { title: 'Platform Administration', layout: 'app', requiresAuth: true, permission: 'admin:platform' },
+    meta: { title: 'Platform Administration', layout: 'app', requiresAuth: true, permission: 'platform.admin' },
   },
   {
     path: '/admin/organization',
     name: 'admin-org',
     component: () => import('@/modules/admin/OrgAdminView.vue'),
-    meta: { title: 'Organization Administration', layout: 'app', requiresAuth: true, permission: 'admin:org' },
+    meta: { title: 'Organization Administration', layout: 'app', requiresAuth: true, permission: 'governance.read' },
   },
   {
     path: '/admin/workspace',
     name: 'admin-workspace',
     component: () => import('@/modules/admin/WorkspaceAdminView.vue'),
-    meta: { title: 'Workspace Administration', layout: 'app', requiresAuth: true, permission: 'admin:workspace' },
+    meta: { title: 'Workspace Administration', layout: 'app', requiresAuth: true, permission: 'workspace.update' },
   },
   {
     path: '/admin/members',
     name: 'admin-members',
     component: () => import('@/modules/admin/MembersView.vue'),
-    meta: { title: 'Members & Roles', layout: 'app', requiresAuth: true, permission: 'admin:org' },
+    meta: { title: 'Members & Roles', layout: 'app', requiresAuth: true, permission: 'governance.read' },
   },
   {
     path: '/admin/feature-flags',
     name: 'admin-flags',
     component: () => import('@/modules/admin/FeatureFlagsView.vue'),
-    meta: { title: 'Feature Flags', layout: 'app', requiresAuth: true, permission: 'featureflag:read' },
+    meta: { title: 'Feature Flags', layout: 'app', requiresAuth: true, permission: 'governance.read' },
   },
   {
     path: '/admin/governance',
     name: 'admin-governance',
     component: () => import('@/modules/admin/GovernanceView.vue'),
-    meta: { title: 'Governance', layout: 'app', requiresAuth: true, permission: 'governance:read' },
+    meta: { title: 'Governance', layout: 'app', requiresAuth: true, permission: 'governance.read' },
   },
   {
     path: '/billing',
     name: 'billing',
     component: () => import('@/modules/billing/BillingView.vue'),
-    meta: { title: 'Billing', layout: 'app', requiresAuth: true, permission: 'billing:read' },
+    meta: { title: 'Billing', layout: 'app', requiresAuth: true, permission: 'billing.read' },
   },
 
   // Settings
@@ -508,15 +555,25 @@ const routes: RouteRecordRaw[] = [
   },
 ]
 
+for (const route of routes) {
+  if (route.meta?.requiresAuth && route.name !== 'home') {
+    route.meta.requiresOrganization ??= true
+    route.meta.requiresWorkspace ??= true
+  }
+}
+
 export const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior: (_to, _from, saved) => saved ?? { top: 0 },
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const platform = usePlatformStore()
+  const authorization = useAuthorizationStore()
   const auth = useAuthStore()
+
+  if (!auth.initialized) await auth.bootstrap()
 
   // Guest-only routes (login): send authenticated users home.
   if (to.meta.publicOnly) {
@@ -529,7 +586,24 @@ router.beforeEach((to) => {
     return { name: 'login' }
   }
 
-  if (to.meta.permission && !hasPermission(platform.permissions, to.meta.permission)) {
+  if (to.meta.requiresAuth && auth.isAuthenticated && !platform.initialized) {
+    await platform.bootstrapTenancy()
+  }
+  if (to.meta.requiresOrganization && !platform.organization) {
+    return { name: 'home', query: { tenant: 'organization-required' } }
+  }
+  if (to.meta.requiresWorkspace && !platform.workspace) {
+    return { name: 'home', query: { tenant: 'workspace-required' } }
+  }
+
+  if (to.meta.requiresAuth && platform.workspace && !authorization.initialized) {
+    try {
+      await authorization.bootstrap()
+    } catch {
+      return { name: 'forbidden', query: { from: to.fullPath, reason: 'authorization-unavailable' } }
+    }
+  }
+  if (to.meta.permission && !authorization.can(to.meta.permission)) {
     return { name: 'forbidden', query: { from: to.fullPath } }
   }
   if (to.meta.entitlement && !platform.entitled(to.meta.entitlement)) {
