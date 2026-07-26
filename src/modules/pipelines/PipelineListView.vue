@@ -13,10 +13,51 @@ import VipInput from '@/shared/ui/VipInput.vue'
 import VipSegmented from '@/shared/ui/VipSegmented.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
+import VipMenu from '@/shared/ui/VipMenu.vue'
+import VipConfirmDialog from '@/shared/ui/VipConfirmDialog.vue'
+import { useUiStore } from '@/shared/stores/ui'
+import { safeErrorText } from '@/shared/lib/safeError'
 
 const router = useRouter()
 const platform = usePlatformStore()
-const { data, isLoading } = useQuery('pipelines:list', () => pipelineService.list())
+const ui = useUiStore()
+const { data, isLoading, refetch } = useQuery('pipelines:list', () => pipelineService.list())
+
+// --- Delete lifecycle (backend soft-archives; no restore, no separate archive) ---
+const canDelete = computed(() => platform.can('pipeline.delete'))
+const target = ref<PipelineListItem | null>(null)
+const pending = ref(false)
+const errorMsg = ref<string | null>(null)
+
+function rowMenu() {
+  return canDelete.value ? [{ key: 'delete', label: 'Delete', icon: 'trash', danger: true }] : []
+}
+function onRowMenu(row: PipelineListItem, key: string) {
+  if (key === 'delete') {
+    errorMsg.value = null
+    target.value = row
+  }
+}
+function closeDelete() {
+  if (pending.value) return
+  target.value = null
+  errorMsg.value = null
+}
+async function confirmDelete() {
+  if (!target.value) return
+  pending.value = true
+  errorMsg.value = null
+  try {
+    await pipelineService.remove(target.value.id, target.value.version)
+    ui.pushToast({ kind: 'success', title: 'Pipeline deleted', message: target.value.name })
+    target.value = null
+    await refetch()
+  } catch (e) {
+    errorMsg.value = safeErrorText(e)
+  } finally {
+    pending.value = false
+  }
+}
 
 const search = ref('')
 const statusFilter = ref<'all' | 'published' | 'draft'>('all')
@@ -42,14 +83,15 @@ function onSort(key: string) {
   }
 }
 
-const columns: Column<PipelineListItem>[] = [
+const columns = computed<Column<PipelineListItem>[]>(() => [
   { key: 'name', label: 'Pipeline', sortable: true },
   { key: 'status', label: 'Status' },
   { key: 'lastRun', label: 'Last run' },
   { key: 'nextSchedule', label: 'Next run' },
   { key: 'owner', label: 'Owner' },
   { key: 'version', label: 'Version', align: 'right' },
-]
+  ...(canDelete.value ? [{ key: 'actions', label: '', align: 'right' as const }] : []),
+])
 
 function statusTone(s?: string) {
   return s === 'succeeded' ? 'success' : s === 'failed' ? 'danger' : s === 'running' ? 'info' : 'neutral'
@@ -124,7 +166,38 @@ function statusTone(s?: string) {
       <template #cell-version="{ row }"
         ><span class="pl-muted">v{{ row.version }}</span></template
       >
+      <template #cell-actions="{ row }">
+        <div class="pl-actions" @click.stop>
+          <VipMenu :items="rowMenu()" align="end" @select="onRowMenu(row, $event)">
+            <template #trigger>
+              <button class="pl-menu" :aria-label="`Actions for ${row.name}`">
+                <VipIcon name="dotsV" :size="16" />
+              </button>
+            </template>
+          </VipMenu>
+        </div>
+      </template>
     </VipTable>
+
+    <VipConfirmDialog
+      :open="!!target"
+      level="danger"
+      title="Delete pipeline?"
+      :resource-name="target?.name"
+      message="Delete is an elevated, audited action that removes this pipeline from active lists."
+      :impact="[
+        'Future scheduled and manual runs will be blocked.',
+        'Run history, versions and logs are retained server-side but no longer accessible here.',
+        'Downstream datasets or dashboards that depend on it may be affected.',
+      ]"
+      note="The server soft-archives on delete; there is no in-app restore, so treat this as final."
+      confirm-label="Delete"
+      require-typing
+      :pending="pending"
+      :error="errorMsg"
+      @confirm="confirmDelete"
+      @cancel="closeDelete"
+    />
   </div>
 </template>
 
@@ -170,5 +243,25 @@ function statusTone(s?: string) {
 }
 .pl-muted {
   color: var(--vip-text-muted);
+}
+.pl-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.pl-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--vip-text-secondary);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--vip-radius-md);
+}
+.pl-menu:hover {
+  background: var(--vip-surface-hover);
+  border-color: var(--vip-border);
+  color: var(--vip-text-primary);
 }
 </style>

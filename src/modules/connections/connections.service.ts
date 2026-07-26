@@ -96,6 +96,9 @@ export const connectionService = {
   update: (id: string, payload: UpdateConnectionPayload) =>
     apiClient.patch<Connection>(`/api/v1/connections/${id}`, payload),
   archive: (id: string) => apiClient.post<void>(`/api/v1/connections/${id}/archive`),
+  // Backend implements DELETE as a soft-archive (elevated permission + delete
+  // audit event). There is no restore/unarchive endpoint.
+  remove: (id: string) => apiClient.delete<void>(`/api/v1/connections/${id}`),
   test: (id: string) => apiClient.post<ConnectionTestResult>(`/api/v1/connections/${id}/test`),
   replaceCredentials: (id: string, credentials: Record<string, string>, expectedVersion: number) =>
     apiClient.put<{ connection_id: string; credential_version: number }>(`/api/v1/connections/${id}/credentials`, {

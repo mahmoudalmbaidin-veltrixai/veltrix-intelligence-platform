@@ -484,6 +484,10 @@ export interface DatasetService {
   qualityHistory(datasetId: string): Promise<QualityEvaluation[]>
   createRule(payload: CreateRulePayload): Promise<QualityRule>
   runQuality(datasetId: string): Promise<{ id: string; status: string }>
+  /** Soft-archive (POST /datasets/:id/archive). No restore/unarchive endpoint exists. */
+  archive(id: string): Promise<void>
+  /** Elevated delete (DELETE /datasets/:id) — backend soft-archives; no restore. */
+  remove(id: string): Promise<void>
 }
 
 const mockDatasetService: DatasetService = {
@@ -578,6 +582,16 @@ const mockDatasetService: DatasetService = {
   async runQuality(): Promise<{ id: string; status: string }> {
     await latency()
     return { id: 'mock-quality-job', status: 'succeeded' }
+  },
+  async archive(id: string): Promise<void> {
+    await latency()
+    const i = DATASETS.findIndex((d) => d.id === id)
+    if (i >= 0) DATASETS.splice(i, 1)
+  },
+  async remove(id: string): Promise<void> {
+    await latency()
+    const i = DATASETS.findIndex((d) => d.id === id)
+    if (i >= 0) DATASETS.splice(i, 1)
   },
 }
 
@@ -955,6 +969,8 @@ const apiDatasetService: DatasetService = {
   },
   runQuality: (datasetId) =>
     apiClient.post<{ id: string; status: string }>(`/datasets/${datasetId}/quality-evaluations`),
+  archive: (id) => apiClient.post<void>(`/datasets/${id}/archive`),
+  remove: (id) => apiClient.delete<void>(`/datasets/${id}`),
 }
 
 export const datasetService: DatasetService = defineService(mockDatasetService, () => apiDatasetService)

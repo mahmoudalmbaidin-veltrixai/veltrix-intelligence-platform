@@ -19,6 +19,9 @@ import VipButton from '@/shared/ui/VipButton.vue'
 import VipDialog from '@/shared/ui/VipDialog.vue'
 import VipTextarea from '@/shared/ui/VipTextarea.vue'
 import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
+import VipMenu from '@/shared/ui/VipMenu.vue'
+import VipConfirmDialog from '@/shared/ui/VipConfirmDialog.vue'
+import { safeErrorText } from '@/shared/lib/safeError'
 
 const router = useRouter()
 const platform = usePlatformStore()
@@ -155,17 +158,94 @@ function qualityTone(score: number | null): 'success' | 'warning' | 'danger' {
   return 'danger'
 }
 
-const columns: Column<Dataset>[] = [
+const canArchive = computed(() => platform.can('dataset.archive'))
+const canDelete = computed(() => platform.can('dataset.delete'))
+const columns = computed<Column<Dataset>[]>(() => [
   { key: 'name', label: 'Dataset', width: '32%' },
   { key: 'owner', label: 'Owner' },
   { key: 'rowCount', label: 'Rows', align: 'right' },
   { key: 'qualityScore', label: 'Quality', align: 'right' },
   { key: 'freshness', label: 'Freshness', align: 'right' },
   { key: 'status', label: 'Status' },
-]
+  ...(canArchive.value || canDelete.value ? [{ key: 'actions', label: '', align: 'right' as const }] : []),
+])
 
 function open(row: Dataset) {
   router.push(`/datasets/${row.id}`)
+}
+
+// --- Archive / delete lifecycle (both soft-archive metadata server-side; no restore) ---
+const lifecycle = ref<{ kind: 'archive' | 'delete'; row: Dataset } | null>(null)
+const lifecyclePending = ref(false)
+const lifecycleError = ref<string | null>(null)
+
+function rowMenu() {
+  return [
+    ...(canArchive.value ? [{ key: 'archive', label: 'Archive', icon: 'archive', danger: true }] : []),
+    ...(canDelete.value ? [{ key: 'delete', label: 'Delete', icon: 'trash', danger: true }] : []),
+  ]
+}
+function onRowMenu(row: Dataset, key: string) {
+  if (key === 'archive' || key === 'delete') {
+    lifecycleError.value = null
+    lifecycle.value = { kind: key, row }
+  }
+}
+function closeLifecycle() {
+  if (lifecyclePending.value) return
+  lifecycle.value = null
+  lifecycleError.value = null
+}
+const lifecycleDialog = computed(() => {
+  const ctx = lifecycle.value
+  if (!ctx) return null
+  const shared = {
+    resourceName: ctx.row.name,
+    impact: [
+      `Owner: ${ctx.row.owner} · ${formatNumber(ctx.row.rowCount, { style: 'compact' })} rows`,
+      'Pipelines, semantic models, metrics and dashboards that use it may break.',
+      'This archives the dataset metadata only — the underlying source data is not deleted.',
+    ],
+    note: 'Not reversible from the UI — no restore endpoint is available.',
+  }
+  return ctx.kind === 'archive'
+    ? {
+        ...shared,
+        level: 'warning' as const,
+        title: 'Archive dataset?',
+        message: 'This dataset will be removed from the active dataset catalog.',
+        confirmLabel: 'Archive',
+        requireTyping: false,
+      }
+    : {
+        ...shared,
+        level: 'danger' as const,
+        title: 'Delete dataset?',
+        message: 'Delete is an elevated, audited action that removes this dataset from the catalog.',
+        confirmLabel: 'Delete',
+        requireTyping: true,
+      }
+})
+async function confirmLifecycle() {
+  const ctx = lifecycle.value
+  if (!ctx) return
+  lifecyclePending.value = true
+  lifecycleError.value = null
+  try {
+    if (ctx.kind === 'archive') await datasetService.archive(ctx.row.id)
+    else await datasetService.remove(ctx.row.id)
+    ui.pushToast({
+      kind: 'success',
+      title: ctx.kind === 'archive' ? 'Dataset archived' : 'Dataset deleted',
+      message: ctx.row.name,
+    })
+    lifecycle.value = null
+    await refetch()
+  } catch (e) {
+    lifecycleError.value = safeErrorText(e)
+  } finally {
+    lifecyclePending.value = false
+  }
 }
 </script>
 
@@ -239,8 +319,37 @@ function open(row: Dataset) {
         <template #cell-status="{ row }">
           <VipBadge :tone="STATUS_TONE[row.status]" variant="soft" size="sm">{{ row.status }}</VipBadge>
         </template>
+
+        <template #cell-actions="{ row }">
+          <div class="dl__actions" @click.stop>
+            <VipMenu :items="rowMenu()" align="end" @select="onRowMenu(row, $event)">
+              <template #trigger>
+                <button class="dl__menu" :aria-label="`Actions for ${row.name}`">
+                  <VipIcon name="dotsV" :size="16" />
+                </button>
+              </template>
+            </VipMenu>
+          </div>
+        </template>
       </VipTable>
     </VipCard>
+
+    <VipConfirmDialog
+      v-if="lifecycleDialog"
+      :open="!!lifecycle"
+      :level="lifecycleDialog.level"
+      :title="lifecycleDialog.title"
+      :resource-name="lifecycleDialog.resourceName"
+      :message="lifecycleDialog.message"
+      :impact="lifecycleDialog.impact"
+      :note="lifecycleDialog.note"
+      :confirm-label="lifecycleDialog.confirmLabel"
+      :require-typing="lifecycleDialog.requireTyping"
+      :pending="lifecyclePending"
+      :error="lifecycleError"
+      @confirm="confirmLifecycle"
+      @cancel="closeLifecycle"
+    />
     <VipDialog
       :open="discoverOpen"
       :title="dialogMode === 'csv' ? 'Import CSV dataset' : 'Discover datasets'"
@@ -373,6 +482,26 @@ function open(row: Dataset) {
 }
 .dl__muted {
   color: var(--vip-text-muted);
+}
+.dl__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.dl__menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--vip-text-secondary);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--vip-radius-md);
+}
+.dl__menu:hover {
+  background: var(--vip-surface-hover);
+  border-color: var(--vip-border);
+  color: var(--vip-text-primary);
 }
 .discovery-form {
   display: grid;

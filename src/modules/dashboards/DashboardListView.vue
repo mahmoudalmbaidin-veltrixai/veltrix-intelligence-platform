@@ -15,11 +15,89 @@ import VipSegmented from '@/shared/ui/VipSegmented.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipSkeleton from '@/shared/ui/VipSkeleton.vue'
 import VipMenu from '@/shared/ui/VipMenu.vue'
+import VipConfirmDialog from '@/shared/ui/VipConfirmDialog.vue'
+import { safeErrorText } from '@/shared/lib/safeError'
 
 const router = useRouter()
 const platform = usePlatformStore()
 const ui = useUiStore()
 const { data, isLoading, refetch } = useQuery('dashboards:list', () => dashboardService.list())
+
+type DashboardRow = NonNullable<typeof data.value>[number]
+
+// --- Lifecycle confirmation state (archive / delete) ---
+const lifecycle = ref<{ kind: 'archive' | 'delete'; row: DashboardRow } | null>(null)
+const lifecyclePending = ref(false)
+const lifecycleError = ref<string | null>(null)
+
+function openLifecycle(kind: 'archive' | 'delete', row: DashboardRow) {
+  lifecycleError.value = null
+  lifecycle.value = { kind, row }
+}
+function closeLifecycle() {
+  if (lifecyclePending.value) return
+  lifecycle.value = null
+  lifecycleError.value = null
+}
+
+const lifecycleDialog = computed(() => {
+  const ctx = lifecycle.value
+  if (!ctx) return null
+  const { kind, row } = ctx
+  if (kind === 'archive') {
+    return {
+      level: 'warning' as const,
+      title: 'Archive dashboard?',
+      resourceName: row.name,
+      message: 'This dashboard will be removed from all active dashboard lists.',
+      impact: [
+        `Current status: ${row.status}`,
+        'Published links and scheduled deliveries may stop working, per backend lifecycle rules.',
+        'Archived dashboards are not listed and cannot be restored from the app in this release.',
+      ],
+      note: 'Archiving is not reversible from the UI — no restore endpoint is available.',
+      confirmLabel: 'Archive',
+      requireTyping: false,
+    }
+  }
+  return {
+    level: 'danger' as const,
+    title: 'Delete dashboard?',
+    resourceName: row.name,
+    message: 'Delete is an elevated, audited action that removes this dashboard from all active lists.',
+    impact: [
+      `${row.pageCount} page(s) and ${row.widgetCount} visual(s) will no longer be accessible`,
+      `Current status: ${row.status}`,
+      'Published links, scheduled deliveries and exports referencing it may be affected.',
+    ],
+    note: 'The server soft-archives on delete; there is no in-app restore, so treat this as final.',
+    confirmLabel: 'Delete',
+    requireTyping: true,
+  }
+})
+
+async function confirmLifecycle() {
+  const ctx = lifecycle.value
+  if (!ctx) return
+  lifecyclePending.value = true
+  lifecycleError.value = null
+  try {
+    const version = await dashboardService.rowVersion(ctx.row.id)
+    await dashboardService[ctx.kind](ctx.row.id, version)
+    ui.pushToast({
+      kind: 'success',
+      title: ctx.kind === 'delete' ? 'Dashboard deleted' : 'Dashboard archived',
+      message: ctx.row.name,
+    })
+    lifecycle.value = null
+    await refetch()
+  } catch (error) {
+    // Keep the dialog open and surface the backend-provided reason (409, etc.).
+    lifecycleError.value = safeErrorText(error)
+  } finally {
+    lifecyclePending.value = false
+  }
+}
 
 const route = useRoute()
 const search = ref('')
@@ -64,14 +142,12 @@ async function onMenu(dashboard: (typeof items.value)[number], key: string) {
       await router.push(`/dashboards/${copy.id}/edit`)
       return
     } else if (key === 'archive' || key === 'delete') {
-      if (!window.confirm(`${key === 'delete' ? 'Delete' : 'Archive'} “${dashboard.name}”?`)) return
-      const version = await dashboardService.rowVersion(dashboard.id)
-      await dashboardService[key](dashboard.id, version)
-      ui.pushToast({ kind: 'success', title: key === 'delete' ? 'Dashboard deleted' : 'Dashboard archived' })
+      openLifecycle(key, dashboard)
+      return
     }
     await refetch()
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Dashboard action failed', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Dashboard action failed', message: safeErrorText(error) })
   }
 }
 </script>
@@ -144,6 +220,23 @@ async function onMenu(dashboard: (typeof items.value)[number], key: string) {
         </div>
       </VipCard>
     </div>
+
+    <VipConfirmDialog
+      v-if="lifecycleDialog"
+      :open="!!lifecycle"
+      :level="lifecycleDialog.level"
+      :title="lifecycleDialog.title"
+      :resource-name="lifecycleDialog.resourceName"
+      :message="lifecycleDialog.message"
+      :impact="lifecycleDialog.impact"
+      :note="lifecycleDialog.note"
+      :confirm-label="lifecycleDialog.confirmLabel"
+      :require-typing="lifecycleDialog.requireTyping"
+      :pending="lifecyclePending"
+      :error="lifecycleError"
+      @confirm="confirmLifecycle"
+      @cancel="closeLifecycle"
+    />
   </div>
 </template>
 

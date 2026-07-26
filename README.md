@@ -36,3 +36,41 @@ Operational endpoints are then available at `http://localhost:8000/health`, `/re
 Create a local account with `python -m vip_api.cli create-user` from `apps/api`, then run the
 frontend with `npm run dev` and sign in at `http://localhost:3009/login`. See the backend README for
 cookie, CSRF, tenancy, migration, testing, and environment details.
+
+## Architecture and local startup
+
+VIP is a full-stack platform. The Vue/Vite frontend is at the repository root, while the FastAPI
+backend is under `apps/api`. PostgreSQL stores platform data, Redis supports caching and background
+work, workers process asynchronous jobs, and file storage is configured by the backend. Docker
+Compose starts the backend services locally:
+
+```bash
+docker compose up --build
+```
+
+Install and run the frontend separately with the repository's npm lock file:
+
+```bash
+npm ci
+npm run dev
+```
+
+Copy the documented keys from `.env.example` into an ignored local environment file and supply
+environment-specific values. Never commit local environment files or credentials.
+
+## Netlify frontend deployment
+
+Netlify hosts only the Vue/Vite frontend. The repository-root configuration uses Node.js 22,
+`npm run build`, and publishes `dist`; its SPA redirect sends direct application routes to
+`index.html`. Netlify automatically installs dependencies from `package-lock.json` with npm.
+
+The frontend reads its API endpoint from the public browser variable `VITE_API_BASE_URL`. Configure
+it only when a publicly reachable HTTPS FastAPI deployment exists, together with the existing
+`VITE_API_MODE=live` and appropriate `VITE_APP_ENV` setting. Variables prefixed with `VITE_` are
+visible to browsers and must never contain database, Redis, SMTP, storage, signing, encryption,
+session, or other backend secrets.
+
+Netlify does not run FastAPI, PostgreSQL, Redis, workers, or backend file storage. Authentication
+and live platform data require a separate public backend deployment with HTTPS, correct CORS and
+CSRF origins, secure cookies, trusted hosts, PostgreSQL, Redis, workers, file storage, and backend
+secrets. Do not proxy a Netlify production deployment to localhost.

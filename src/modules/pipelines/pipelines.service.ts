@@ -262,6 +262,12 @@ export const pipelineService = {
   async retryRun(pipelineId: string, runId: string): Promise<PipelineRun> {
     return mapRun(await apiClient.post<RunDto>(`/api/v1/pipelines/${pipelineId}/runs/${runId}/retry`))
   },
+  // Backend implements DELETE as a soft-archive (sets archived_at); requires the
+  // current version for optimistic concurrency. There is no separate pipeline
+  // archive endpoint and no restore/unarchive endpoint.
+  async remove(id: string, expectedVersion: number): Promise<void> {
+    await apiClient.delete(`/api/v1/pipelines/${id}?expected_version=${expectedVersion}`)
+  },
 }
 
 export function newDraft(): Pipeline {
