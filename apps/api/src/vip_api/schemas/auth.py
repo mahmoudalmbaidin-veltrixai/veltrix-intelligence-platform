@@ -5,19 +5,33 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from vip_api.auth.models import User, UserStatus
 
 
 class LoginRequest(BaseModel):
-    email: str = Field(min_length=3, max_length=320)
+    # Username is the primary identifier; email is accepted for backward
+    # compatibility. At least one must be supplied.
+    username: str | None = Field(default=None, min_length=1, max_length=150)
+    email: str | None = Field(default=None, min_length=3, max_length=320)
     password: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def _require_identifier(self) -> LoginRequest:
+        if not (self.username or self.email):
+            raise ValueError("A username or email is required.")
+        return self
+
+    @property
+    def identifier(self) -> str:
+        return (self.username or self.email or "").strip()
 
 
 class AuthenticatedUser(BaseModel):
     id: UUID
-    email: str
+    username: str
+    email: str | None = None
     display_name: str
     status: UserStatus
     is_platform_admin: bool = False
@@ -26,6 +40,7 @@ class AuthenticatedUser(BaseModel):
     def from_user(cls, user: User) -> AuthenticatedUser:
         return cls(
             id=user.id,
+            username=user.username,
             email=user.email,
             display_name=user.display_name,
             status=user.status,

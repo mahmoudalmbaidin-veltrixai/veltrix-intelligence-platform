@@ -94,6 +94,10 @@ async def run_async_migrations() -> None:
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
+        # SQLAlchemy 2.0 async connections are commit-as-you-go: without an
+        # explicit commit the transaction is rolled back when the block exits,
+        # which silently discards the applied migration. Commit explicitly.
+        await connection.commit()
     await connectable.dispose()
 
 

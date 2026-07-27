@@ -43,13 +43,16 @@ const userCreatePending = ref(false)
 const userCreateError = ref<string | null>(null)
 const showPassword = ref(false)
 const userForm = ref({
-  email: '',
+  username: '',
   display_name: '',
+  email: '',
   password: '',
   is_platform_admin: false,
   organization_id: '',
   organization_role: 'organization_member',
 })
+// Username: required, lowercase letters/numbers/._- ; email is OPTIONAL.
+const usernameValid = computed(() => /^[a-z0-9][a-z0-9._-]{2,}$/.test(userForm.value.username.trim().toLowerCase()))
 const orgRoleOptions = [
   { value: 'organization_admin', label: 'Admin — manage the org, members and content' },
   { value: 'organization_member', label: 'Member — use the org’s modules' },
@@ -59,7 +62,7 @@ const orgOptions = computed(() => [
   ...orgs.value.map((o) => ({ value: o.id, label: `${o.name} · ${o.slug}` })),
 ])
 // Credentials to share once, shown after a successful create.
-const createdCreds = ref<{ email: string; password: string } | null>(null)
+const createdCreds = ref<{ username: string; password: string } | null>(null)
 const userEmailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.value.email.trim()))
 
 // Organization detail dialog
@@ -134,7 +137,7 @@ async function toggleUser(row: PlatformUserRow) {
         ? await platformService.activateUser(row.id)
         : await platformService.suspendUser(row.id)
     row.status = updated.status
-    ui.pushToast({ kind: 'success', title: `User ${updated.status}`, message: row.email })
+    ui.pushToast({ kind: 'success', title: `User ${updated.status}`, message: row.email ?? `@${row.username}` })
     await loadOverview()
   } catch (error) {
     ui.pushToast({ kind: 'error', title: 'Action failed', message: safeErrorText(error) })
@@ -159,8 +162,9 @@ function generatePassword(): string {
 }
 function openCreateUser() {
   userForm.value = {
-    email: '',
+    username: '',
     display_name: '',
+    email: '',
     password: generatePassword(),
     is_platform_admin: false,
     organization_id: '',
@@ -182,8 +186,15 @@ async function copyText(text: string, label: string) {
   }
 }
 async function submitCreateUser() {
-  if (!userEmailValid.value || userForm.value.display_name.trim().length < 1 || userForm.value.password.length < 12) {
-    userCreateError.value = 'Enter a name, a valid email, and a password of at least 12 characters.'
+  const emailProvided = userForm.value.email.trim().length > 0
+  if (
+    !usernameValid.value ||
+    userForm.value.display_name.trim().length < 1 ||
+    userForm.value.password.length < 12 ||
+    (emailProvided && !userEmailValid.value)
+  ) {
+    userCreateError.value =
+      'Enter a valid username, a full name, a password of at least 12 characters, and a valid email if provided.'
     return
   }
   userCreatePending.value = true
@@ -191,16 +202,17 @@ async function submitCreateUser() {
   try {
     const assignOrg = userForm.value.organization_id !== ''
     const created = await platformService.createUser({
-      email: userForm.value.email.trim(),
+      username: userForm.value.username.trim(),
       display_name: userForm.value.display_name.trim(),
+      email: emailProvided ? userForm.value.email.trim() : null,
       password: userForm.value.password,
       is_platform_admin: userForm.value.is_platform_admin,
       organization_id: assignOrg ? userForm.value.organization_id : null,
       organization_role: assignOrg ? userForm.value.organization_role : null,
     })
     // Surface the credentials once so the operator can share them securely.
-    createdCreds.value = { email: created.email, password: userForm.value.password }
-    ui.pushToast({ kind: 'success', title: 'User created', message: created.email })
+    createdCreds.value = { username: created.username, password: userForm.value.password }
+    ui.pushToast({ kind: 'success', title: 'User created', message: `@${created.username}` })
     await Promise.all([loadUsers(), loadOverview()])
   } catch (error) {
     userCreateError.value = safeErrorText(error)
@@ -366,8 +378,13 @@ onMounted(loadOverview)
         <tbody>
           <tr v-for="u in users" :key="u.id">
             <td>
-              <div>{{ u.display_name }}</div>
-              <div class="pa__muted">{{ u.email }}</div>
+              <div>
+                {{ u.display_name }} <span class="pa__uname">@{{ u.username }}</span>
+              </div>
+              <div class="pa__muted">
+                <template v-if="u.email">{{ u.email }}</template>
+                <span v-else class="pa__no-email">No email configured</span>
+              </div>
             </td>
             <td>
               <VipBadge :tone="tone(u.status)" size="sm">{{ u.status }}</VipBadge>
@@ -430,12 +447,19 @@ onMounted(loadOverview)
       @close="userCreateOpen = false"
     >
       <div v-if="!createdCreds" class="pa__form">
-        <VipInput v-model="userForm.display_name" label="Full name (username)" placeholder="Jane Cooper" />
+        <VipInput v-model="userForm.display_name" label="Full name" placeholder="Jane Cooper" />
+        <VipInput
+          v-model="userForm.username"
+          label="Username (login identifier)"
+          placeholder="jane.cooper"
+          help="Required. Lowercase letters, numbers, dot, dash or underscore."
+        />
         <VipInput
           v-model="userForm.email"
-          label="Email (login identifier)"
+          label="Email (optional)"
           type="email"
           placeholder="jane@company.com"
+          help="Leave blank if the person has no email — email features simply stay disabled."
         />
         <div class="pa__pw">
           <VipInput
@@ -471,7 +495,7 @@ onMounted(loadOverview)
         />
         <VipCheckbox v-model="userForm.is_platform_admin" label="Grant platform-admin access (cross-tenant console)" />
         <p class="pa__hint">
-          The person signs in with this <strong>email + password</strong>. Pick an organization + role here to grant
+          The person signs in with their <strong>username + password</strong>. Pick an organization + role here to grant
           modules immediately, or leave it unassigned and add them later from an org’s <em>Members &amp; Roles</em>.
         </p>
         <p v-if="userCreateError" class="pa__error" role="alert">{{ userCreateError }}</p>
@@ -483,9 +507,9 @@ onMounted(loadOverview)
           Account created. Share these credentials securely — the password is shown only once.
         </p>
         <div class="pa__cred-row">
-          <span class="pa__cred-label">Email</span>
-          <code class="pa__cred-value">{{ createdCreds.email }}</code>
-          <VipButton variant="tertiary" size="xs" icon="copy" @click="copyText(createdCreds.email, 'Email')"
+          <span class="pa__cred-label">Username</span>
+          <code class="pa__cred-value">{{ createdCreds.username }}</code>
+          <VipButton variant="tertiary" size="xs" icon="copy" @click="copyText(createdCreds.username, 'Username')"
             >Copy</VipButton
           >
         </div>
@@ -504,7 +528,7 @@ onMounted(loadOverview)
           <VipButton
             variant="primary"
             :loading="userCreatePending"
-            :disabled="!userEmailValid || !userForm.display_name.trim()"
+            :disabled="!usernameValid || !userForm.display_name.trim()"
             @click="submitCreateUser"
             >Create user</VipButton
           >
@@ -645,6 +669,15 @@ onMounted(loadOverview)
   font-size: var(--vip-fs-xs);
   color: var(--vip-text-muted);
   line-height: 1.5;
+}
+.pa__uname {
+  font-family: var(--vip-font-mono);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.pa__no-email {
+  font-style: italic;
+  color: var(--vip-text-disabled);
 }
 .pa__creds {
   display: flex;

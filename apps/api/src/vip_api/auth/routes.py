@@ -96,7 +96,7 @@ async def login(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         )
     user, auth_session, tokens = await authenticate_login(
-        db, payload.email, payload.password, settings, password_service
+        db, payload.identifier, payload.password, settings, password_service
     )
     set_auth_cookies(response, tokens, settings)
     return auth_response(user, auth_session)

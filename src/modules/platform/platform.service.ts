@@ -59,7 +59,8 @@ export interface PlatformOrganizationDetail {
 
 export interface PlatformUserRow {
   id: string
-  email: string
+  username: string
+  email: string | null
   display_name: string
   status: string
   is_platform_admin: boolean
@@ -82,9 +83,10 @@ export interface CreateOrganizationInput {
 }
 
 export interface CreatePlatformUserInput {
-  email: string
+  username: string
   display_name: string
   password: string
+  email?: string | null
   is_platform_admin?: boolean
   /** Optionally assign into an org + role at creation (also grants default workspace). */
   organization_id?: string | null

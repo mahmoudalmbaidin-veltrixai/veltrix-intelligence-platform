@@ -1,5 +1,6 @@
 export interface LoginCredentials {
-  email: string
+  /** Username (primary) or email — the backend accepts either. */
+  username: string
   password: string
 }
 
@@ -7,7 +8,8 @@ export type UserStatus = 'pending' | 'active' | 'locked' | 'disabled' | 'suspend
 
 export interface AuthenticatedUser {
   id: string
-  email: string
+  username?: string
+  email?: string | null
   displayName: string
   status: UserStatus
   isPlatformAdmin: boolean

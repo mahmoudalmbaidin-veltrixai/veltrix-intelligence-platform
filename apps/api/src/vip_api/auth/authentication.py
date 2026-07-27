@@ -3,7 +3,7 @@
 import logging
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.auth.models import AuthSession, User, UserStatus, utc_now
@@ -22,20 +22,29 @@ def normalize_email(email: str) -> str:
 
 def invalid_credentials() -> ApplicationError:
     return ApplicationError(
-        code="INVALID_CREDENTIALS", message="Invalid email or password.", status_code=401
+        code="INVALID_CREDENTIALS", message="Invalid username or password.", status_code=401
     )
 
 
 async def authenticate_login(
     db: AsyncSession,
-    email: str,
+    identifier: str,
     password: str,
     settings: Settings,
     password_service: PasswordService,
 ) -> tuple[User, AuthSession, SessionTokens]:
     now = utc_now()
+    # Accept the username (primary) or the email (legacy) as the login identifier.
+    normalized = identifier.strip().casefold()
     user = await db.scalar(
-        select(User).where(User.normalized_email == normalize_email(email)).with_for_update()
+        select(User)
+        .where(
+            or_(
+                User.normalized_username == normalized,
+                User.normalized_email == normalized,
+            )
+        )
+        .with_for_update()
     )
     if user is None:
         password_service.verify_unknown_user(password)

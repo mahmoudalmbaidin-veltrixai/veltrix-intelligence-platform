@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.auth.authentication import normalize_email
-from vip_api.auth.models import User, UserStatus, utc_now
+from vip_api.auth.models import User, UserStatus, normalize_username, utc_now
 from vip_api.auth.password import PasswordService
 from vip_api.core.errors import ApplicationError
 from vip_api.governance.audit import record_audit
@@ -345,6 +345,7 @@ async def list_users(
         items.append(
             PlatformUserRow(
                 id=user.id,
+                username=user.username,
                 email=user.email,
                 display_name=user.display_name,
                 status=str(user.status),
@@ -365,24 +366,34 @@ async def create_user(
 ) -> PlatformUserRow:
     """Provision a user directly with an operator-set initial password.
 
-    Reuses the standard password hashing; no schema change. 'username' is the
-    display name, the login identifier is the email.
+    Login is by username (required). Email is optional — its uniqueness is only
+    checked when provided; a NULL email is stored (never a placeholder).
     """
-    normalized = normalize_email(payload.email)
-    existing = await db.scalar(select(User).where(User.normalized_email == normalized))
-    if existing is not None:
+    norm_username = normalize_username(payload.username)
+    if await db.scalar(select(User).where(User.normalized_username == norm_username)):
+        raise ApplicationError(
+            code="USERNAME_ALREADY_EXISTS",
+            message="A user with that username already exists.",
+            status_code=409,
+        )
+    email = payload.email.strip() if payload.email and payload.email.strip() else None
+    norm_email = normalize_email(email) if email else None
+    if norm_email and await db.scalar(select(User).where(User.normalized_email == norm_email)):
         raise ApplicationError(
             code="EMAIL_ALREADY_EXISTS",
             message="A user with that email already exists.",
             status_code=409,
         )
     user = User(
-        email=payload.email.strip(),
-        normalized_email=normalized,
+        username=payload.username.strip(),
+        normalized_username=norm_username,
+        email=email,
+        normalized_email=norm_email,
         password_hash=password_service.hash_password(payload.password),
         display_name=payload.display_name.strip(),
         status=UserStatus.ACTIVE,
         is_platform_admin=payload.is_platform_admin,
+        created_by=actor.id,
     )
     db.add(user)
     await db.flush()
@@ -402,6 +413,7 @@ async def create_user(
     org_count = 1 if payload.organization_id is not None and payload.organization_role else 0
     return PlatformUserRow(
         id=user.id,
+        username=user.username,
         email=user.email,
         display_name=user.display_name,
         status=str(user.status),
@@ -415,13 +427,19 @@ async def create_user(
 async def add_org_member(
     db: AsyncSession, actor: User, organization_id: UUID, payload: AddOrgMemberRequest
 ) -> PlatformUserRow:
-    """Add an existing user (by email) to an organization with a role."""
-    user = await db.scalar(
-        select(User).where(User.normalized_email == normalize_email(payload.email))
-    )
+    """Add an existing user (by username or email) to an organization with a role."""
+    if payload.username:
+        user = await db.scalar(
+            select(User).where(User.normalized_username == normalize_username(payload.username))
+        )
+    else:
+        assert payload.email is not None  # guaranteed by the request validator
+        user = await db.scalar(
+            select(User).where(User.normalized_email == normalize_email(payload.email))
+        )
     if user is None:
         raise ApplicationError(
-            code="USER_NOT_FOUND", message="No user exists with that email.", status_code=404
+            code="USER_NOT_FOUND", message="No user exists with that identifier.", status_code=404
         )
     await _provision_org_access(db, user, organization_id, payload.organization_role)
     await record_audit(
@@ -445,6 +463,7 @@ async def add_org_member(
     )
     return PlatformUserRow(
         id=user.id,
+        username=user.username,
         email=user.email,
         display_name=user.display_name,
         status=str(user.status),
@@ -494,6 +513,7 @@ async def set_user_status(
     )
     return PlatformUserRow(
         id=user.id,
+        username=user.username,
         email=user.email,
         display_name=user.display_name,
         status=str(user.status),

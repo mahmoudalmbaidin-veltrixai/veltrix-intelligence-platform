@@ -31,13 +31,11 @@ const shake = ref(false)
 
 const passwordField = ref<InstanceType<typeof VipInput>>()
 
-const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()))
-
 // Client-side validation surfaces only after the first submit attempt (live thereafter).
+// The identifier may be a username or an email, so only require a non-empty value.
 const emailClientError = computed(() => {
   if (!attempted.value) return ''
-  if (!email.value.trim()) return 'Enter your work email.'
-  if (!emailValid.value) return 'Enter a valid email address.'
+  if (!email.value.trim()) return 'Enter your username or email.'
   return ''
 })
 const passwordClientError = computed(() => {
@@ -89,7 +87,7 @@ function triggerShake() {
 async function submit() {
   if (submitting.value) return // prevent double-submit
   attempted.value = true
-  if (!email.value.trim() || !emailValid.value || !password.value) {
+  if (!email.value.trim() || !password.value) {
     triggerShake()
     return
   }
@@ -133,13 +131,12 @@ function forgotPassword() {
       <form class="login__form" novalidate @submit.prevent="submit">
         <VipInput
           v-model="email"
-          label="Work email"
-          type="email"
-          name="email"
+          label="Username or email"
+          type="text"
+          name="username"
           autocomplete="username"
-          inputmode="email"
           icon="users"
-          placeholder="you@company.com"
+          placeholder="your.username"
           :error="emailError"
           :disabled="submitting"
           required
