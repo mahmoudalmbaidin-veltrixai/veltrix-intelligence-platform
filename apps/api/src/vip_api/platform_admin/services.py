@@ -9,19 +9,25 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.auth.authentication import normalize_email
 from vip_api.auth.models import User, UserStatus, normalize_username, utc_now
 from vip_api.auth.password import PasswordService
+from vip_api.auth.sessions import revoke_all_user_sessions
 from vip_api.core.errors import ApplicationError
 from vip_api.governance.audit import record_audit
+from vip_api.governance.models import Role
 from vip_api.governance.services import get_role
 from vip_api.platform_admin.schemas import (
     AddOrgMemberRequest,
+    AddWorkspaceMemberRequest,
+    AdminResetPasswordRequest,
     CreateOrganizationRequest,
     CreatePlatformUserRequest,
+    CreateWorkspaceRequest,
+    OrgAssignment,
     PlatformMemberRow,
     PlatformOrganizationDetail,
     PlatformOrganizationList,
@@ -30,6 +36,9 @@ from vip_api.platform_admin.schemas import (
     PlatformUserList,
     PlatformUserRow,
     PlatformWorkspaceRow,
+    UpdatePlatformUserRequest,
+    UserAccessSummary,
+    WorkspaceAssignment,
 )
 from vip_api.schemas.tenancy import OrganizationCreate
 from vip_api.tenancy.models import (
@@ -322,7 +331,11 @@ async def list_users(
     count_stmt = select(func.count()).select_from(User)
     if search:
         term = f"%{search.strip().lower()}%"
-        clause = func.lower(User.email).like(term) | func.lower(User.display_name).like(term)
+        clause = (
+            func.lower(User.username).like(term)
+            | func.lower(User.email).like(term)
+            | func.lower(User.display_name).like(term)
+        )
         base = base.where(clause)
         count_stmt = count_stmt.where(clause)
     total = await db.scalar(count_stmt) or 0
@@ -521,4 +534,403 @@ async def set_user_status(
         organization_count=org_count,
         created_at=user.created_at,
         last_login_at=user.last_login_at,
+    )
+
+
+async def _resolve_user(db: AsyncSession, username: str | None, email: str | None) -> User:
+    if username:
+        user = await db.scalar(
+            select(User).where(User.normalized_username == normalize_username(username))
+        )
+    else:
+        assert email is not None
+        user = await db.scalar(select(User).where(User.normalized_email == normalize_email(email)))
+    if user is None:
+        raise ApplicationError(
+            code="USER_NOT_FOUND", message="No user exists with that identifier.", status_code=404
+        )
+    return user
+
+
+async def _provision_workspace_access(
+    db: AsyncSession, user: User, organization_id: UUID, workspace_id: UUID, ws_role_key: str
+) -> None:
+    """Assign a user to a specific workspace. Enforces org membership first."""
+    org_membership = await db.scalar(
+        select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == organization_id,
+            OrganizationMembership.user_id == user.id,
+        )
+    )
+    if org_membership is None or org_membership.status is not MembershipStatus.ACTIVE:
+        raise ApplicationError(
+            code="NOT_ORGANIZATION_MEMBER",
+            message="The user must belong to the organization before joining a workspace.",
+            status_code=409,
+        )
+    workspace = await db.scalar(
+        select(Workspace).where(
+            Workspace.id == workspace_id,
+            Workspace.organization_id == organization_id,
+            Workspace.status == WorkspaceStatus.ACTIVE,
+        )
+    )
+    if workspace is None:
+        raise ApplicationError(
+            code="WORKSPACE_NOT_FOUND",
+            message="Workspace not found in this organization.",
+            status_code=404,
+        )
+    role = await get_role(db, ws_role_key, "workspace")
+    membership = await db.scalar(
+        select(WorkspaceMembership).where(
+            WorkspaceMembership.workspace_id == workspace_id,
+            WorkspaceMembership.user_id == user.id,
+        )
+    )
+    if membership is None:
+        db.add(
+            WorkspaceMembership(
+                organization_id=organization_id,
+                workspace_id=workspace_id,
+                user_id=user.id,
+                role_id=role.id,
+                status=MembershipStatus.ACTIVE,
+            )
+        )
+    else:
+        membership.role_id = role.id
+        membership.status = MembershipStatus.ACTIVE
+
+
+async def add_workspace_member(
+    db: AsyncSession,
+    actor: User,
+    organization_id: UUID,
+    workspace_id: UUID,
+    payload: AddWorkspaceMemberRequest,
+) -> UserAccessSummary:
+    user = await _resolve_user(db, payload.username, payload.email)
+    await _provision_workspace_access(
+        db, user, organization_id, workspace_id, payload.workspace_role
+    )
+    await record_audit(
+        db,
+        "platform.workspace_member.added",
+        actor_user_id=actor.id,
+        organization_id=organization_id,
+        resource_type="workspace",
+        resource_id=workspace_id,
+        metadata={"user_id": str(user.id), "workspace_role": payload.workspace_role},
+    )
+    await db.commit()
+    return await get_access_summary(db, user.id)
+
+
+async def update_user(
+    db: AsyncSession, actor: User, user_id: UUID, payload: UpdatePlatformUserRequest
+) -> PlatformUserRow:
+    user = await db.get(User, user_id)
+    if user is None:
+        raise ApplicationError(code="USER_NOT_FOUND", message="User not found.", status_code=404)
+    if payload.display_name is not None:
+        user.display_name = payload.display_name.strip()
+    if payload.email is not None:
+        cleaned = payload.email.strip()
+        if cleaned == "":
+            user.email = None
+            user.normalized_email = None
+        else:
+            norm = normalize_email(cleaned)
+            dup = await db.scalar(
+                select(User.id).where(User.normalized_email == norm, User.id != user_id)
+            )
+            if dup is not None:
+                raise ApplicationError(
+                    code="EMAIL_ALREADY_EXISTS",
+                    message="A user with that email already exists.",
+                    status_code=409,
+                )
+            user.email = cleaned
+            user.normalized_email = norm
+    if payload.job_title is not None:
+        user.job_title = payload.job_title.strip() or None
+    if payload.department is not None:
+        user.department = payload.department.strip() or None
+    if payload.phone is not None:
+        user.phone = payload.phone.strip() or None
+    if payload.must_change_password is not None:
+        user.must_change_password = payload.must_change_password
+    if payload.default_organization_id is not None:
+        user.default_organization_id = payload.default_organization_id
+    if payload.default_workspace_id is not None:
+        user.default_workspace_id = payload.default_workspace_id
+    user.updated_by = actor.id
+    await record_audit(
+        db,
+        "platform.user.updated",
+        actor_user_id=actor.id,
+        organization_id=None,
+        resource_type="user",
+        resource_id=user.id,
+    )
+    await db.commit()
+    return await _user_row(db, user)
+
+
+async def reset_user_password(
+    db: AsyncSession,
+    actor: User,
+    user_id: UUID,
+    password_service: PasswordService,
+    payload: AdminResetPasswordRequest,
+) -> PlatformUserRow:
+    user = await db.get(User, user_id)
+    if user is None:
+        raise ApplicationError(code="USER_NOT_FOUND", message="User not found.", status_code=404)
+    user.password_hash = password_service.hash_password(payload.password)
+    user.password_changed_at = utc_now()
+    user.must_change_password = payload.must_change_password
+    user.failed_login_count = 0
+    user.locked_until = None
+    await revoke_all_user_sessions(db, user.id, "admin_password_reset")
+    await record_audit(
+        db,
+        "platform.user.password_reset",
+        actor_user_id=actor.id,
+        organization_id=None,
+        resource_type="user",
+        resource_id=user.id,
+    )
+    await db.commit()
+    return await _user_row(db, user)
+
+
+async def remove_org_access(
+    db: AsyncSession, actor: User, organization_id: UUID, user_id: UUID
+) -> None:
+    membership = await db.scalar(
+        select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == organization_id,
+            OrganizationMembership.user_id == user_id,
+        )
+    )
+    if membership is None:
+        raise ApplicationError(
+            code="MEMBERSHIP_NOT_FOUND", message="Membership not found.", status_code=404
+        )
+    # Cascade: removing organization access also removes the users workspace
+    # memberships within that organization.
+    await db.execute(
+        update(WorkspaceMembership)
+        .where(
+            WorkspaceMembership.organization_id == organization_id,
+            WorkspaceMembership.user_id == user_id,
+        )
+        .values(status=MembershipStatus.REMOVED)
+    )
+    membership.status = MembershipStatus.REMOVED
+    await record_audit(
+        db,
+        "platform.org_member.removed",
+        actor_user_id=actor.id,
+        organization_id=organization_id,
+        resource_type="user",
+        resource_id=user_id,
+    )
+    await db.commit()
+
+
+async def remove_workspace_access(
+    db: AsyncSession, actor: User, organization_id: UUID, workspace_id: UUID, user_id: UUID
+) -> None:
+    membership = await db.scalar(
+        select(WorkspaceMembership).where(
+            WorkspaceMembership.workspace_id == workspace_id,
+            WorkspaceMembership.user_id == user_id,
+        )
+    )
+    if membership is None:
+        raise ApplicationError(
+            code="MEMBERSHIP_NOT_FOUND", message="Workspace membership not found.", status_code=404
+        )
+    membership.status = MembershipStatus.REMOVED
+    await record_audit(
+        db,
+        "platform.workspace_member.removed",
+        actor_user_id=actor.id,
+        organization_id=organization_id,
+        resource_type="workspace",
+        resource_id=workspace_id,
+        metadata={"user_id": str(user_id)},
+    )
+    await db.commit()
+
+
+async def _user_row(db: AsyncSession, user: User) -> PlatformUserRow:
+    org_count = (
+        await db.scalar(
+            select(func.count()).where(
+                OrganizationMembership.user_id == user.id,
+                OrganizationMembership.status.in_(_ACTIVE_MEMBER),
+            )
+        )
+        or 0
+    )
+    return PlatformUserRow(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        display_name=user.display_name,
+        status=str(user.status),
+        is_platform_admin=user.is_platform_admin,
+        organization_count=org_count,
+        created_at=user.created_at,
+        last_login_at=user.last_login_at,
+    )
+
+
+async def get_access_summary(db: AsyncSession, user_id: UUID) -> UserAccessSummary:
+    user = await db.get(User, user_id)
+    if user is None:
+        raise ApplicationError(code="USER_NOT_FOUND", message="User not found.", status_code=404)
+
+    org_rows = (
+        await db.execute(
+            select(OrganizationMembership, Organization, Role)
+            .join(Organization, Organization.id == OrganizationMembership.organization_id)
+            .join(Role, Role.id == OrganizationMembership.role_id)
+            .where(
+                OrganizationMembership.user_id == user_id,
+                OrganizationMembership.status == MembershipStatus.ACTIVE,
+            )
+            .order_by(Organization.name)
+        )
+    ).all()
+    organizations = [
+        OrgAssignment(
+            organization_id=org.id,
+            organization_name=org.name,
+            organization_slug=org.slug,
+            role=role.key,
+            status=str(membership.status),
+        )
+        for membership, org, role in org_rows
+    ]
+
+    ws_rows = (
+        await db.execute(
+            select(WorkspaceMembership, Workspace, Organization, Role)
+            .join(Workspace, Workspace.id == WorkspaceMembership.workspace_id)
+            .join(Organization, Organization.id == WorkspaceMembership.organization_id)
+            .join(Role, Role.id == WorkspaceMembership.role_id)
+            .where(
+                WorkspaceMembership.user_id == user_id,
+                WorkspaceMembership.status == MembershipStatus.ACTIVE,
+            )
+            .order_by(Organization.name, Workspace.name)
+        )
+    ).all()
+    workspaces = [
+        WorkspaceAssignment(
+            organization_id=org.id,
+            workspace_id=ws.id,
+            workspace_name=ws.name,
+            organization_name=org.name,
+            role=role.key,
+            status=str(membership.status),
+        )
+        for membership, ws, org, role in ws_rows
+    ]
+
+    return UserAccessSummary(
+        user_id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        email=user.email,
+        status=str(user.status),
+        default_organization_id=user.default_organization_id,
+        default_workspace_id=user.default_workspace_id,
+        organizations=organizations,
+        workspaces=workspaces,
+    )
+
+
+async def create_workspace(
+    db: AsyncSession, actor: User, organization_id: UUID, payload: CreateWorkspaceRequest
+) -> PlatformWorkspaceRow:
+    organization = await db.get(Organization, organization_id)
+    if organization is None:
+        raise ApplicationError(
+            code="ORGANIZATION_NOT_FOUND", message="Organization not found.", status_code=404
+        )
+    duplicate = await db.scalar(
+        select(Workspace.id).where(
+            Workspace.organization_id == organization_id,
+            Workspace.slug == payload.slug,
+            Workspace.status != WorkspaceStatus.DELETED,
+        )
+    )
+    if duplicate is not None:
+        raise ApplicationError(
+            code="WORKSPACE_SLUG_CONFLICT",
+            message="A workspace with that slug already exists in this organization.",
+            status_code=409,
+        )
+    workspace = Workspace(
+        organization_id=organization_id,
+        name=payload.name.strip(),
+        slug=payload.slug,
+        status=WorkspaceStatus.ACTIVE,
+        is_default=False,
+        created_by_user_id=actor.id,
+    )
+    db.add(workspace)
+    await db.flush()
+    await record_audit(
+        db,
+        "platform.workspace.created",
+        actor_user_id=actor.id,
+        organization_id=organization_id,
+        resource_type="workspace",
+        resource_id=workspace.id,
+    )
+    await db.commit()
+    return PlatformWorkspaceRow(
+        id=workspace.id,
+        name=workspace.name,
+        slug=workspace.slug,
+        status=str(workspace.status),
+        is_default=workspace.is_default,
+    )
+
+
+async def set_workspace_status(
+    db: AsyncSession, actor: User, organization_id: UUID, workspace_id: UUID, *, suspend: bool
+) -> PlatformWorkspaceRow:
+    workspace = await db.scalar(
+        select(Workspace).where(
+            Workspace.id == workspace_id, Workspace.organization_id == organization_id
+        )
+    )
+    if workspace is None or workspace.status is WorkspaceStatus.DELETED:
+        raise ApplicationError(
+            code="WORKSPACE_NOT_FOUND", message="Workspace not found.", status_code=404
+        )
+    workspace.status = WorkspaceStatus.SUSPENDED if suspend else WorkspaceStatus.ACTIVE
+    await record_audit(
+        db,
+        "platform.workspace.suspended" if suspend else "platform.workspace.activated",
+        actor_user_id=actor.id,
+        organization_id=organization_id,
+        resource_type="workspace",
+        resource_id=workspace.id,
+    )
+    await db.commit()
+    return PlatformWorkspaceRow(
+        id=workspace.id,
+        name=workspace.name,
+        slug=workspace.slug,
+        status=str(workspace.status),
+        is_default=workspace.is_default,
     )
