@@ -1,8 +1,9 @@
-import { test, expect, E2E_PASSWORD, signInAs } from './fixtures'
+import { test, expect, E2E_PASSWORD, selectOrganizationByName, signInAs } from './fixtures'
 
 test('organization and workspace switchers use authorized backend data', async ({ authenticatedPage: page }) => {
   await page.context().clearCookies()
   await signInAs(page, 'tenant-a@vip.demo', E2E_PASSWORD)
+  await selectOrganizationByName(page, 'Organization Alpha')
   await expect(page.getByRole('button', { name: 'Organization: Organization Alpha' })).toBeVisible()
   await page.getByRole('button', { name: 'Organization: Organization Alpha' }).click()
   await expect(page.getByRole('menuitem', { name: 'Organization Beta' })).toHaveCount(0)
@@ -18,6 +19,7 @@ test('workspace switching changes headers and survives reload only after validat
 }) => {
   await page.context().clearCookies()
   await signInAs(page, 'tenant-a@vip.demo', E2E_PASSWORD)
+  await selectOrganizationByName(page, 'Organization Alpha')
   const observed: Array<{ organization?: string; workspace?: string }> = []
   page.on('request', (request) => {
     if (request.url().includes('/api/v1/')) {

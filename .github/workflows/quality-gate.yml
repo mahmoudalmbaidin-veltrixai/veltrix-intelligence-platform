@@ -98,6 +98,9 @@ jobs:
           VIP_DEMO_USER_C_PASSWORD="$VIP_E2E_PASSWORD" \
           python -m vip_api.cli seed-multitenancy-demo
         working-directory: apps/api
+      - name: Grant platform super-admin to the browser-test owner
+        run: python -m vip_api.cli grant-platform-admin --email tenant-a@vip.demo
+        working-directory: apps/api
       - name: Configure governance personas
         run: |
           VIP_GOVERNANCE_ADMIN_PASSWORD="$VIP_E2E_PASSWORD" \

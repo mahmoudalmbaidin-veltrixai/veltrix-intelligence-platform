@@ -11,7 +11,11 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.auth.models import utc_now
-from vip_api.connections.catalog import validate_configuration, validate_credentials
+from vip_api.connections.catalog import (
+    CONNECTION_TYPE_BY_KEY,
+    validate_configuration,
+    validate_credentials,
+)
 from vip_api.connections.models import Connection, ConnectionType
 from vip_api.connections.network import UnsafeDestinationError
 from vip_api.connections.repositories import ConnectionRepository
@@ -166,11 +170,27 @@ def serialize_connection(
 
 
 def serialize_type(item: ConnectionType) -> ConnectionTypeResponse:
+    # Enterprise metadata (implementation status, vendor, auth methods, network
+    # requirements) is code-authoritative and served from the checked-in catalog.
+    definition = CONNECTION_TYPE_BY_KEY.get(item.key)
+    if definition is not None:
+        status = definition.implementation_status
+    else:
+        status = "available" if item.is_enabled else "planned"
     return ConnectionTypeResponse(
         key=item.key,
         name=item.name,
         description=item.description,
         category=item.category,
+        subcategory=definition.subcategory if definition else "",
+        vendor=definition.vendor if definition else item.name,
+        implementation_status=status,
+        deployment=definition.deployment if definition else "cloud",
+        auth_methods=list(definition.auth_methods) if definition else [],
+        documentation_reference=definition.documentation_reference if definition else None,
+        requirements=list(definition.requirements) if definition else [],
+        feature_flag=definition.feature_flag if definition else None,
+        beta=definition.beta if definition else False,
         configuration_schema=item.configuration_schema,
         secret_schema=item.secret_schema,
         capabilities=item.capabilities,

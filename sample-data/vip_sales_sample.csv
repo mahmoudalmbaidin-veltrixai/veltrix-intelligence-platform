@@ -1,0 +1,61 @@
+order_id,order_date,region,country,category,product,sales_rep,units,unit_price,discount_pct,revenue
+ORD-1001,2026-07-08,Jeddah,KSA,Analytics,VIP Metrics,Sara Al-Otaibi,18,702.84,0,12651.12
+ORD-1002,2026-05-10,Jeddah,KSA,Storage,VIP Lake,Huda Mansour,2,342.99,0,685.98
+ORD-1003,2026-01-02,Riyadh,KSA,Integration,VIP Pipeline,Omar Haddad,15,1189.12,0,17836.8
+ORD-1004,2026-03-28,Manama,Bahrain,AI,VIP Forecast,Sara Al-Otaibi,10,632.45,0.2,5059.6
+ORD-1005,2026-03-09,Jeddah,KSA,Storage,VIP Lake,Sara Al-Otaibi,23,2137.04,0.1,44236.73
+ORD-1006,2026-06-10,Kuwait City,Kuwait,Analytics,VIP Insight,Huda Mansour,6,1433.86,0.2,6882.53
+ORD-1007,2026-03-16,Doha,Qatar,Integration,VIP Connect,Sara Al-Otaibi,3,1693.81,0.2,4065.14
+ORD-1008,2026-04-04,Dubai,UAE,Analytics,VIP Insight,Omar Haddad,18,1199.12,0.2,17267.33
+ORD-1009,2026-06-15,Doha,Qatar,AI,VIP Copilot,Sara Al-Otaibi,18,1790.33,0.15,27392.05
+ORD-1010,2026-06-26,Dammam,KSA,Integration,VIP Connect,Huda Mansour,30,1023.1,0.15,26089.05
+ORD-1011,2026-03-22,Dubai,UAE,AI,VIP Copilot,Yousef Karim,15,2075.89,0.2,24910.68
+ORD-1012,2026-02-24,Abu Dhabi,UAE,Analytics,VIP Analytics Pro,Faisal Rashid,37,2205.75,0,81612.75
+ORD-1013,2026-07-10,Kuwait City,Kuwait,Storage,VIP Vault,Huda Mansour,10,750.41,0,7504.1
+ORD-1014,2026-05-11,Abu Dhabi,UAE,Storage,VIP Vault,Yousef Karim,24,641.98,0,15407.52
+ORD-1015,2026-06-24,Jeddah,KSA,Analytics,VIP Analytics Pro,Yousef Karim,10,1613.32,0.2,12906.56
+ORD-1016,2026-03-06,Jeddah,KSA,Storage,VIP Vault,Huda Mansour,39,2490.77,0.1,87426.03
+ORD-1017,2026-06-14,Riyadh,KSA,Analytics,VIP Metrics,Layla Nasser,35,1907.09,0.2,53398.52
+ORD-1018,2026-07-04,Jeddah,KSA,AI,VIP Forecast,Layla Nasser,11,1199.86,0.15,11218.69
+ORD-1019,2026-06-05,Dammam,KSA,Analytics,VIP Metrics,Omar Haddad,20,2123.17,0.1,38217.06
+ORD-1020,2026-01-01,Dammam,KSA,AI,VIP Copilot,Huda Mansour,35,2389.33,0.1,75263.9
+ORD-1021,2026-03-20,Doha,Qatar,Storage,VIP Lake,Omar Haddad,8,2331.25,0.2,14920.0
+ORD-1022,2026-01-18,Riyadh,KSA,Integration,VIP Connect,Huda Mansour,6,1861.94,0.2,8937.31
+ORD-1023,2026-06-05,Dammam,KSA,Integration,VIP Pipeline,Yousef Karim,36,513.0,0.1,16621.2
+ORD-1024,2026-04-06,Dubai,UAE,Integration,VIP Pipeline,Yousef Karim,26,2488.46,0.15,54994.97
+ORD-1025,2026-05-31,Kuwait City,Kuwait,Analytics,VIP Analytics Pro,Huda Mansour,15,272.38,0,4085.7
+ORD-1026,2026-02-28,Dubai,UAE,Integration,VIP Connect,Sara Al-Otaibi,5,1804.66,0,9023.3
+ORD-1027,2026-05-05,Riyadh,KSA,AI,VIP Copilot,Omar Haddad,33,686.45,0.15,19254.92
+ORD-1028,2026-01-25,Dammam,KSA,Storage,VIP Lake,Sara Al-Otaibi,31,2041.84,0,63297.04
+ORD-1029,2026-01-14,Manama,Bahrain,AI,VIP Forecast,Faisal Rashid,27,1231.52,0.15,28263.38
+ORD-1030,2026-03-05,Jeddah,KSA,Analytics,VIP Insight,Omar Haddad,22,2025.41,0,44559.02
+ORD-1031,2026-03-05,Dubai,UAE,Storage,VIP Lake,Sara Al-Otaibi,28,556.7,0.05,14808.22
+ORD-1032,2026-07-12,Kuwait City,Kuwait,Analytics,VIP Analytics Pro,Omar Haddad,35,2109.75,0,73841.25
+ORD-1033,2026-01-16,Dammam,KSA,Storage,VIP Vault,Omar Haddad,31,628.72,0.05,18515.8
+ORD-1034,2026-04-27,Manama,Bahrain,Analytics,VIP Insight,Layla Nasser,17,2325.11,0.2,31621.5
+ORD-1035,2026-05-29,Manama,Bahrain,Storage,VIP Lake,Faisal Rashid,13,826.16,0,10740.08
+ORD-1036,2026-05-16,Riyadh,KSA,AI,VIP Copilot,Omar Haddad,4,1510.34,0.1,5437.22
+ORD-1037,2026-03-02,Riyadh,KSA,Analytics,VIP Analytics Pro,Yousef Karim,5,1536.18,0.15,6528.77
+ORD-1038,2026-05-30,Jeddah,KSA,Integration,VIP Connect,Huda Mansour,40,315.12,0.15,10714.08
+ORD-1039,2026-02-03,Doha,Qatar,AI,VIP Copilot,Faisal Rashid,21,688.07,0.05,13727.0
+ORD-1040,2026-05-25,Abu Dhabi,UAE,Storage,VIP Vault,Sara Al-Otaibi,5,142.17,0.1,639.76
+ORD-1041,2026-03-04,Jeddah,KSA,Integration,VIP Pipeline,Layla Nasser,9,2341.16,0,21070.44
+ORD-1042,2026-06-17,Abu Dhabi,UAE,Integration,VIP Pipeline,Huda Mansour,35,1794.43,0.1,56524.55
+ORD-1043,2026-07-10,Riyadh,KSA,AI,VIP Copilot,Huda Mansour,9,749.43,0,6744.87
+ORD-1044,2026-02-22,Dammam,KSA,AI,VIP Forecast,Faisal Rashid,39,621.3,0,24230.7
+ORD-1045,2026-03-12,Abu Dhabi,UAE,Storage,VIP Vault,Sara Al-Otaibi,4,339.67,0.05,1290.75
+ORD-1046,2026-05-22,Riyadh,KSA,AI,VIP Copilot,Faisal Rashid,17,504.57,0.05,8148.81
+ORD-1047,2026-02-08,Manama,Bahrain,Analytics,VIP Analytics Pro,Huda Mansour,5,2369.22,0.15,10069.18
+ORD-1048,2026-04-04,Riyadh,KSA,AI,VIP Copilot,Sara Al-Otaibi,28,423.32,0,11852.96
+ORD-1049,2026-04-15,Doha,Qatar,Integration,VIP Connect,Huda Mansour,7,961.76,0.1,6059.09
+ORD-1050,2026-02-15,Dammam,KSA,Integration,VIP Connect,Faisal Rashid,12,2217.77,0,26613.24
+ORD-1051,2026-01-28,Doha,Qatar,Storage,VIP Lake,Yousef Karim,18,498.89,0.15,7633.02
+ORD-1052,2026-03-31,Riyadh,KSA,Storage,VIP Lake,Layla Nasser,13,2063.48,0.05,25483.98
+ORD-1053,2026-01-18,Dubai,UAE,Integration,VIP Connect,Layla Nasser,13,1068.35,0,13888.55
+ORD-1054,2026-02-15,Doha,Qatar,Storage,VIP Vault,Huda Mansour,2,394.51,0,789.02
+ORD-1055,2026-03-22,Abu Dhabi,UAE,Analytics,VIP Analytics Pro,Yousef Karim,39,1154.26,0.15,38263.72
+ORD-1056,2026-01-01,Jeddah,KSA,Storage,VIP Lake,Huda Mansour,17,225.64,0.05,3644.09
+ORD-1057,2026-06-09,Dubai,UAE,AI,VIP Forecast,Layla Nasser,5,2378.32,0,11891.6
+ORD-1058,2026-03-17,Jeddah,KSA,AI,VIP Forecast,Huda Mansour,27,896.32,0.15,20570.54
+ORD-1059,2026-06-07,Dammam,KSA,Integration,VIP Pipeline,Huda Mansour,25,1732.02,0,43300.5
+ORD-1060,2026-05-29,Abu Dhabi,UAE,Storage,VIP Lake,Huda Mansour,20,802.85,0.05,15254.15

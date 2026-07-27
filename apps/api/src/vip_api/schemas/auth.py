@@ -20,10 +20,17 @@ class AuthenticatedUser(BaseModel):
     email: str
     display_name: str
     status: UserStatus
+    is_platform_admin: bool = False
 
     @classmethod
     def from_user(cls, user: User) -> AuthenticatedUser:
-        return cls(id=user.id, email=user.email, display_name=user.display_name, status=user.status)
+        return cls(
+            id=user.id,
+            email=user.email,
+            display_name=user.display_name,
+            status=user.status,
+            is_platform_admin=user.is_platform_admin,
+        )
 
 
 class SessionInfo(BaseModel):

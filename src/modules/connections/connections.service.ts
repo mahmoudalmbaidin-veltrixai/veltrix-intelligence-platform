@@ -19,17 +19,65 @@ export interface SafeJsonSchema {
   required?: string[]
 }
 
+export type ImplementationStatus = 'available' | 'beta' | 'planned' | 'requires_agent' | 'requires_driver' | 'disabled'
+
 export interface ConnectionType {
   key: string
   name: string
   description: string
   category: string
+  subcategory: string
+  vendor: string
+  implementation_status: ImplementationStatus
+  deployment: 'cloud' | 'on_prem' | 'hybrid'
+  auth_methods: string[]
+  documentation_reference: string | null
+  requirements: string[]
+  feature_flag: string | null
+  beta: boolean
   configuration_schema: SafeJsonSchema
   secret_schema: SafeJsonSchema
   capabilities: string[]
   test_strategy: string
   is_enabled: boolean
   version: number
+}
+
+export interface StatusPresentation {
+  label: string
+  tone: 'success' | 'info' | 'neutral' | 'warning'
+}
+
+export const CONNECTOR_STATUS: Record<ImplementationStatus, StatusPresentation> = {
+  available: { label: 'Available', tone: 'success' },
+  beta: { label: 'Beta', tone: 'info' },
+  planned: { label: 'Planned', tone: 'neutral' },
+  requires_driver: { label: 'Requires driver', tone: 'warning' },
+  requires_agent: { label: 'Requires agent', tone: 'warning' },
+  disabled: { label: 'Disabled', tone: 'neutral' },
+}
+
+export const CONNECTOR_CATEGORY_LABEL: Record<string, string> = {
+  database: 'Databases',
+  warehouse: 'Warehouses & analytics',
+  object_storage: 'Data lakes & storage',
+  file: 'Files & transfer',
+  api: 'APIs & integration',
+  erp: 'ERP systems',
+  crm: 'CRM & customer',
+  marketing: 'Marketing & commerce',
+  streaming: 'Streaming & messaging',
+  bi: 'BI & analytics',
+  collaboration: 'Collaboration & apps',
+  hr_finance: 'HR, finance & identity',
+  observability: 'Observability',
+  email: 'Email',
+}
+
+export const DEPLOYMENT_LABEL: Record<string, string> = {
+  cloud: 'Cloud',
+  on_prem: 'On-premise',
+  hybrid: 'Cloud / on-premise',
 }
 
 export interface Connection {
@@ -107,4 +155,24 @@ export const connectionService = {
     }),
 }
 
-export const connectionIcon = (key: string): string => (key === 'rest_api' ? 'webhook' : 'database')
+const CATEGORY_ICON: Record<string, string> = {
+  database: 'database',
+  warehouse: 'layers',
+  object_storage: 'archive',
+  file: 'file',
+  api: 'webhook',
+  erp: 'building',
+  crm: 'users',
+  marketing: 'chart',
+  streaming: 'activity',
+  bi: 'chart',
+  collaboration: 'message',
+  hr_finance: 'briefcase',
+  observability: 'pulse',
+  email: 'mail',
+}
+
+export const connectionIcon = (keyOrCategory: string, category?: string): string => {
+  if (keyOrCategory === 'rest_api') return 'webhook'
+  return CATEGORY_ICON[category ?? keyOrCategory] ?? 'database'
+}

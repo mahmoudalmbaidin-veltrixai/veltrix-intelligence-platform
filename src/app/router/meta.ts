@@ -10,6 +10,8 @@ declare module 'vue-router' {
     requiresAuth?: boolean
     requiresOrganization?: boolean
     requiresWorkspace?: boolean
+    /** Platform super-admin (cross-tenant operator) only. Non-admins get a 404. */
+    requiresPlatformAdmin?: boolean
     /** Guest-only route (e.g. login); redirects authenticated users to home. */
     publicOnly?: boolean
     permission?: Permission

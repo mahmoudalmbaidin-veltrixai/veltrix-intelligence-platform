@@ -12,25 +12,68 @@ export interface MenuItem {
   shortcut?: string
 }
 
-withDefaults(defineProps<{ items: MenuItem[]; align?: 'start' | 'end'; label?: string }>(), { align: 'end' })
+const props = withDefaults(defineProps<{ items: MenuItem[]; align?: 'start' | 'end'; label?: string }>(), {
+  align: 'end',
+})
 const emit = defineEmits<{ select: [string] }>()
 
 const open = ref(false)
 const root = ref<HTMLElement>()
 const panel = ref<HTMLElement>()
+// The panel is teleported to <body> and positioned with fixed coordinates so it
+// can never be clipped by an ancestor's `overflow: hidden` (cards, tables) or
+// trapped in a low stacking context. Coordinates are derived from the trigger.
+const pos = ref<{ top: number; left: number; minWidth: number }>({ top: 0, left: 0, minWidth: 190 })
+
+function triggerEl() {
+  return root.value?.querySelector<HTMLElement>('.vip-menu__trigger')
+}
+
+function updatePosition() {
+  const trigger = triggerEl()
+  const p = panel.value
+  if (!trigger || !p) return
+  const t = trigger.getBoundingClientRect()
+  const pw = p.offsetWidth
+  const ph = p.offsetHeight
+  const gap = 6
+  const margin = 8
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  let left = props.align === 'end' ? t.right - pw : t.left
+  left = Math.min(Math.max(margin, left), Math.max(margin, vw - pw - margin))
+  let top = t.bottom + gap
+  // Flip above the trigger when there is not enough room below.
+  if (top + ph > vh - margin && t.top - gap - ph > margin) {
+    top = t.top - gap - ph
+  }
+  top = Math.min(Math.max(margin, top), Math.max(margin, vh - ph - margin))
+  pos.value = { top, left, minWidth: Math.max(t.width, 190) }
+}
 
 async function toggle() {
   open.value = !open.value
   if (open.value) {
     await nextTick()
+    updatePosition()
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
     focusItem(0)
+  } else {
+    stopTracking()
   }
 }
+function stopTracking() {
+  window.removeEventListener('scroll', updatePosition, true)
+  window.removeEventListener('resize', updatePosition)
+}
 function focusTrigger() {
-  root.value?.querySelector<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])')?.focus()
+  triggerEl()?.querySelector<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])')?.focus()
 }
 function close(restoreFocus = false) {
+  if (!open.value) return
   open.value = false
+  stopTracking()
   if (restoreFocus) nextTick(focusTrigger)
 }
 
@@ -71,10 +114,15 @@ function choose(item: MenuItem) {
   close()
 }
 function onDocClick(e: MouseEvent) {
-  if (root.value && !root.value.contains(e.target as Node)) close()
+  const target = e.target as Node
+  if (root.value?.contains(target) || panel.value?.contains(target)) return
+  close()
 }
 document.addEventListener('click', onDocClick)
-onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocClick)
+  stopTracking()
+})
 </script>
 
 <template>
@@ -86,26 +134,35 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         </button>
       </slot>
     </div>
-    <Transition name="vip-menu-pop">
-      <div v-if="open" ref="panel" class="vip-menu__panel" :class="`is-${align}`" role="menu" @keydown="onMenuKeydown">
-        <template v-for="item in items" :key="item.key">
-          <div v-if="item.divider" class="vip-menu__divider" role="separator" />
-          <button
-            v-else
-            type="button"
-            role="menuitem"
-            class="vip-menu__item"
-            :class="{ 'is-danger': item.danger, 'is-disabled': item.disabled }"
-            :disabled="item.disabled"
-            @click="choose(item)"
-          >
-            <VipIcon v-if="item.icon" :name="item.icon" :size="15" />
-            <span class="vip-menu__item-label">{{ item.label }}</span>
-            <kbd v-if="item.shortcut" class="vip-menu__kbd">{{ item.shortcut }}</kbd>
-          </button>
-        </template>
-      </div>
-    </Transition>
+    <Teleport to="body">
+      <Transition name="vip-menu-pop">
+        <div
+          v-if="open"
+          ref="panel"
+          class="vip-menu__panel"
+          role="menu"
+          :style="{ top: `${pos.top}px`, left: `${pos.left}px`, minWidth: `${pos.minWidth}px` }"
+          @keydown="onMenuKeydown"
+        >
+          <template v-for="item in items" :key="item.key">
+            <div v-if="item.divider" class="vip-menu__divider" role="separator" />
+            <button
+              v-else
+              type="button"
+              role="menuitem"
+              class="vip-menu__item"
+              :class="{ 'is-danger': item.danger, 'is-disabled': item.disabled }"
+              :disabled="item.disabled"
+              @click="choose(item)"
+            >
+              <VipIcon v-if="item.icon" :name="item.icon" :size="15" />
+              <span class="vip-menu__item-label">{{ item.label }}</span>
+              <kbd v-if="item.shortcut" class="vip-menu__kbd">{{ item.shortcut }}</kbd>
+            </button>
+          </template>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -129,24 +186,22 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   color: var(--vip-text-primary);
   font-size: var(--vip-fs-md);
 }
+</style>
+
+<style>
+/* Unscoped: the panel is teleported to <body>, outside this component's DOM. */
 .vip-menu__panel {
-  position: absolute;
-  top: calc(100% + 6px);
+  position: fixed;
   min-width: 190px;
+  max-width: min(320px, calc(100vw - 16px));
   background: var(--vip-surface-1);
   border: 1px solid var(--vip-border);
   border-radius: var(--vip-radius-md);
   box-shadow: var(--vip-shadow-lg);
   padding: var(--vip-sp-2);
-  z-index: var(--vip-z-dropdown);
+  z-index: var(--vip-z-popover);
 }
-.is-end {
-  right: 0;
-}
-.is-start {
-  left: 0;
-}
-.vip-menu__item {
+.vip-menu__panel .vip-menu__item {
   display: flex;
   align-items: center;
   gap: var(--vip-sp-4);
@@ -158,25 +213,26 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   color: var(--vip-text-secondary);
   font-size: var(--vip-fs-md);
   text-align: left;
+  cursor: pointer;
 }
-.vip-menu__item:hover {
+.vip-menu__panel .vip-menu__item:hover {
   background: var(--vip-surface-hover);
   color: var(--vip-text-primary);
 }
-.vip-menu__item.is-danger {
+.vip-menu__panel .vip-menu__item.is-danger {
   color: var(--vip-danger-text);
 }
-.vip-menu__item.is-danger:hover {
+.vip-menu__panel .vip-menu__item.is-danger:hover {
   background: var(--vip-danger-soft);
 }
-.vip-menu__item.is-disabled {
+.vip-menu__panel .vip-menu__item.is-disabled {
   opacity: 0.45;
   pointer-events: none;
 }
-.vip-menu__item-label {
+.vip-menu__panel .vip-menu__item-label {
   flex: 1;
 }
-.vip-menu__kbd {
+.vip-menu__panel .vip-menu__kbd {
   font-family: var(--vip-font-mono);
   font-size: var(--vip-fs-2xs);
   color: var(--vip-text-muted);
@@ -184,12 +240,11 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   padding: 1px 5px;
   border-radius: var(--vip-radius-xs);
 }
-.vip-menu__divider {
+.vip-menu__panel .vip-menu__divider {
   height: 1px;
   background: var(--vip-border-subtle);
   margin: var(--vip-sp-2) 0;
 }
-
 .vip-menu-pop-enter-active {
   transition:
     opacity var(--vip-motion-fast),

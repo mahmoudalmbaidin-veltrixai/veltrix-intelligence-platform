@@ -50,7 +50,11 @@ test('Pipeline Studio uploads, previews, persists, and publishes a governed CSV 
   await expect(page.getByLabel('Dataset', { exact: true })).toHaveValue(/.+/)
   await expect(page.getByText('B850001', { exact: true })).toBeVisible({ timeout: 20_000 })
   await page.getByRole('button', { name: 'Validate' }).click()
-  await expect(page.getByText('Validation passed', { exact: true })).toBeVisible()
+  // Validation is a live round-trip; use an explicit timeout consistent with the
+  // other live assertions in this test to avoid flakiness under concurrent load.
+  await expect(page.getByText('Validation passed', { exact: true })).toBeVisible({
+    timeout: 20_000,
+  })
   const published = page.waitForResponse(
     (response) => response.url().endsWith('/publish') && response.request().method() === 'POST',
   )

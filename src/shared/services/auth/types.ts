@@ -10,6 +10,7 @@ export interface AuthenticatedUser {
   email: string
   displayName: string
   status: UserStatus
+  isPlatformAdmin: boolean
 }
 
 export interface Session {

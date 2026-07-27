@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Dashboard } from '@/shared/types/dashboard'
 import { relativeTime } from '@/shared/lib/format'
+import { safeErrorText } from '@/shared/lib/safeError'
 import { useUiStore } from '@/shared/stores/ui'
 import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
@@ -44,6 +45,9 @@ const rowVersion = ref(1)
 const principalId = ref('')
 const snapLabel = ref('')
 const exportFormat = ref<ExportFormat>('pdf')
+// Exports and deliveries render the immutable published version, so they are only
+// available once the dashboard has been published at least once.
+const canExport = computed(() => props.dashboard.status === 'published')
 const recipients = ref('')
 const ccRecipients = ref('')
 const bccRecipients = ref('')
@@ -83,7 +87,7 @@ async function refresh() {
       deliveryService.list(props.dashboard.id),
     ])
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Dashboard governance could not be loaded', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Dashboard governance could not be loaded', message: safeErrorText(error) })
   } finally {
     loading.value = false
   }
@@ -161,7 +165,7 @@ async function startExport() {
     startPolling()
     ui.pushToast({ kind: 'success', title: `${exportFormat.value.toUpperCase()} export queued` })
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Export could not be queued', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Export could not be queued', message: safeErrorText(error) })
   }
 }
 
@@ -170,7 +174,7 @@ async function cancelExport(job: DashboardExport) {
     Object.assign(job, await deliveryService.cancelExport(job))
     ui.pushToast({ kind: 'info', title: 'Export cancellation requested' })
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Export could not be cancelled', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Export could not be cancelled', message: safeErrorText(error) })
   }
 }
 
@@ -180,7 +184,7 @@ async function retryExport(job: DashboardExport) {
     startPolling()
     ui.pushToast({ kind: 'success', title: 'Export queued for retry' })
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Export could not be retried', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Export could not be retried', message: safeErrorText(error) })
   }
 }
 
@@ -189,7 +193,7 @@ async function downloadExport(job: DashboardExport) {
     await deliveryService.downloadExport(job)
     ui.pushToast({ kind: 'success', title: 'Secure download started' })
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Secure download failed', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Secure download failed', message: safeErrorText(error) })
   }
 }
 
@@ -216,7 +220,7 @@ async function previewDelivery() {
     const input = scheduleInput()
     emailPreview.value = await deliveryService.preview(props.dashboard.id, input)
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Email preview unavailable', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Email preview unavailable', message: safeErrorText(error) })
   }
 }
 
@@ -226,7 +230,7 @@ async function createDelivery() {
     await refresh()
     ui.pushToast({ kind: 'success', title: 'Dashboard delivery scheduled' })
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Delivery could not be scheduled', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Delivery could not be scheduled', message: safeErrorText(error) })
   }
 }
 
@@ -235,7 +239,7 @@ async function testDelivery(item: ScheduledDelivery) {
     await deliveryService.test(item.id)
     ui.pushToast({ kind: 'success', title: 'Test delivery queued' })
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Test delivery could not be queued', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Test delivery could not be queued', message: safeErrorText(error) })
   }
 }
 
@@ -243,7 +247,7 @@ async function showHistory(item: ScheduledDelivery) {
   try {
     deliveryRuns.value = { ...deliveryRuns.value, [item.id]: await deliveryService.history(item.id) }
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Delivery history unavailable', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Delivery history unavailable', message: safeErrorText(error) })
   }
 }
 
@@ -255,7 +259,7 @@ async function cancelDelivery(item: ScheduledDelivery) {
     await refresh()
     ui.pushToast({ kind: 'info', title: 'Delivery cancelled' })
   } catch (error) {
-    ui.pushToast({ kind: 'error', title: 'Delivery could not be cancelled', message: String(error) })
+    ui.pushToast({ kind: 'error', title: 'Delivery could not be cancelled', message: safeErrorText(error) })
   }
 }
 </script>
@@ -331,10 +335,15 @@ async function cancelDelivery(item: ScheduledDelivery) {
 
       <template v-else-if="tab === 'export'">
         <p class="hint">Exports run asynchronously from the immutable published dashboard version.</p>
+        <div v-if="!canExport" class="notice notice--warning" role="status">
+          Publish this dashboard to enable PDF, PNG, JSON and CSV exports. Exports always render the latest published
+          version.
+        </div>
         <div class="form-row">
           <VipSelect
             v-model="exportFormat"
             label="Format"
+            :disabled="!canExport"
             :options="[
               { value: 'pdf', label: 'PDF' },
               { value: 'png', label: 'PNG image' },
@@ -342,7 +351,14 @@ async function cancelDelivery(item: ScheduledDelivery) {
               { value: 'csv', label: 'CSV — all tables' },
             ]"
           />
-          <VipButton variant="primary" icon="download" @click="startExport">Queue export</VipButton>
+          <VipButton
+            variant="primary"
+            icon="download"
+            :disabled="!canExport"
+            :title="canExport ? 'Queue a PDF/PNG/JSON/CSV export' : 'Publish the dashboard first'"
+            @click="startExport"
+            >Queue export</VipButton
+          >
         </div>
         <div v-if="!exports.length" class="empty">No exports yet.</div>
         <div v-for="job in exports" :key="job.id" class="record export-record">
@@ -482,6 +498,20 @@ async function cancelDelivery(item: ScheduledDelivery) {
 .empty {
   padding: var(--vip-sp-5);
   text-align: center;
+}
+.notice {
+  margin-bottom: var(--vip-sp-4);
+  padding: var(--vip-sp-3) var(--vip-sp-4);
+  border-radius: var(--vip-radius-md);
+  font-size: var(--vip-fs-sm);
+  border: 1px solid var(--vip-border);
+  background: var(--vip-surface-2);
+  color: var(--vip-text-secondary);
+}
+.notice--warning {
+  border-color: var(--vip-warning);
+  background: var(--vip-warning-soft, var(--vip-surface-2));
+  color: var(--vip-text-primary);
 }
 .form-row,
 .actions {

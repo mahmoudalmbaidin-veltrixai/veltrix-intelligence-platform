@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlatformStore } from '@/shared/stores/platform'
 import { useAuthStore } from '@/shared/stores/auth'
@@ -7,11 +7,15 @@ import { useUiStore } from '@/shared/stores/ui'
 import { useThemeStore } from '@/shared/stores/theme'
 import { QUICK_CREATE } from '@/app/navigation'
 import { config } from '@/shared/config/env'
+import { safeErrorText } from '@/shared/lib/safeError'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipMenu from '@/shared/ui/VipMenu.vue'
 import VipAvatar from '@/shared/ui/VipAvatar.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipTooltip from '@/shared/ui/VipTooltip.vue'
+import VipDialog from '@/shared/ui/VipDialog.vue'
+import VipInput from '@/shared/ui/VipInput.vue'
+import VipButton from '@/shared/ui/VipButton.vue'
 
 const isHybridMode = config.apiMode === 'mock'
 const platform = usePlatformStore()
@@ -30,8 +34,106 @@ const roleLabel = computed(() => {
   return [...roles].map(formatRole).join(' · ')
 })
 
-const orgItems = computed(() => platform.organizations.map((o) => ({ key: o.id, label: o.name, icon: 'building' })))
-const wsItems = computed(() => platform.workspaces.map((w) => ({ key: w.id, label: w.name, icon: 'layers' })))
+const NEW_ORG = '__new_org__'
+const NEW_WS = '__new_ws__'
+const canCreateWorkspace = computed(() => platform.can('workspace.create'))
+
+const orgItems = computed(() => [
+  ...platform.organizations.map((o) => ({ key: o.id, label: o.name, icon: 'building' })),
+  { key: 'divider', label: '', divider: true },
+  { key: NEW_ORG, label: 'New organization', icon: 'plus' },
+])
+const wsItems = computed(() => [
+  ...platform.workspaces.map((w) => ({ key: w.id, label: w.name, icon: 'layers' })),
+  ...(canCreateWorkspace.value
+    ? [
+        { key: 'divider', label: '', divider: true },
+        { key: NEW_WS, label: 'New workspace', icon: 'plus' },
+      ]
+    : []),
+])
+
+// --- Create organization / workspace (SaaS onboarding) ---
+const orgDialogOpen = ref(false)
+const wsDialogOpen = ref(false)
+const pending = ref(false)
+const formError = ref<string | null>(null)
+const form = reactive({ name: '', slug: '' })
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100)
+}
+function onNameInput(): void {
+  // Keep slug in sync with the name until the user edits the slug manually.
+  form.slug = slugify(form.name)
+}
+const slugValid = computed(() => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug) && form.slug.length >= 2)
+
+function openOrgDialog(): void {
+  form.name = ''
+  form.slug = ''
+  formError.value = null
+  orgDialogOpen.value = true
+}
+function openWsDialog(): void {
+  form.name = ''
+  form.slug = ''
+  formError.value = null
+  wsDialogOpen.value = true
+}
+function onOrgSelect(key: string): void {
+  if (key === NEW_ORG) openOrgDialog()
+  else void platform.switchOrg(key)
+}
+function onWsSelect(key: string): void {
+  if (key === NEW_WS) openWsDialog()
+  else void platform.switchWorkspace(key)
+}
+
+async function submitOrg(): Promise<void> {
+  if (!form.name.trim() || !slugValid.value) {
+    formError.value = 'Enter a name and a valid slug (lowercase letters, numbers and hyphens).'
+    return
+  }
+  pending.value = true
+  formError.value = null
+  try {
+    const org = await platform.createOrganization({ name: form.name.trim(), slug: form.slug })
+    // Close the dialog before switching so the org-switch re-render cannot orphan the modal.
+    orgDialogOpen.value = false
+    await nextTick()
+    ui.pushToast({ kind: 'success', title: 'Organization created', message: `Switched to ${org.name}` })
+    await platform.switchOrg(org.id)
+  } catch (error) {
+    formError.value = safeErrorText(error)
+  } finally {
+    pending.value = false
+  }
+}
+async function submitWs(): Promise<void> {
+  if (!form.name.trim() || !slugValid.value) {
+    formError.value = 'Enter a name and a valid slug (lowercase letters, numbers and hyphens).'
+    return
+  }
+  pending.value = true
+  formError.value = null
+  try {
+    const workspaceId = await platform.createWorkspace({ name: form.name.trim(), slug: form.slug })
+    wsDialogOpen.value = false
+    await nextTick()
+    ui.pushToast({ kind: 'success', title: 'Workspace created', message: form.name.trim() })
+    await platform.switchWorkspace(workspaceId)
+  } catch (error) {
+    formError.value = safeErrorText(error)
+  } finally {
+    pending.value = false
+  }
+}
 const createItems = computed(() =>
   QUICK_CREATE.filter((i) => !i.permission || platform.can(i.permission)).map((i) => ({
     key: i.to,
@@ -64,7 +166,7 @@ async function onUserSelect(key: string) {
         <VipIcon name="menu" :size="18" />
       </button>
 
-      <VipMenu :items="orgItems" align="start" @select="platform.switchOrg($event)">
+      <VipMenu :items="orgItems" align="start" @select="onOrgSelect($event)">
         <template #trigger>
           <button
             class="vip-switcher"
@@ -86,7 +188,7 @@ async function onUserSelect(key: string) {
 
       <span class="vip-topbar__sep">/</span>
 
-      <VipMenu :items="wsItems" align="start" @select="platform.switchWorkspace($event)">
+      <VipMenu :items="wsItems" align="start" @select="onWsSelect($event)">
         <template #trigger>
           <button class="vip-switcher is-ws" :disabled="!platform.workspace">
             <VipIcon name="layers" :size="15" />
@@ -151,6 +253,48 @@ async function onUserSelect(key: string) {
         </template>
       </VipMenu>
     </div>
+
+    <VipDialog
+      :open="orgDialogOpen"
+      title="New organization"
+      description="Create a fully isolated organization. You become its owner and a default workspace is created."
+      @close="orgDialogOpen = false"
+    >
+      <div class="vip-create-form">
+        <VipInput v-model="form.name" label="Organization name" placeholder="Acme Corporation" @input="onNameInput" />
+        <VipInput
+          v-model="form.slug"
+          label="Slug"
+          help="Lowercase letters, numbers and hyphens. Used in identifiers."
+        />
+        <p v-if="formError" class="vip-create-form__error" role="alert">{{ formError }}</p>
+      </div>
+      <template #footer>
+        <VipButton variant="tertiary" :disabled="pending" @click="orgDialogOpen = false">Cancel</VipButton>
+        <VipButton variant="primary" :loading="pending" :disabled="!form.name.trim() || !slugValid" @click="submitOrg"
+          >Create organization</VipButton
+        >
+      </template>
+    </VipDialog>
+
+    <VipDialog
+      :open="wsDialogOpen"
+      title="New workspace"
+      :description="`Create an isolated workspace inside ${platform.organization?.name ?? 'this organization'}.`"
+      @close="wsDialogOpen = false"
+    >
+      <div class="vip-create-form">
+        <VipInput v-model="form.name" label="Workspace name" placeholder="Production" @input="onNameInput" />
+        <VipInput v-model="form.slug" label="Slug" help="Lowercase letters, numbers and hyphens." />
+        <p v-if="formError" class="vip-create-form__error" role="alert">{{ formError }}</p>
+      </div>
+      <template #footer>
+        <VipButton variant="tertiary" :disabled="pending" @click="wsDialogOpen = false">Cancel</VipButton>
+        <VipButton variant="primary" :loading="pending" :disabled="!form.name.trim() || !slugValid" @click="submitWs"
+          >Create workspace</VipButton
+        >
+      </template>
+    </VipDialog>
   </header>
 </template>
 
@@ -328,6 +472,15 @@ async function onUserSelect(key: string) {
   border: none;
   padding: 0;
   border-radius: 50%;
+}
+.vip-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-4);
+}
+.vip-create-form__error {
+  color: var(--vip-danger-text);
+  font-size: var(--vip-fs-sm);
 }
 
 @media (max-width: 1024px) {

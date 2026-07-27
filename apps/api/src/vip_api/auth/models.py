@@ -44,6 +44,7 @@ class User(Base):
     status: Mapped[UserStatus] = mapped_column(
         user_status_enum, default=UserStatus.ACTIVE, nullable=False
     )
+    is_platform_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
     failed_login_count: Mapped[int] = mapped_column(default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

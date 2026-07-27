@@ -85,6 +85,23 @@ async def create_user(email: str, display_name: str, *, password_stdin: bool = F
     print("User created successfully.")
 
 
+async def set_platform_admin(email: str, *, grant: bool) -> None:
+    settings = get_settings()
+    database = Database(settings)
+    try:
+        async with database.session_factory() as db:
+            user = await db.scalar(
+                select(User).where(User.normalized_email == normalize_email(email))
+            )
+            if user is None:
+                raise SystemExit("No user exists with that email.")
+            user.is_platform_admin = grant
+            await db.commit()
+    finally:
+        await database.dispose()
+    print(f"Platform admin {'granted to' if grant else 'revoked from'} {email}.")
+
+
 async def revoke_user_sessions(email: str) -> None:
     settings = get_settings()
     database = Database(settings)
@@ -608,6 +625,14 @@ def build_parser() -> argparse.ArgumentParser:
         "seed-multitenancy-demo", help="Idempotently create the B2 two-tenant demo fixture"
     )
     subparsers.add_parser("cleanup-multitenancy-demo", help="Remove only the known B2 demo fixture")
+    grant_admin = subparsers.add_parser(
+        "grant-platform-admin", help="Grant the cross-tenant platform super-admin flag to a user"
+    )
+    grant_admin.add_argument("--email", required=True)
+    revoke_admin = subparsers.add_parser(
+        "revoke-platform-admin", help="Revoke the platform super-admin flag from a user"
+    )
+    revoke_admin.add_argument("--email", required=True)
     return parser
 
 
@@ -637,6 +662,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         asyncio.run(seed_multitenancy_demo())
     elif args.command == "cleanup-multitenancy-demo":
         asyncio.run(cleanup_multitenancy_demo())
+    elif args.command == "grant-platform-admin":
+        asyncio.run(set_platform_admin(args.email, grant=True))
+    elif args.command == "revoke-platform-admin":
+        asyncio.run(set_platform_admin(args.email, grant=False))
     return 0
 
 

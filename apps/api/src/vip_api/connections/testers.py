@@ -75,6 +75,68 @@ class PostgreSQLTester:
                 await connection.close(timeout=2)
 
 
+class MySQLTester:
+    """Real MySQL/MariaDB reachability + authentication test.
+
+    The async driver is imported lazily so a missing optional driver degrades to a
+    safe, actionable error instead of crashing API startup.
+    """
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    async def test(
+        self, configuration: dict[str, object], credentials: dict[str, str]
+    ) -> TesterResult:
+        try:
+            import aiomysql  # type: ignore
+        except ImportError:
+            return TesterResult(False, "unhealthy", 0, "CONNECTION_DRIVER_UNAVAILABLE")
+        host = str(configuration["host"])
+        port = cast(int, configuration["port"])
+        await validate_host(host, port, self.settings)
+        ssl_mode = str(configuration.get("ssl_mode", "require"))
+        started = time.perf_counter()
+        pool = None
+        try:
+            pool = await asyncio.wait_for(
+                aiomysql.create_pool(
+                    host=host,
+                    port=port,
+                    db=str(configuration["database"]),
+                    user=str(configuration["username"]),
+                    password=credentials["password"],
+                    ssl=ssl_mode != "disable",
+                    connect_timeout=self.settings.CONNECTION_TEST_TIMEOUT_SECONDS,
+                    minsize=1,
+                    maxsize=1,
+                    program_name="vip-connection-test",
+                ),
+                timeout=self.settings.CONNECTION_TEST_TIMEOUT_SECONDS,
+            )
+            async with pool.acquire() as connection, connection.cursor() as cursor:
+                await cursor.execute("SELECT 1")
+                await cursor.fetchone()
+            return TesterResult(True, "healthy", _latency(started))
+        except TimeoutError:
+            return TesterResult(False, "unhealthy", _latency(started), "CONNECTION_TIMEOUT")
+        except Exception as error:
+            # Raw driver details are never surfaced; only safe, actionable codes.
+            args = getattr(error, "args", ()) or (None,)
+            number = args[0]
+            if number in {1045, 1044, 1698}:  # access denied / auth failures
+                code = "CONNECTION_AUTHENTICATION_FAILED"
+            elif number == 1049:  # unknown database
+                code = "CONNECTION_METADATA_UNAVAILABLE"
+            else:
+                code = "CONNECTION_HOST_UNREACHABLE"
+            return TesterResult(False, "unhealthy", _latency(started), code)
+        finally:
+            if pool is not None:
+                pool.close()
+                await pool.wait_closed()
+
+
 class RestApiTester:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -144,6 +206,7 @@ class ConnectionTesterRegistry:
     def __init__(self, settings: Settings) -> None:
         self._testers: dict[str, ConnectionTester] = {
             "postgresql": PostgreSQLTester(settings),
+            "mysql": MySQLTester(settings),
             "rest_api": RestApiTester(settings),
         }
 

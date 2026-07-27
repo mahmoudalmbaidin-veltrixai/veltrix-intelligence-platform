@@ -17,6 +17,15 @@ class ConnectionTypeSummary(BaseModel):
 class ConnectionTypeResponse(ConnectionTypeSummary):
     description: str
     category: str
+    subcategory: str = ""
+    vendor: str = ""
+    implementation_status: str = "planned"
+    deployment: str = "cloud"
+    auth_methods: list[str] = []
+    documentation_reference: str | None = None
+    requirements: list[str] = []
+    feature_flag: str | None = None
+    beta: bool = False
     configuration_schema: dict[str, object]
     secret_schema: dict[str, object]
     capabilities: list[str]

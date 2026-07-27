@@ -306,6 +306,27 @@ services:
     init: true
     networks: [vip_backend]
 
+  # Optional local MySQL for the B4 MySQL (beta) connector integration test.
+  # Not started by default; enable with: docker compose --profile connectors up -d mysql
+  mysql:
+    image: mysql:8.0
+    profiles: ["connectors"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-vip_mysql_root_dev}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-vip_demo}
+      MYSQL_USER: ${MYSQL_USER:-vip_reader}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-vip_reader_dev}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - vip_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [vip_backend]
+
 volumes:
   vip_postgres_data:
   vip_redis_data:
@@ -313,6 +334,7 @@ volumes:
   vip_dashboard_email_outbox:
   vip_pipeline_artifacts:
   vip_files:
+  vip_mysql_data:
 
 networks:
   vip_backend:

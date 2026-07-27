@@ -30,6 +30,19 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/platform',
+    name: 'platform-admin',
+    component: () => import('@/modules/platform/PlatformConsoleView.vue'),
+    meta: {
+      title: 'Platform Administration',
+      layout: 'app',
+      requiresAuth: true,
+      requiresOrganization: false,
+      requiresWorkspace: false,
+      requiresPlatformAdmin: true,
+    },
+  },
+  {
     path: '/favorites',
     name: 'favorites',
     component: () => import('@/modules/home/FavoritesView.vue'),
@@ -584,6 +597,12 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     auth.setIntended(to.fullPath)
     return { name: 'login' }
+  }
+
+  // Platform super-admin gate: non-disclosing (mirror the backend 404) and
+  // independent of any tenant context.
+  if (to.meta.requiresPlatformAdmin && !platform.isPlatformAdmin) {
+    return { name: 'not-found' }
   }
 
   if (to.meta.requiresAuth && auth.isAuthenticated && !platform.initialized) {

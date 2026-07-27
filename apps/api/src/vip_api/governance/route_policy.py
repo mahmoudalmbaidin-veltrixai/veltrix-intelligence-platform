@@ -8,7 +8,10 @@ from fastapi.routing import APIRoute
 from vip_api.governance.dependencies import RequireGovernance, get_authorization_context
 from vip_api.tenancy.dependencies import get_tenant_context
 
-PUBLIC_PREFIXES = ("/health", "/ready", "/auth/", "/api/v1/version")
+# Platform super-admin routes intentionally use the stronger, cross-tenant
+# `require_platform_admin` gate instead of per-tenant governance. Their protection
+# is asserted separately in the platform-admin coverage test.
+PUBLIC_PREFIXES = ("/health", "/ready", "/auth/", "/api/v1/version", "/api/v1/platform")
 SPECIAL_POLICIES = {
     ("GET", "/api/v1/organizations"): "authentication",
     ("POST", "/api/v1/organizations"): "authentication",

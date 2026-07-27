@@ -18,6 +18,8 @@ export interface NavItem {
   featureFlag?: FeatureFlagKey
   keywords?: string[]
   adminOnly?: boolean
+  /** Cross-tenant platform super-admin only. */
+  platformAdminOnly?: boolean
 }
 
 export interface NavGroup {
@@ -328,11 +330,11 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         label: 'Platform Admin',
-        to: '/admin/platform',
+        to: '/platform',
         icon: 'building',
-        description: 'Tenant-wide administration and configuration.',
-        permission: 'platform.admin',
-        adminOnly: true,
+        description: 'Cross-tenant operator console: all organizations, workspaces and users.',
+        keywords: ['super admin', 'saas', 'tenants', 'operator'],
+        platformAdminOnly: true,
       },
       {
         label: 'Organization Admin',

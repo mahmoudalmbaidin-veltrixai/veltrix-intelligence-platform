@@ -33,6 +33,7 @@ const EMPTY_USER: UserProfile = {
   jobTitle: '',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   locale: navigator.language || 'en-US',
+  isPlatformAdmin: false,
 }
 
 interface TenantPreference {
@@ -69,6 +70,7 @@ function mapWorkspace(value: AuthorizedWorkspaceDto): Workspace {
 export const usePlatformStore = defineStore('platform', () => {
   const authorization = useAuthorizationStore()
   const user = ref<UserProfile>({ ...EMPTY_USER })
+  const isPlatformAdmin = computed(() => user.value.isPlatformAdmin)
   const organizations = ref<Organization[]>([])
   const workspaces = ref<Workspace[]>([])
   const orgId = ref<string | null>(null)
@@ -193,6 +195,24 @@ export const usePlatformStore = defineStore('platform', () => {
     await authorization.bootstrap(true)
   }
 
+  // SaaS onboarding: provision a fully isolated new organization (the creator becomes
+  // its owner and a default workspace is created server-side). The caller decides when
+  // to switch into it (kept separate so callers can close UI before the switch re-render).
+  async function createOrganization(payload: { name: string; slug: string }): Promise<Organization> {
+    const created = await tenancyService.createOrganization(payload)
+    const org = mapOrganization(created.organization)
+    organizations.value = [...organizations.value.filter((item) => item.id !== org.id), org]
+    return org
+  }
+
+  // Create an isolated workspace inside the active organization; returns its id so the
+  // caller can switch to it after closing any UI.
+  async function createWorkspace(payload: { name: string; slug: string }): Promise<string> {
+    if (!orgId.value) throw new Error('No active organization')
+    const created = await tenancyService.createWorkspace(orgId.value, payload)
+    return created.id
+  }
+
   function hydrateAuthenticatedUser(authenticatedUser: AuthenticatedUser): void {
     if (user.value.id && user.value.id !== authenticatedUser.id) clearTenantContext()
     user.value = {
@@ -200,6 +220,7 @@ export const usePlatformStore = defineStore('platform', () => {
       id: authenticatedUser.id,
       email: authenticatedUser.email,
       name: authenticatedUser.displayName,
+      isPlatformAdmin: authenticatedUser.isPlatformAdmin,
     }
   }
 
@@ -253,6 +274,9 @@ export const usePlatformStore = defineStore('platform', () => {
     fetchWorkspaces,
     switchOrg,
     switchWorkspace,
+    createOrganization,
+    createWorkspace,
+    isPlatformAdmin,
     hydrateAuthenticatedUser,
     clearContext: clearTenantContext,
     clearTenantContext,

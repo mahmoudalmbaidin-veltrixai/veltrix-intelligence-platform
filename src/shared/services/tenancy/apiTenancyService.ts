@@ -39,9 +39,20 @@ export interface UpdateOrganizationPayload {
   status?: OrganizationStatus
 }
 
+export interface CreateOrganizationPayload {
+  name: string
+  slug: string
+}
+
+export interface OrganizationCreatedDto {
+  organization: AuthorizedOrganizationDto
+  default_workspace: AuthorizedWorkspaceDto
+}
+
 export interface TenancyService {
   listOrganizations(): Promise<AuthorizedOrganizationDto[]>
   listWorkspaces(organizationId: string, includeArchived?: boolean): Promise<AuthorizedWorkspaceDto[]>
+  createOrganization(payload: CreateOrganizationPayload): Promise<OrganizationCreatedDto>
   updateOrganization(organizationId: string, payload: UpdateOrganizationPayload): Promise<AuthorizedOrganizationDto>
   createWorkspace(organizationId: string, payload: CreateWorkspacePayload): Promise<AuthorizedWorkspaceDto>
   updateWorkspace(
@@ -62,6 +73,9 @@ export const tenancyService: TenancyService = {
         { retry: 0, query: includeArchived ? { include_archived: true } : undefined },
       )
     ).items
+  },
+  createOrganization(payload) {
+    return apiClient.post<OrganizationCreatedDto>('/api/v1/organizations', payload)
   },
   updateOrganization(organizationId, payload) {
     return apiClient.patch<AuthorizedOrganizationDto>(

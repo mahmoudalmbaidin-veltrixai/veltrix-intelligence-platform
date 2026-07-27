@@ -19,6 +19,7 @@ from vip_api.home.routes import router as home_router
 from vip_api.jobs.routes import router as jobs_router
 from vip_api.pipelines.routes import artifact_router as pipeline_artifact_router
 from vip_api.pipelines.routes import router as pipelines_router
+from vip_api.platform_admin.routes import router as platform_admin_router
 from vip_api.semantic.routes import glossary_router, models_router, query_router
 from vip_api.tenancy.routes import router as tenancy_router
 
@@ -29,6 +30,7 @@ def register_routers(app: FastAPI, settings: Settings) -> None:
     app.include_router(version_router, prefix=settings.API_V1_PREFIX, tags=["version"])
     app.include_router(tenancy_router, prefix=settings.API_V1_PREFIX)
     app.include_router(governance_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(platform_admin_router, prefix=settings.API_V1_PREFIX)
     app.include_router(home_router, prefix=settings.API_V1_PREFIX)
     app.include_router(notifications_router, prefix=settings.API_V1_PREFIX)
     app.include_router(catalog_router, prefix=settings.API_V1_PREFIX)

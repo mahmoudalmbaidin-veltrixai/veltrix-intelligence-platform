@@ -19,6 +19,7 @@ const hovered = ref(false)
 let hoverTimer: ReturnType<typeof setTimeout> | undefined
 
 function visible(item: NavItem): boolean {
+  if (item.platformAdminOnly && !platform.isPlatformAdmin) return false
   if (item.permission && !platform.can(item.permission)) return false
   if (item.entitlement && !platform.entitled(item.entitlement)) return false
   if (item.featureFlag && !platform.flagEnabled(item.featureFlag)) return false

@@ -142,3 +142,5 @@ tzdata==2026.3
     # via vip-api (pyproject.toml)
 uvicorn==0.51.0
     # via vip-api (pyproject.toml)
+aiomysql==0.3.2
+pymysql==1.2.0

@@ -391,7 +391,11 @@ onBeforeUnmount(() => {
           size="sm"
           icon="share"
           :disabled="!editor || editor.dashboard.id === 'new'"
-          title="Save the dashboard before managing governance"
+          :title="
+            !editor || editor.dashboard.id === 'new'
+              ? 'Save the dashboard before managing governance'
+              : 'Share, publish versions, snapshots, exports and delivery'
+          "
           @click="openGovernance"
           >Share</VipButton
         >

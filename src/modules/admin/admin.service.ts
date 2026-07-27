@@ -176,4 +176,12 @@ export const adminService = {
       `/api/v1/organizations/${encodeURIComponent(activeOrganizationId())}/invitations/${encodeURIComponent(invitationId)}`,
     )
   },
+
+  // Removes a member from the organization (existing backend endpoint; permission
+  // organization.members.remove). Backend enforces last-owner / self protections.
+  async removeMember(membershipId: string): Promise<void> {
+    await apiClient.delete(
+      `/api/v1/organizations/${encodeURIComponent(activeOrganizationId())}/members/${encodeURIComponent(membershipId)}`,
+    )
+  },
 }

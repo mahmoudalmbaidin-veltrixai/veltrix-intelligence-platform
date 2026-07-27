@@ -13,6 +13,7 @@ function parseSession(value: unknown): Session {
       email: dto.user.email,
       displayName: dto.user.display_name,
       status: dto.user.status,
+      isPlatformAdmin: dto.user.is_platform_admin,
     },
   }
 }

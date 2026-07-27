@@ -31,6 +31,7 @@ export interface UserProfile {
   jobTitle: string
   timezone: string
   locale: string
+  isPlatformAdmin: boolean
 }
 
 export type TenantStatus = 'trial' | 'active' | 'suspended' | 'archived' | 'deleted' | 'disabled' | 'pending-deletion'

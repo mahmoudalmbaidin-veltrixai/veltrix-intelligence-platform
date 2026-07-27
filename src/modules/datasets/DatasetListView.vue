@@ -43,6 +43,70 @@ const csvImport = reactive({
   description: '',
   content: '',
 })
+const csvFileName = ref('')
+const csvFileInput = ref<HTMLInputElement>()
+
+function triggerCsvFilePicker(): void {
+  csvFileInput.value?.click()
+}
+
+async function onCsvFileSelected(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // allow re-selecting the same file
+  if (!file) return
+  discoverError.value = ''
+  const name = file.name
+  const lower = name.toLowerCase()
+  const isExcel =
+    lower.endsWith('.xlsx') ||
+    lower.endsWith('.xls') ||
+    file.type.includes('spreadsheetml') ||
+    file.type === 'application/vnd.ms-excel'
+  if (isExcel) {
+    discoverError.value =
+      'Excel workbooks are not parsed in the browser. In Excel, choose File → Save As → CSV UTF-8, then upload the .csv file.'
+    return
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    discoverError.value = 'The file is larger than 10 MB. Import a smaller extract or split it.'
+    return
+  }
+  try {
+    const raw = await file.text()
+    let text = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw // strip UTF-8 BOM
+    if (lower.endsWith('.tsv')) {
+      // Convert tab-separated values to CSV so the backend ingest sees commas.
+      text = text
+        .split(/\r?\n/)
+        .map((line) =>
+          line
+            .split('\t')
+            .map((cell) => (/[",\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell))
+            .join(','),
+        )
+        .join('\n')
+    }
+    if (!text.trim()) {
+      discoverError.value = 'The selected file is empty.'
+      return
+    }
+    csvImport.content = text
+    csvFileName.value = name
+    const base = name.replace(/\.[^.]+$/, '')
+    if (!csvImport.displayName.trim()) csvImport.displayName = base
+    if (!csvImport.table.trim()) {
+      csvImport.table =
+        base
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .slice(0, 60) || 'imported_table'
+    }
+  } catch {
+    discoverError.value = 'The file could not be read. Ensure it is a UTF-8 encoded CSV file.'
+  }
+}
 const connectionOptions = computed(() =>
   (connections.value ?? [])
     .filter((item) => item.status === 'active')
@@ -71,6 +135,7 @@ function openCsvImport(): void {
   csvImport.displayName = ''
   csvImport.description = ''
   csvImport.content = ''
+  csvFileName.value = ''
   discoverError.value = ''
   discoverOpen.value = true
 }
@@ -385,12 +450,29 @@ async function confirmLifecycle() {
           />
           <VipInput v-model="csvImport.displayName" label="Display name" />
           <VipInput v-model="csvImport.description" label="Description" />
+          <div class="csv-upload">
+            <VipButton type="button" variant="secondary" icon="upload" @click="triggerCsvFilePicker">
+              Upload CSV file…
+            </VipButton>
+            <span v-if="csvFileName" class="csv-upload__name"
+              ><VipIcon name="check" :size="14" /> {{ csvFileName }}</span
+            >
+            <span v-else class="csv-upload__hint">Choose a .csv or .tsv file from your device, or paste below.</span>
+            <input
+              ref="csvFileInput"
+              type="file"
+              accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"
+              class="csv-upload__input"
+              aria-label="Upload CSV file from your device"
+              @change="onCsvFileSelected"
+            />
+          </div>
           <VipTextarea
             v-model="csvImport.content"
             label="CSV data"
             :rows="10"
             required
-            help="The first row must contain unique field names."
+            help="Uploaded file contents appear here. The first row must contain unique field names."
           />
         </template>
         <p v-if="discoverError" role="alert">{{ discoverError }}</p>
@@ -506,5 +588,25 @@ async function confirmLifecycle() {
 .discovery-form {
   display: grid;
   gap: var(--vip-sp-5);
+}
+.csv-upload {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--vip-sp-3);
+}
+.csv-upload__input {
+  display: none;
+}
+.csv-upload__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-primary);
+}
+.csv-upload__hint {
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
 }
 </style>

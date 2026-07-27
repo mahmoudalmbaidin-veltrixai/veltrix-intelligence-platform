@@ -21,6 +21,17 @@ export async function signInAs(page: Page, email: string, password: string) {
   await expect(page).toHaveURL(/\/home$/)
 }
 
+export async function selectOrganizationByName(page: Page, name: string) {
+  const selected = page.getByRole('button', { name: `Organization: ${name}` })
+  if (await selected.isVisible()) return
+
+  const trigger = page.getByRole('button', { name: /^Organization: / })
+  await expect(trigger).toBeVisible()
+  await trigger.click()
+  await page.getByRole('menuitem', { name, exact: true }).click()
+  await expect(selected).toBeVisible()
+}
+
 async function signIn(page: Page) {
   await signInAs(page, E2E_EMAIL, E2E_PASSWORD)
 }
@@ -34,6 +45,7 @@ export const test = base.extend<{ authenticatedPage: Page }>({
     await resetClientState(page)
     await signIn(page)
     await expect(page.locator('#vip-main')).toBeVisible()
+    await selectOrganizationByName(page, 'Organization Alpha')
     await use(page)
   },
 })
