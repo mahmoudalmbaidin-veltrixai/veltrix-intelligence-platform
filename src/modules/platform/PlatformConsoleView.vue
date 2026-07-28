@@ -18,6 +18,8 @@ import {
   type PlatformOrganizationRow,
   type PlatformOrganizationDetail,
   type PlatformUserRow,
+  type PlatformWorkspaceRow,
+  type UserAccessSummary,
 } from './platform.service'
 
 const ui = useUiStore()
@@ -67,6 +69,35 @@ const userEmailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm
 
 // Organization detail dialog
 const detail = ref<PlatformOrganizationDetail | null>(null)
+const wsCreate = ref({ name: '', slug: '' })
+const wsCreatePending = ref(false)
+const wsBusyId = ref<string | null>(null)
+
+// Manage-access dialog (per user)
+const workspaceRoleOptions = [
+  { value: 'workspace_admin', label: 'Workspace Admin — full control of the workspace' },
+  { value: 'workspace_editor', label: 'Editor — create and edit content' },
+  { value: 'workspace_viewer', label: 'Viewer — read-only access' },
+]
+const manageUser = ref<PlatformUserRow | null>(null)
+const manageOpen = computed(() => manageUser.value !== null)
+const summary = ref<UserAccessSummary | null>(null)
+const summaryLoading = ref(false)
+const manageBusy = ref<string | null>(null)
+// Add-to-org form
+const addOrgForm = ref({ organization_id: '', organization_role: 'organization_member' })
+// Add-to-workspace form
+const addWsForm = ref({ organization_id: '', workspace_id: '', workspace_role: 'workspace_viewer' })
+const addWsWorkspaces = ref<PlatformWorkspaceRow[]>([])
+// Reset-password sub-panel
+const resetPwOpen = ref(false)
+const resetPwValue = ref('')
+const resetPwMustChange = ref(true)
+const resetPwPending = ref(false)
+// Edit-profile sub-panel
+const editOpen = ref(false)
+const editForm = ref({ display_name: '', email: '', job_title: '', department: '', phone: '' })
+const editPending = ref(false)
 
 function tone(status: string): 'success' | 'warning' | 'neutral' | 'danger' {
   if (status === 'active') return 'success'
@@ -244,12 +275,237 @@ async function submitCreate() {
 }
 
 async function openDetail(row: PlatformOrganizationRow) {
+  wsCreate.value = { name: '', slug: '' }
   try {
     detail.value = await platformService.organization(row.id)
   } catch (error) {
     ui.pushToast({ kind: 'error', title: 'Detail failed to load', message: safeErrorText(error) })
   }
 }
+
+// --- Workspace management (inside an org detail) ---
+async function submitCreateWorkspace() {
+  if (!detail.value) return
+  if (!wsCreate.value.name.trim() || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(wsCreate.value.slug)) {
+    ui.pushToast({ kind: 'error', title: 'Invalid workspace', message: 'Enter a name and a valid slug.' })
+    return
+  }
+  wsCreatePending.value = true
+  try {
+    await platformService.createWorkspace(detail.value.id, {
+      name: wsCreate.value.name.trim(),
+      slug: wsCreate.value.slug,
+    })
+    ui.pushToast({ kind: 'success', title: 'Workspace created', message: wsCreate.value.name })
+    detail.value = await platformService.organization(detail.value.id)
+    wsCreate.value = { name: '', slug: '' }
+    await loadOverview()
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Create failed', message: safeErrorText(error) })
+  } finally {
+    wsCreatePending.value = false
+  }
+}
+async function toggleWorkspace(w: PlatformWorkspaceRow) {
+  if (!detail.value) return
+  wsBusyId.value = w.id
+  try {
+    const updated =
+      w.status === 'suspended'
+        ? await platformService.activateWorkspace(detail.value.id, w.id)
+        : await platformService.suspendWorkspace(detail.value.id, w.id)
+    w.status = updated.status
+    ui.pushToast({ kind: 'success', title: `Workspace ${updated.status}`, message: w.name })
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Action failed', message: safeErrorText(error) })
+  } finally {
+    wsBusyId.value = null
+  }
+}
+
+// --- Manage user access ---
+async function refreshSummary(userId: string) {
+  summaryLoading.value = true
+  try {
+    summary.value = await platformService.accessSummary(userId)
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Access summary failed', message: safeErrorText(error) })
+  } finally {
+    summaryLoading.value = false
+  }
+}
+function openManage(user: PlatformUserRow) {
+  manageUser.value = user
+  summary.value = null
+  resetPwOpen.value = false
+  editOpen.value = false
+  addOrgForm.value = { organization_id: '', organization_role: 'organization_member' }
+  addWsForm.value = { organization_id: '', workspace_id: '', workspace_role: 'workspace_viewer' }
+  addWsWorkspaces.value = []
+  if (!orgs.value.length) void loadOrgs()
+  void refreshSummary(user.id)
+}
+function closeManage() {
+  manageUser.value = null
+  summary.value = null
+}
+async function addUserToOrg() {
+  if (!manageUser.value || !summary.value || !addOrgForm.value.organization_id) return
+  manageBusy.value = 'add-org'
+  try {
+    // Resolve by username (the user may have no email at all).
+    await platformService.addOrgMember(addOrgForm.value.organization_id, {
+      username: summary.value.username,
+      organization_role: addOrgForm.value.organization_role,
+    })
+    ui.pushToast({ kind: 'success', title: 'Added to organization' })
+    addOrgForm.value.organization_id = ''
+    await refreshSummary(manageUser.value.id)
+    await Promise.all([loadUsers(), loadOverview()])
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Add failed', message: safeErrorText(error) })
+  } finally {
+    manageBusy.value = null
+  }
+}
+async function onAddWsOrgChange(orgId: string) {
+  addWsForm.value.workspace_id = ''
+  addWsWorkspaces.value = []
+  if (!orgId) return
+  try {
+    const org = await platformService.organization(orgId)
+    addWsWorkspaces.value = org.workspaces.filter((w) => w.status === 'active')
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Workspaces failed to load', message: safeErrorText(error) })
+  }
+}
+async function addUserToWorkspace() {
+  if (!manageUser.value || !summary.value) return
+  const { organization_id, workspace_id, workspace_role } = addWsForm.value
+  if (!organization_id || !workspace_id) return
+  manageBusy.value = 'add-ws'
+  try {
+    summary.value = await platformService.addWorkspaceMember(organization_id, workspace_id, {
+      username: summary.value.username,
+      workspace_role,
+    })
+    ui.pushToast({ kind: 'success', title: 'Added to workspace' })
+    addWsForm.value = { organization_id: '', workspace_id: '', workspace_role: 'workspace_viewer' }
+    addWsWorkspaces.value = []
+    await Promise.all([loadUsers(), loadOverview()])
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Add failed', message: safeErrorText(error) })
+  } finally {
+    manageBusy.value = null
+  }
+}
+async function removeOrg(organizationId: string) {
+  if (!manageUser.value) return
+  manageBusy.value = `org:${organizationId}`
+  try {
+    await platformService.removeOrgAccess(organizationId, manageUser.value.id)
+    ui.pushToast({ kind: 'success', title: 'Organization access removed' })
+    await refreshSummary(manageUser.value.id)
+    await Promise.all([loadUsers(), loadOverview()])
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Remove failed', message: safeErrorText(error) })
+  } finally {
+    manageBusy.value = null
+  }
+}
+async function removeWorkspace(organizationId: string, workspaceId: string) {
+  if (!manageUser.value) return
+  manageBusy.value = `ws:${workspaceId}`
+  try {
+    await platformService.removeWorkspaceAccess(organizationId, workspaceId, manageUser.value.id)
+    ui.pushToast({ kind: 'success', title: 'Workspace access removed' })
+    await refreshSummary(manageUser.value.id)
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Remove failed', message: safeErrorText(error) })
+  } finally {
+    manageBusy.value = null
+  }
+}
+function openResetPw() {
+  resetPwValue.value = generatePassword()
+  resetPwMustChange.value = true
+  resetPwOpen.value = true
+}
+async function submitResetPw() {
+  if (!manageUser.value || resetPwValue.value.length < 12) return
+  resetPwPending.value = true
+  try {
+    await platformService.resetPassword(manageUser.value.id, {
+      password: resetPwValue.value,
+      must_change_password: resetPwMustChange.value,
+    })
+    ui.pushToast({
+      kind: 'success',
+      title: 'Password reset',
+      message: 'The user’s sessions were revoked. Share the new password securely.',
+    })
+    resetPwOpen.value = false
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Reset failed', message: safeErrorText(error) })
+  } finally {
+    resetPwPending.value = false
+  }
+}
+function openEdit() {
+  if (!summary.value) return
+  editForm.value = {
+    display_name: summary.value.display_name,
+    email: summary.value.email ?? '',
+    job_title: '',
+    department: '',
+    phone: '',
+  }
+  editOpen.value = true
+}
+async function submitEdit() {
+  if (!manageUser.value) return
+  editPending.value = true
+  try {
+    // Email "" clears it on the backend; only send changed profile fields.
+    const updated = await platformService.updateUser(manageUser.value.id, {
+      display_name: editForm.value.display_name.trim() || undefined,
+      email: editForm.value.email.trim(),
+      job_title: editForm.value.job_title.trim() || undefined,
+      department: editForm.value.department.trim() || undefined,
+      phone: editForm.value.phone.trim() || undefined,
+    })
+    manageUser.value.display_name = updated.display_name
+    manageUser.value.email = updated.email
+    ui.pushToast({ kind: 'success', title: 'Profile updated' })
+    editOpen.value = false
+    await Promise.all([refreshSummary(manageUser.value.id), loadUsers()])
+  } catch (error) {
+    ui.pushToast({ kind: 'error', title: 'Update failed', message: safeErrorText(error) })
+  } finally {
+    editPending.value = false
+  }
+}
+
+// Orgs the user is NOT already a member of (avoid duplicate-membership errors).
+const availableOrgOptions = computed(() => {
+  const memberIds = new Set((summary.value?.organizations ?? []).map((o) => o.organization_id))
+  return [
+    { value: '', label: 'Select an organization…' },
+    ...orgs.value.filter((o) => !memberIds.has(o.id)).map((o) => ({ value: o.id, label: `${o.name} · ${o.slug}` })),
+  ]
+})
+// Only orgs the user already belongs to can receive a workspace assignment (rule: org first).
+const memberOrgOptions = computed(() => [
+  { value: '', label: 'Select an organization…' },
+  ...(summary.value?.organizations ?? []).map((o) => ({
+    value: o.organization_id,
+    label: `${o.organization_name} · ${o.organization_slug}`,
+  })),
+])
+const addWsWorkspaceOptions = computed(() => [
+  { value: '', label: 'Select a workspace…' },
+  ...addWsWorkspaces.value.map((w) => ({ value: w.id, label: w.name })),
+])
 
 onMounted(loadOverview)
 </script>
@@ -396,6 +652,7 @@ onMounted(loadOverview)
             </td>
             <td class="pa__muted">{{ u.last_login_at ? relativeTime(u.last_login_at) : 'never' }}</td>
             <td class="pa__actions">
+              <VipButton variant="ghost" size="xs" icon="settings" @click="openManage(u)">Manage</VipButton>
               <VipButton
                 :variant="u.status === 'suspended' ? 'secondary' : 'tertiary'"
                 size="xs"
@@ -547,12 +804,37 @@ onMounted(loadOverview)
     >
       <div v-if="detail" class="pa__detail">
         <h4>Workspaces ({{ detail.workspaces.length }})</h4>
-        <ul class="pa__list">
-          <li v-for="w in detail.workspaces" :key="w.id">
-            {{ w.name }} <span class="pa__muted">· {{ w.slug }} · {{ w.status }}</span>
-            <VipBadge v-if="w.is_default" tone="neutral" size="sm">default</VipBadge>
+        <ul class="pa__ws-list">
+          <li v-for="w in detail.workspaces" :key="w.id" class="pa__ws-item">
+            <div>
+              <span class="pa__ws-name">{{ w.name }}</span>
+              <span class="pa__muted">· {{ w.slug }}</span>
+              <VipBadge :tone="tone(w.status)" size="sm">{{ w.status }}</VipBadge>
+              <VipBadge v-if="w.is_default" tone="neutral" size="sm">default</VipBadge>
+            </div>
+            <VipButton
+              v-if="!w.is_default"
+              :variant="w.status === 'suspended' ? 'secondary' : 'tertiary'"
+              size="xs"
+              :loading="wsBusyId === w.id"
+              @click="toggleWorkspace(w)"
+              >{{ w.status === 'suspended' ? 'Activate' : 'Suspend' }}</VipButton
+            >
           </li>
         </ul>
+        <div class="pa__ws-create">
+          <VipInput
+            v-model="wsCreate.name"
+            label="New workspace"
+            placeholder="Marketing"
+            size="sm"
+            @input="wsCreate.slug = slugify(wsCreate.name)"
+          />
+          <VipInput v-model="wsCreate.slug" label="Slug" size="sm" />
+          <VipButton variant="primary" size="sm" :loading="wsCreatePending" @click="submitCreateWorkspace"
+            >Add workspace</VipButton
+          >
+        </div>
         <h4>Members ({{ detail.members.length }})</h4>
         <ul class="pa__list">
           <li v-for="m in detail.members" :key="m.user_id">
@@ -562,6 +844,150 @@ onMounted(loadOverview)
       </div>
       <template #footer>
         <VipButton variant="tertiary" @click="detail = null">Close</VipButton>
+      </template>
+    </VipDialog>
+
+    <!-- Manage user access -->
+    <VipDialog
+      :open="manageOpen"
+      :title="manageUser ? `Manage ${manageUser.display_name}` : ''"
+      :description="manageUser ? `@${manageUser.username}${manageUser.email ? ' · ' + manageUser.email : ' · no email'}` : ''"
+      size="lg"
+      @close="closeManage"
+    >
+      <div v-if="summaryLoading && !summary" class="pa__loading">Loading access…</div>
+      <div v-else-if="summary" class="pa__manage">
+        <!-- Profile / security actions -->
+        <div class="pa__manage-actions">
+          <VipButton variant="tertiary" size="sm" icon="text" @click="openEdit">Edit profile</VipButton>
+          <VipButton variant="tertiary" size="sm" icon="key" @click="openResetPw">Reset password</VipButton>
+          <VipBadge :tone="tone(summary.status)" size="sm">{{ summary.status }}</VipBadge>
+        </div>
+
+        <!-- Edit profile sub-panel -->
+        <div v-if="editOpen" class="pa__subpanel">
+          <div class="pa__grid2">
+            <VipInput v-model="editForm.display_name" label="Full name" size="sm" />
+            <VipInput v-model="editForm.email" label="Email (blank clears)" type="email" size="sm" />
+            <VipInput v-model="editForm.job_title" label="Job title" size="sm" />
+            <VipInput v-model="editForm.department" label="Department" size="sm" />
+            <VipInput v-model="editForm.phone" label="Phone" size="sm" />
+          </div>
+          <div class="pa__subpanel-actions">
+            <VipButton variant="tertiary" size="sm" :disabled="editPending" @click="editOpen = false">Cancel</VipButton>
+            <VipButton variant="primary" size="sm" :loading="editPending" @click="submitEdit">Save profile</VipButton>
+          </div>
+        </div>
+
+        <!-- Reset password sub-panel -->
+        <div v-if="resetPwOpen" class="pa__subpanel">
+          <VipInput
+            v-model="resetPwValue"
+            label="New password"
+            type="text"
+            size="sm"
+            help="At least 12 characters. Resetting revokes all of the user’s active sessions."
+          />
+          <VipCheckbox v-model="resetPwMustChange" label="Require the user to change it at next sign-in" />
+          <div class="pa__subpanel-actions">
+            <VipButton variant="tertiary" size="sm" icon="refresh" @click="resetPwValue = generatePassword()"
+              >Regenerate</VipButton
+            >
+            <VipButton
+              variant="tertiary"
+              size="sm"
+              icon="copy"
+              @click="copyText(resetPwValue, 'Password')"
+              >Copy</VipButton
+            >
+            <VipButton variant="tertiary" size="sm" :disabled="resetPwPending" @click="resetPwOpen = false">Cancel</VipButton>
+            <VipButton
+              variant="primary"
+              size="sm"
+              :loading="resetPwPending"
+              :disabled="resetPwValue.length < 12"
+              @click="submitResetPw"
+              >Reset password</VipButton
+            >
+          </div>
+        </div>
+
+        <!-- Organizations -->
+        <h4>Organizations ({{ summary.organizations.length }})</h4>
+        <ul v-if="summary.organizations.length" class="pa__ws-list">
+          <li v-for="o in summary.organizations" :key="o.organization_id" class="pa__ws-item">
+            <div>
+              <span class="pa__ws-name">{{ o.organization_name }}</span>
+              <span class="pa__muted">· {{ o.organization_slug }}</span>
+              <VipBadge tone="info" size="sm">{{ o.role }}</VipBadge>
+            </div>
+            <VipButton
+              variant="ghost"
+              size="xs"
+              :loading="manageBusy === `org:${o.organization_id}`"
+              @click="removeOrg(o.organization_id)"
+              >Remove</VipButton
+            >
+          </li>
+        </ul>
+        <p v-else class="pa__muted">No organization memberships.</p>
+        <div class="pa__addrow">
+          <VipSelect v-model="addOrgForm.organization_id" :options="availableOrgOptions" size="sm" />
+          <VipSelect v-model="addOrgForm.organization_role" :options="orgRoleOptions" size="sm" />
+          <VipButton
+            variant="secondary"
+            size="sm"
+            :disabled="!addOrgForm.organization_id"
+            :loading="manageBusy === 'add-org'"
+            @click="addUserToOrg"
+            >Add to org</VipButton
+          >
+        </div>
+
+        <!-- Workspaces -->
+        <h4>Workspaces ({{ summary.workspaces.length }})</h4>
+        <ul v-if="summary.workspaces.length" class="pa__ws-list">
+          <li v-for="w in summary.workspaces" :key="w.workspace_id" class="pa__ws-item">
+            <div>
+              <span class="pa__ws-name">{{ w.workspace_name }}</span>
+              <span class="pa__muted">· {{ w.organization_name }}</span>
+              <VipBadge tone="info" size="sm">{{ w.role }}</VipBadge>
+            </div>
+            <VipButton
+              variant="ghost"
+              size="xs"
+              :loading="manageBusy === `ws:${w.workspace_id}`"
+              @click="removeWorkspace(w.organization_id, w.workspace_id)"
+              >Remove</VipButton
+            >
+          </li>
+        </ul>
+        <p v-else class="pa__muted">No workspace assignments.</p>
+        <div class="pa__addrow">
+          <VipSelect
+            :model-value="addWsForm.organization_id"
+            :options="memberOrgOptions"
+            size="sm"
+            @update:model-value="(v: string) => { addWsForm.organization_id = v; onAddWsOrgChange(v) }"
+          />
+          <VipSelect v-model="addWsForm.workspace_id" :options="addWsWorkspaceOptions" size="sm" />
+          <VipSelect v-model="addWsForm.workspace_role" :options="workspaceRoleOptions" size="sm" />
+          <VipButton
+            variant="secondary"
+            size="sm"
+            :disabled="!addWsForm.workspace_id"
+            :loading="manageBusy === 'add-ws'"
+            @click="addUserToWorkspace"
+            >Add to workspace</VipButton
+          >
+        </div>
+        <p class="pa__hint">
+          A user must belong to an organization before they can be assigned to one of its workspaces. Removing
+          organization access also removes every workspace assignment in that org.
+        </p>
+      </div>
+      <template #footer>
+        <VipButton variant="tertiary" @click="closeManage">Close</VipButton>
       </template>
     </VipDialog>
   </div>
@@ -710,5 +1136,75 @@ onMounted(loadOverview)
   font-size: var(--vip-fs-sm);
   color: var(--vip-text-primary);
   overflow-wrap: anywhere;
+}
+.pa__ws-list {
+  list-style: none;
+  margin: 0 0 var(--vip-sp-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-2);
+}
+.pa__ws-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-3);
+  padding: var(--vip-sp-2) var(--vip-sp-3);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+}
+.pa__ws-item > div {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  flex-wrap: wrap;
+}
+.pa__ws-name {
+  font-weight: var(--vip-fw-medium);
+}
+.pa__ws-create,
+.pa__addrow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--vip-sp-3);
+  margin: var(--vip-sp-3) 0 var(--vip-sp-4);
+  flex-wrap: wrap;
+}
+.pa__addrow > :first-child {
+  flex: 1;
+  min-width: 160px;
+}
+.pa__manage {
+  display: flex;
+  flex-direction: column;
+}
+.pa__manage-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-3);
+  margin-bottom: var(--vip-sp-4);
+}
+.pa__subpanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+  padding: var(--vip-sp-4);
+  margin-bottom: var(--vip-sp-4);
+  background: var(--vip-surface-2);
+  border: 1px solid var(--vip-border-subtle);
+  border-radius: var(--vip-radius-md);
+}
+.pa__grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--vip-sp-3);
+}
+.pa__subpanel-actions {
+  display: flex;
+  gap: var(--vip-sp-2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
 </style>
