@@ -82,7 +82,22 @@ async def formula_language(
         "version": 1,
         "field_syntax": "[field_name]",
         "functions": list(FUNCTION_CATALOG),
-        "operators": ["+", "-", "*", "/", "==", "!=", "<", "<=", ">", ">="],
+        "operators": [
+            "+",
+            "-",
+            "*",
+            "/",
+            "==",
+            "!=",
+            "<",
+            "<=",
+            ">",
+            ">=",
+            "and",
+            "or",
+            "not",
+            "IF..THEN..ELSEIF..ELSE..ENDIF",
+        ],
         "literals": ["number", "quoted string", "true", "false", "null"],
     }
 
