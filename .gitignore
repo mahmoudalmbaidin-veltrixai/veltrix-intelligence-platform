@@ -40,8 +40,8 @@ pnpm-lock.yaml
 pnpm-workspace.yaml
 
 # Local QA/certification evidence and working design assets
-QA Files/
-Logo/
+# (organized under the git-ignored artifacts/ tree; patterns below guard the
+# repository root against re-accumulation of local report clutter)
 /*_REPORT.md
 /*_SUMMARY.md
 /PRODUCTION_READINESS_CHECKLIST.md

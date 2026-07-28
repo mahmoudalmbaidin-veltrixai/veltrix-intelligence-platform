@@ -276,7 +276,7 @@ const mockReportService: ReportService = {
 
 /**
  * Live adapter — routes through the centralized API client. Endpoint paths
- * reflect the expected backend contract (see BACKEND_INTEGRATION.md).
+ * reflect the expected backend contract (see docs/BACKEND_INTEGRATION.md).
  */
 const apiReportService: ReportService = {
   list: () => apiClient.get<Report[]>('/reports'),

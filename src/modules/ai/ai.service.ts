@@ -381,7 +381,7 @@ const mockAiService: AiService = {
 
 /**
  * Live adapter — routes through the centralized API client. Endpoint paths
- * reflect the expected backend contract (see BACKEND_INTEGRATION.md).
+ * reflect the expected backend contract (see docs/BACKEND_INTEGRATION.md).
  */
 const apiAiService: AiService = {
   listConversations: () => apiClient.get<Conversation[]>('/ai/conversations'),
