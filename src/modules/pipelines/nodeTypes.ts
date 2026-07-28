@@ -138,6 +138,25 @@ export const NODE_TYPES: Record<PipelineNodeKind, NodeTypeSpec> = {
     outputs: OUT,
     config: [field('field', 'Output field'), { key: 'formula', label: 'Formula', type: 'formula', required: true }],
   }),
+  'row-validation': spec({
+    kind: 'row-validation',
+    label: 'Row Validation',
+    category: 'transform',
+    icon: 'quality',
+    description: 'Reject rows that fail approved formula rules.',
+    docs: 'Each rule is a JSON object with formula and reason fields. Rejected rows are retained in a protected artifact.',
+    inputs: IN,
+    outputs: OUT,
+    config: [
+      {
+        key: 'rules',
+        label: 'Validation rules',
+        type: 'textarea',
+        required: true,
+        help: 'JSON array of { "formula": "...", "reason": "..." } rules.',
+      },
+    ],
+  }),
   'type-convert': spec({
     kind: 'type-convert',
     label: 'Type Convert',
@@ -252,7 +271,16 @@ export const PALETTE_GROUPS: { label: string; kinds: PipelineNodeKind[] }[] = [
   { label: 'Sources', kinds: ['source-dataset'] },
   {
     label: 'Prepare',
-    kinds: ['select-columns', 'rename-columns', 'filter', 'sort', 'deduplicate', 'null-handling', 'type-convert'],
+    kinds: [
+      'select-columns',
+      'rename-columns',
+      'filter',
+      'sort',
+      'deduplicate',
+      'null-handling',
+      'row-validation',
+      'type-convert',
+    ],
   },
   { label: 'Combine', kinds: ['join', 'union'] },
   { label: 'Transform', kinds: ['aggregate', 'formula'] },

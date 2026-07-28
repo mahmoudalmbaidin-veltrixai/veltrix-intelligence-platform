@@ -9,7 +9,13 @@ import pytest
 from starlette.testclient import TestClient
 
 os.environ.setdefault("APP_ENV", "test")
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://vip:vip_test@localhost:5432/vip_test")
+os.environ.setdefault(
+    "DATABASE_URL",
+    os.getenv(
+        "TEST_DATABASE_URL",
+        "postgresql+asyncpg://vip:vip_local_dev_only@localhost:5432/vip_test",
+    ),
+)
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("ENABLE_DOCS", "false")
 

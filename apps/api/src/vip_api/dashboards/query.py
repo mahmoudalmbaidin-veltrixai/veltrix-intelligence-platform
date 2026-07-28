@@ -148,6 +148,16 @@ async def execute_widget(
             return cached
     runtime_filters: list[QueryFilter] = []
     allowed = {item.field for item in widget.query.filters} | set(widget.query.dimensions)
+    if not payload.preview and version is not None:
+        snapshot_filters = cast(list[dict[str, object]], version.snapshot.get("filters", []))
+        for item in snapshot_filters:
+            mapped_widgets = cast(list[object], item.get("widget_ids", []))
+            if str(widget_id) in {str(value) for value in mapped_widgets} and str(
+                item.get("semantic_model_id")
+            ) == str(widget.semantic_model_id):
+                dimension_key = item.get("dimension_key")
+                if isinstance(dimension_key, str):
+                    allowed.add(dimension_key)
     for key, value in sorted(payload.filters.items()):
         if key not in allowed:
             raise ApplicationError(

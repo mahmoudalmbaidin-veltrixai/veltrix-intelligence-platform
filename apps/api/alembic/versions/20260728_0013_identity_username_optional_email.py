@@ -35,9 +35,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "users",
-        sa.Column(
-            "must_change_password", sa.Boolean(), nullable=False, server_default=sa.false()
-        ),
+        sa.Column("must_change_password", sa.Boolean(), nullable=False, server_default=sa.false()),
     )
     op.add_column("users", sa.Column("default_organization_id", sa.Uuid(as_uuid=True)))
     op.add_column("users", sa.Column("default_workspace_id", sa.Uuid(as_uuid=True)))
@@ -92,17 +90,13 @@ def upgrade() -> None:
     # 4. Enforce NOT NULL + unique on username now that it is populated.
     op.alter_column("users", "username", nullable=False)
     op.alter_column("users", "normalized_username", nullable=False)
-    op.create_index(
-        "uq_users_normalized_username", "users", ["normalized_username"], unique=True
-    )
+    op.create_index("uq_users_normalized_username", "users", ["normalized_username"], unique=True)
 
     # 5. Make email optional; swap the unconditional unique constraint for a
     #    partial unique index (only enforced when email is present).
     op.drop_constraint("uq_users_normalized_email", "users", type_="unique")
     op.alter_column("users", "email", existing_type=sa.String(length=320), nullable=True)
-    op.alter_column(
-        "users", "normalized_email", existing_type=sa.String(length=320), nullable=True
-    )
+    op.alter_column("users", "normalized_email", existing_type=sa.String(length=320), nullable=True)
     op.create_index(
         "uq_users_normalized_email_present",
         "users",

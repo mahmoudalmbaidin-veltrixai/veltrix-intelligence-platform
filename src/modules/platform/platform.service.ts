@@ -183,8 +183,7 @@ export const platformService = {
     apiClient.post<PlatformUserRow>(`${API}/organizations/${organizationId}/members`, input),
 
   // --- User access management ---
-  accessSummary: (userId: string) =>
-    apiClient.get<UserAccessSummary>(`${API}/users/${userId}/access-summary`),
+  accessSummary: (userId: string) => apiClient.get<UserAccessSummary>(`${API}/users/${userId}/access-summary`),
   updateUser: (userId: string, input: UpdatePlatformUserInput) =>
     apiClient.patch<PlatformUserRow>(`${API}/users/${userId}`, input),
   resetPassword: (userId: string, input: ResetPasswordInput) =>
@@ -205,11 +204,7 @@ export const platformService = {
   createWorkspace: (organizationId: string, input: CreateWorkspaceInput) =>
     apiClient.post<PlatformWorkspaceRow>(`${API}/organizations/${organizationId}/workspaces`, input),
   suspendWorkspace: (organizationId: string, workspaceId: string) =>
-    apiClient.post<PlatformWorkspaceRow>(
-      `${API}/organizations/${organizationId}/workspaces/${workspaceId}/suspend`,
-    ),
+    apiClient.post<PlatformWorkspaceRow>(`${API}/organizations/${organizationId}/workspaces/${workspaceId}/suspend`),
   activateWorkspace: (organizationId: string, workspaceId: string) =>
-    apiClient.post<PlatformWorkspaceRow>(
-      `${API}/organizations/${organizationId}/workspaces/${workspaceId}/activate`,
-    ),
+    apiClient.post<PlatformWorkspaceRow>(`${API}/organizations/${organizationId}/workspaces/${workspaceId}/activate`),
 }

@@ -60,6 +60,8 @@ async def test_pipeline_tables_tenant_isolation_and_conflict(settings: Settings)
                 "pipeline_outbox_events",
             } <= tables
             user = User(
+                username="pipeline-test",
+                normalized_username="pipeline-test",
                 email=f"pipeline-{uuid4().hex}@vip.test",
                 normalized_email=f"pipeline-{uuid4().hex}@vip.test",
                 display_name="Pipeline Test",

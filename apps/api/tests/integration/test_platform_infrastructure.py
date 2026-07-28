@@ -90,6 +90,8 @@ async def test_job_persistence_and_tenant_isolation(settings: Settings) -> None:
                 "file_download_tokens",
             } <= tables
             user = User(
+                username="b8-test",
+                normalized_username="b8-test",
                 email=f"b8-{uuid4().hex}@vip.test",
                 normalized_email=f"b8-{uuid4().hex}@vip.test",
                 display_name="B8 Test",

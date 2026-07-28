@@ -393,6 +393,23 @@ def transform(node: NodeInput, inputs: list[Rows]) -> Rows:
     return rows
 
 
+def validate_rows(node: NodeInput, rows: Rows) -> tuple[Rows, Rows]:
+    """Split rows using bounded safe-formula rules and retain rejection reasons."""
+    rules = cast(list[dict[str, str]], node.config["rules"])
+    parsed = [(parse_formula(rule["formula"]), rule["reason"]) for rule in rules]
+    valid: Rows = []
+    rejected: Rows = []
+    for source in rows:
+        reasons = [
+            reason for expression, reason in parsed if not bool(evaluate(expression, source))
+        ]
+        if reasons:
+            rejected.append({**source, "_invalid_reasons": reasons})
+        else:
+            valid.append(dict(source))
+    return valid, rejected
+
+
 async def execute_snapshot(
     db: AsyncSession,
     context: AuthorizationContext,
@@ -424,6 +441,8 @@ async def execute_snapshot(
         UUID(str(node.config["dataset_id"])) for node in nodes if node.type == "source-dataset"
     }
     artifacts: list[str] = []
+    rejected_rows: Rows = []
+    validated_rows: int | None = None
     for index, key in enumerate(validation.topological_order):
         await db.refresh(run, attribute_names=["cancellation_requested"])
         if run.cancellation_requested:
@@ -487,6 +506,36 @@ async def execute_snapshot(
             db.add(artifact)
             await db.flush()
             artifacts.append(str(artifact.id))
+        elif node.type == "row-validation":
+            rows, rejected = validate_rows(node, inputs[0])
+            validated_rows = len(rows)
+            rejected_rows.extend(rejected)
+            if rejected:
+                content = json.dumps(rejected, default=str, separators=(",", ":")).encode()
+                if len(content) > settings.PIPELINE_RUN_MAX_RESULT_BYTES:
+                    raise ApplicationError(
+                        code="PIPELINE_ARTIFACT_TOO_LARGE",
+                        message="The rejected-row artifact exceeds the configured limit.",
+                        status_code=422,
+                    )
+                filename = f"{uuid4()}.json"
+                storage_key = f"{run.organization_id}/{run.workspace_id}/{run.id}/{filename}"
+                size, digest = storage.write(storage_key, content)
+                artifact = PipelineArtifact(
+                    organization_id=run.organization_id,
+                    workspace_id=run.workspace_id,
+                    run_id=run.id,
+                    node_key=node.key,
+                    storage_key=storage_key,
+                    content_type="application/json",
+                    size_bytes=size,
+                    sha256=digest,
+                    expires_at=datetime.now(UTC)
+                    + timedelta(hours=settings.PIPELINE_ARTIFACT_RETENTION_HOURS),
+                )
+                db.add(artifact)
+                await db.flush()
+                artifacts.append(str(artifact.id))
         else:
             rows = transform(node, inputs)
         results[key] = rows
@@ -524,4 +573,14 @@ async def execute_snapshot(
         ],
         "artifact_ids": artifacts,
         "rows_processed": run.rows_processed,
+        "valid_rows": validated_rows if validated_rows is not None else len(rows),
+        "output_rows": len(rows),
+        "rejected_rows": len(rejected_rows),
+        "rejection_reasons": sorted(
+            {
+                str(reason)
+                for row in rejected_rows
+                for reason in cast(list[object], row["_invalid_reasons"])
+            }
+        ),
     }

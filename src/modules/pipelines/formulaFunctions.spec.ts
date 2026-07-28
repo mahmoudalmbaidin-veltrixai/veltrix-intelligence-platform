@@ -31,9 +31,7 @@ describe('formula validator', () => {
   it('accepts the expanded Math / Text / Conversion functions', () => {
     const r = validateFormula('if(isnumber(tonumber([amt])), clamp(round([amt], 2), 0, 100), 0)')
     expect(r.valid).toBe(true)
-    expect(r.usedFunctions).toEqual(
-      expect.arrayContaining(['if', 'isnumber', 'tonumber', 'clamp', 'round']),
-    )
+    expect(r.usedFunctions).toEqual(expect.arrayContaining(['if', 'isnumber', 'tonumber', 'clamp', 'round']))
   })
   it('accepts and / or / not logical operators', () => {
     expect(validateFormula('[a] > 0 and [b] == 0 or not [c]').valid).toBe(true)

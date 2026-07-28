@@ -15,7 +15,8 @@ COPY alembic.ini ./
 COPY alembic ./alembic
 COPY scripts ./scripts
 
-RUN python -m pip install --no-cache-dir -r requirements.runtime.lock \
+RUN python -m pip install --no-cache-dir "pip==26.1.2" \
+    && python -m pip install --no-cache-dir -r requirements.runtime.lock \
     && python -m pip install --no-cache-dir --no-deps . \
     && chmod +x /app/scripts/docker-entrypoint.sh \
     && chown -R vip:vip /app

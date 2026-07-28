@@ -2,7 +2,9 @@ name: vip
 
 services:
   postgres:
-    image: postgres:17.5-alpine
+    image: vip-postgres:17.10-alpine
+    build:
+      context: ./infra/postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-vip}
       POSTGRES_USER: ${POSTGRES_USER:-vip}
@@ -21,7 +23,7 @@ services:
     networks: [vip_backend]
 
   redis:
-    image: redis:8.0.3-alpine
+    image: redis:8.0-alpine@sha256:5f61955be8ab2ccee9372b84ae4d4da2e2b156f87281e3f218544055e7ee04d4
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -32,6 +34,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+    networks: [vip_backend]
+
+  clamav:
+    image: clamav/clamav:stable@sha256:7f5389ccaa2368c383fa80e167ccfe44348d71e685f926fce4755eed1757673a
+    volumes:
+      - vip_clamav_signatures:/var/lib/clamav
     restart: unless-stopped
     networks: [vip_backend]
 
@@ -160,7 +169,10 @@ services:
       FILE_STORAGE_PROVIDER: ${FILE_STORAGE_PROVIDER:-local}
       FILE_STORAGE_ROOT: /data/vip-files
       FILE_MAX_UPLOAD_BYTES: ${FILE_MAX_UPLOAD_BYTES:-104857600}
-      FILE_MALWARE_SCANNER: ${FILE_MALWARE_SCANNER:-noop}
+      FILE_MALWARE_SCANNER: ${FILE_MALWARE_SCANNER:-clamav}
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      FILE_SCAN_TIMEOUT_SECONDS: ${FILE_SCAN_TIMEOUT_SECONDS:-30}
       FILE_DOWNLOAD_SIGNING_KEY: ${FILE_DOWNLOAD_SIGNING_KEY:-vip-local-file-signing-key-change-me-2026}
     ports:
       - "${API_PORT:-8000}:8000"
@@ -168,6 +180,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
     volumes:
       - ./apps/api/src:/app/src:ro
@@ -302,6 +316,12 @@ services:
         condition: service_completed_successfully
     volumes:
       - vip_pipeline_artifacts:/data/vip-pipeline-artifacts
+    healthcheck:
+      test: ["CMD", "python", "/app/scripts/worker-health.py"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     init: true
     networks: [vip_backend]
@@ -334,6 +354,7 @@ volumes:
   vip_dashboard_email_outbox:
   vip_pipeline_artifacts:
   vip_files:
+  vip_clamav_signatures:
   vip_mysql_data:
 
 networks:

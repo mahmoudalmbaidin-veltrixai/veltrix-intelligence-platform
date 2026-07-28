@@ -84,6 +84,8 @@ async def test_connection_secret_safety_governance_testing_and_tenant_isolation(
 
             roles = {item.key: item for item in (await db.scalars(select(Role))).all()}
             admin = User(
+                username="b4-admin",
+                normalized_username="b4-admin",
                 email="b4-admin@test.local",
                 normalized_email="b4-admin@test.local",
                 password_hash="unused",
@@ -91,6 +93,8 @@ async def test_connection_secret_safety_governance_testing_and_tenant_isolation(
                 status=UserStatus.ACTIVE,
             )
             viewer = User(
+                username="b4-viewer",
+                normalized_username="b4-viewer",
                 email="b4-viewer@test.local",
                 normalized_email="b4-viewer@test.local",
                 password_hash="unused",

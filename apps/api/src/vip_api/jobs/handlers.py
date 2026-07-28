@@ -111,10 +111,13 @@ async def dashboard_export(
             if export.status == "cancelled":
                 return {"dashboard_export_id": raw_id, "cancelled": True}
             if export.status != "completed":
-                export.status = "queued"
-                export.progress = 0
+                exhausted = export.attempts >= export.max_attempts
+                if not exhausted:
+                    export.status = "queued"
+                    export.progress = 0
                 await db.commit()
-                raise RetryableJobError(
+                error = PermanentJobError if exhausted else RetryableJobError
+                raise error(
                     export.safe_error_code or "DASHBOARD_EXPORT_FAILED",
                     "The dashboard export could not be completed.",
                 )

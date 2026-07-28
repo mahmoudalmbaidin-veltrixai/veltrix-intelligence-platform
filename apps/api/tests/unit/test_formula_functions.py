@@ -45,7 +45,11 @@ def test_math_domain_errors_return_null_not_crash() -> None:
 
 
 def test_text_functions() -> None:
-    row = {"name": "  Ada Lovelace ", "sku": "US-1234", "email": "a@b.com"}
+    row: dict[str, object] = {
+        "name": "  Ada Lovelace ",
+        "sku": "US-1234",
+        "email": "a@b.com",
+    }
     assert _run("length(trim([name]))", row) == 12
     assert _run("left([sku], 2)", row) == "US"
     assert _run("right([sku], 4)", row) == "1234"
@@ -84,7 +88,7 @@ def test_existing_behaviour_preserved() -> None:
 
 
 def test_and_or_not_operators() -> None:
-    row = {"a": 5, "b": 0}
+    row: dict[str, object] = {"a": 5, "b": 0}
     assert _run("[a] > 0 and [b] == 0", row) is True
     assert _run("[a] > 10 or [b] == 0", row) is True
     assert _run("not [b] > 0", row) is True
@@ -116,7 +120,7 @@ def test_in_membership() -> None:
 
 
 def test_date_extraction() -> None:
-    row = {"ts": "2024-03-15T10:30:00"}
+    row: dict[str, object] = {"ts": "2024-03-15T10:30:00"}
     assert _run("year([ts])", row) == 2024
     assert _run("month([ts])", row) == 3
     assert _run("day([ts])", row) == 15
@@ -126,7 +130,7 @@ def test_date_extraction() -> None:
 
 
 def test_date_arithmetic_and_formatting() -> None:
-    row = {"start": "2024-01-01", "end": "2024-01-11"}
+    row: dict[str, object] = {"start": "2024-01-01", "end": "2024-01-11"}
     assert _run('datediff([start], [end], "days")', row) == 10
     assert _run('dateformat(dateadd([start], 7, "days"), "%Y-%m-%d")', row) == "2024-01-08"
     assert _run('dateformat(dateparse("03/15/2024", "%m/%d/%Y"), "%Y-%m-%d")', {}) == "2024-03-15"

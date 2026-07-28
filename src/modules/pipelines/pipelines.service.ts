@@ -249,8 +249,8 @@ export const pipelineService = {
   async startRun(id: string): Promise<PipelineRun> {
     return mapRun(await apiClient.post<RunDto>(`/api/v1/pipelines/${id}/runs`, {}))
   },
-  async getRun(pipelineId: string, runId: string): Promise<PipelineRun> {
-    return mapRun(await apiClient.get<RunDto>(`/api/v1/pipelines/${pipelineId}/runs/${runId}`))
+  async getRun(pipelineId: string, runId: string, signal?: AbortSignal): Promise<PipelineRun> {
+    return mapRun(await apiClient.get<RunDto>(`/api/v1/pipelines/${pipelineId}/runs/${runId}`, { signal }))
   },
   async listRuns(id: string): Promise<PipelineRun[]> {
     const page = await apiClient.get<{ items: RunDto[] }>(`/api/v1/pipelines/${id}/runs`)

@@ -79,7 +79,13 @@ describe('platform admin service — user access management', () => {
   })
 
   it('creates a workspace inside an organization', async () => {
-    api.post.mockResolvedValue({ id: 'ws-1', name: 'Marketing', slug: 'marketing', status: 'active', is_default: false })
+    api.post.mockResolvedValue({
+      id: 'ws-1',
+      name: 'Marketing',
+      slug: 'marketing',
+      status: 'active',
+      is_default: false,
+    })
     await platformService.createWorkspace('org-1', { name: 'Marketing', slug: 'marketing' })
     expect(api.post).toHaveBeenCalledWith(`${API}/organizations/org-1/workspaces`, {
       name: 'Marketing',

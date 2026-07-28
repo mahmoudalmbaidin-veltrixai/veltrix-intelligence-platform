@@ -29,6 +29,7 @@ from vip_api.governance.services import (
     authorize,
     resolve_authorization_context,
 )
+from vip_api.jobs.models import WorkerHeartbeat
 from vip_api.pipelines.execution import execute_snapshot
 from vip_api.pipelines.models import (
     PipelineArtifact,
@@ -45,6 +46,41 @@ from vip_api.tenancy.context import TenantContext
 from vip_api.tenancy.models import MembershipStatus, OrganizationMembership, WorkspaceMembership
 
 logger = logging.getLogger(__name__)
+
+
+async def service_heartbeat(
+    database: Database,
+    worker_id: str,
+    settings: Settings,
+    stop: asyncio.Event,
+) -> None:
+    """Publish pipeline process health for the shared container health probe."""
+    status = "running"
+    while True:
+        async with database.session_factory() as db:
+            row = await db.get(WorkerHeartbeat, worker_id)
+            now = datetime.now(UTC)
+            if row is None:
+                row = WorkerHeartbeat(
+                    worker_id=worker_id,
+                    queue_name="pipeline",
+                    hostname=socket.gethostname(),
+                    process_id=os.getpid(),
+                    concurrency=1,
+                    started_at=now,
+                )
+                db.add(row)
+            row.status = status
+            row.last_seen_at = now
+            row.shutdown_at = now if status == "stopped" else None
+            await db.commit()
+        if status == "stopped":
+            return
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=settings.JOB_HEARTBEAT_SECONDS)
+        except TimeoutError:
+            continue
+        status = "stopped"
 
 
 async def _context(db: AsyncSession, run: PipelineRun) -> AuthorizationContext:
@@ -411,6 +447,10 @@ async def serve() -> None:
     provider = DatabaseEncryptedSecretProvider(EnvironmentEncryptionKeyProvider(settings))
     storage = PipelineArtifactStorage(settings.PIPELINE_ARTIFACT_ROOT)
     worker_id = f"{socket.gethostname()}:{os.getpid()}"
+    heartbeat_stop = asyncio.Event()
+    heartbeat_task = asyncio.create_task(
+        service_heartbeat(database, worker_id, settings, heartbeat_stop)
+    )
     logger.info("Pipeline worker started", extra={"worker_id": worker_id})
     try:
         while True:
@@ -446,6 +486,8 @@ async def serve() -> None:
             if run is None:
                 await asyncio.sleep(settings.PIPELINE_WORKER_POLL_SECONDS)
     finally:
+        heartbeat_stop.set()
+        await heartbeat_task
         await database.dispose()
 
 

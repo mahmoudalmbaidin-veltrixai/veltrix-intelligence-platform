@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
+from vip_api.core.metrics import metrics
 from vip_api.database.session import get_db_session
 from vip_api.events.broker import RedisEventBroker
 from vip_api.governance.audit import record_audit
@@ -73,21 +74,30 @@ async def stream_events(
     await db.commit()
 
     async def generate() -> AsyncIterator[str]:
-        yield "retry: 3000\n\n"
-        async for event in broker.subscribe(
-            context.organization_id,
-            workspace_id,
-            resume,
-            allowed_types,
-            settings.JOB_EVENT_HEARTBEAT_SECONDS,
-        ):
-            if await request.is_disconnected():
-                return
-            if event is None:
-                yield ": keepalive\n\n"
-                continue
-            body = json.dumps(event.data, separators=(",", ":"), default=str)
-            yield f"id: {event.id}\nevent: {event.event_type}\ndata: {body}\n\n"
+        metrics.sse_opened(resumed=resume != "$")
+        try:
+            yield "retry: 3000\n\n"
+            async for event in broker.subscribe(
+                context.organization_id,
+                workspace_id,
+                resume,
+                allowed_types,
+                settings.JOB_EVENT_HEARTBEAT_SECONDS,
+            ):
+                if await request.is_disconnected():
+                    return
+                if event is None:
+                    yield ": keepalive\n\n"
+                    continue
+                if event.event_type == "stream.reset":
+                    metrics.sse_missed_event_recovered()
+                body = json.dumps(event.data, separators=(",", ":"), default=str)
+                yield f"id: {event.id}\nevent: {event.event_type}\ndata: {body}\n\n"
+        except Exception:
+            metrics.sse_error()
+            raise
+        finally:
+            metrics.sse_closed()
 
     return StreamingResponse(
         generate(),

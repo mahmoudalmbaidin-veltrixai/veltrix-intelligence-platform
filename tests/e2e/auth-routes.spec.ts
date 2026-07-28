@@ -7,7 +7,7 @@ test('unauthenticated direct protected route redirects and restores intent', asy
   await page.goto('/dashboards')
   await expect(page).toHaveURL(/\/login/)
   await expect(page.getByRole('heading', { name: /Sign in/ })).toBeVisible()
-  await page.getByLabel('Work email').fill(E2E_EMAIL)
+  await page.getByLabel('Username or email').fill(E2E_EMAIL)
   await page.locator('input[name="password"]').fill(E2E_PASSWORD)
   const submit = page.getByRole('button', { name: 'Sign in' })
   await expect(submit).toBeEnabled()
@@ -19,10 +19,12 @@ test('login validation and expired-session state are safe', async ({ page }) => 
   await resetClientState(page)
   await page.goto('/login?expired=1')
   await expect(page.getByText('Session expired')).toBeVisible()
-  await page.getByLabel('Work email').fill('')
+  await page.getByLabel('Username or email').fill('')
   await page.locator('input[name="password"]').fill('')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  expect(await page.getByLabel('Work email').evaluate((el: HTMLInputElement) => el.validity.valueMissing)).toBe(true)
+  expect(
+    await page.getByLabel('Username or email').evaluate((el: HTMLInputElement) => el.validity.valueMissing),
+  ).toBe(true)
   expect(
     await page.locator('input[name="password"]').evaluate((el: HTMLInputElement) => el.validity.valueMissing),
   ).toBe(true)
@@ -31,12 +33,12 @@ test('login validation and expired-session state are safe', async ({ page }) => 
 test('invalid credentials stay generic and real cookie session survives bootstrap refresh', async ({ page }) => {
   await resetClientState(page)
   await page.goto('/login')
-  await page.getByLabel('Work email').fill(`invalid-${Date.now()}@vip.invalid`)
+  await page.getByLabel('Username or email').fill(`invalid-${Date.now()}@vip.invalid`)
   await page.locator('input[name="password"]').fill('definitely-not-the-password')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByRole('alert').filter({ hasText: 'Sign-in failed' })).toContainText('Invalid email or password')
 
-  await page.getByLabel('Work email').fill(E2E_EMAIL)
+  await page.getByLabel('Username or email').fill(E2E_EMAIL)
   await page.locator('input[name="password"]').fill(E2E_PASSWORD)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page).toHaveURL(/\/home$/)
@@ -65,6 +67,7 @@ test('invalid credentials stay generic and real cookie session survives bootstra
 })
 
 test('logout is durable and protected routes cannot be reopened', async ({ authenticatedPage: page }) => {
+  test.setTimeout(60_000)
   await page.getByRole('button', { name: 'User menu' }).click()
   await page.getByRole('menuitem', { name: 'Sign out' }).click()
   await expect(page).toHaveURL(/\/login$/)

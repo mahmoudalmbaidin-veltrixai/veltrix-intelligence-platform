@@ -22,9 +22,7 @@ test('Pipeline Studio uploads, previews, persists, and publishes a governed CSV 
   await page.getByLabel('Destination schema').fill('public')
   await page.getByLabel('Destination table').fill(tableName)
   await page.getByLabel('Dataset name').fill(datasetName)
-  await page
-    .getByLabel('CSV file')
-    .setInputFiles(path.resolve('e2e', 'data', 'b8_5_certification.csv'))
+  await page.getByLabel('CSV file').setInputFiles(path.resolve('tests', 'e2e', 'data', 'b8_5_certification.csv'))
   await page.getByRole('button', { name: 'Upload and register' }).click()
 
   await expect(page.getByText(/Bound \d+ fields to this source/)).toBeVisible({ timeout: 30_000 })

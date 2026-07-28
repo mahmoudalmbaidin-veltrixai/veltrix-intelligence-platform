@@ -72,6 +72,8 @@ async def test_dashboard_tables_persist_and_queries_are_tenant_qualified(
             await db.execute(delete(Organization))
             await db.execute(delete(User))
             user = User(
+                username="dashboard-admin",
+                normalized_username="dashboard-admin",
                 email="dashboard-admin@vip.test",
                 normalized_email="dashboard-admin@vip.test",
                 display_name="Dashboard Admin",
@@ -79,6 +81,8 @@ async def test_dashboard_tables_persist_and_queries_are_tenant_qualified(
                 status=UserStatus.ACTIVE,
             )
             shared_user = User(
+                username="dashboard-shared",
+                normalized_username="dashboard-shared",
                 email="dashboard-shared@vip.test",
                 normalized_email="dashboard-shared@vip.test",
                 display_name="Dashboard Shared User",

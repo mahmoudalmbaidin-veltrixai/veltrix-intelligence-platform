@@ -71,6 +71,8 @@ async def seed_fixture(settings: Settings) -> TenantFixture:
             roles = {role.key: role.id for role in (await db.scalars(select(Role))).all()}
             users = {
                 key: User(
+                    username=f"tenant-user-{key}",
+                    normalized_username=f"tenant-user-{key}",
                     email=f"user-{key}@tenant.test",
                     normalized_email=f"user-{key}@tenant.test",
                     password_hash=password_hash,

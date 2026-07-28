@@ -194,6 +194,9 @@ onBeforeUnmount(() => {
   position: fixed;
   min-width: 190px;
   max-width: min(320px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--vip-surface-1);
   border: 1px solid var(--vip-border);
   border-radius: var(--vip-radius-md);

@@ -18,6 +18,7 @@ export type PipelineNodeKind =
   | 'union'
   | 'aggregate'
   | 'formula'
+  | 'row-validation'
   | 'type-convert'
   | 'deduplicate'
   | 'null-handling'

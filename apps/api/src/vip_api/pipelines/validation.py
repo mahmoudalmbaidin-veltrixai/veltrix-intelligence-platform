@@ -34,6 +34,7 @@ _CONFIG_KEYS: dict[str, frozenset[str]] = {
     "union": frozenset({"distinct"}),
     "aggregate": frozenset({"group_by", "aggregations"}),
     "formula": frozenset({"field", "formula"}),
+    "row-validation": frozenset({"rules"}),
     "type-convert": frozenset({"field", "target_type"}),
     "deduplicate": frozenset({"fields"}),
     "null-handling": frozenset({"field", "strategy", "value"}),
@@ -179,6 +180,25 @@ def _typed_config_issues(node: NodeInput) -> list[ValidationIssue]:
             invalid("config.aggregations", "Aggregations must use approved fields and operations.")
     elif kind == "formula":
         string("field")
+    elif kind == "row-validation":
+        rules = config.get("rules")
+        if (
+            not isinstance(rules, list)
+            or not 1 <= len(rules) <= 50
+            or any(
+                not isinstance(rule, dict)
+                or set(rule) != {"formula", "reason"}
+                or not isinstance(rule.get("formula"), str)
+                or not 1 <= len(rule["formula"]) <= 4096
+                or not isinstance(rule.get("reason"), str)
+                or not 1 <= len(rule["reason"]) <= 255
+                for rule in rules
+            )
+        ):
+            invalid(
+                "config.rules",
+                "rules must contain 1 to 50 bounded formula and reason pairs.",
+            )
     elif kind == "type-convert":
         string("field")
         if config.get("target_type") not in {"string", "integer", "number", "boolean"}:
@@ -304,6 +324,23 @@ async def validate_graph(
                             field="config.formula",
                         )
                     )
+        if node.type == "row-validation":
+            rules = node.config.get("rules")
+            if isinstance(rules, list):
+                for index, rule in enumerate(rules):
+                    if not isinstance(rule, dict) or not isinstance(rule.get("formula"), str):
+                        continue
+                    try:
+                        parse_formula(rule["formula"])
+                    except Exception as exc:
+                        errors.append(
+                            ValidationIssue(
+                                code="INVALID_FORMULA",
+                                message=str(exc),
+                                node_key=node.key,
+                                field=f"config.rules.{index}.formula",
+                            )
+                        )
         if node.type == "file-export" and node.config.get("format") not in {"csv", "json"}:
             errors.append(
                 ValidationIssue(

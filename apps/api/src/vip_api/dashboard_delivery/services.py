@@ -146,7 +146,6 @@ async def create_export(
     db.add(platform_job)
     await db.flush()
     export.platform_job_id = platform_job.id
-    export.max_attempts = 1
     db.add(
         JobPayload(
             job_id=platform_job.id,

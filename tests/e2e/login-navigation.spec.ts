@@ -31,7 +31,7 @@ test('@mobile login remains usable at 320px', async ({ page }) => {
   await expect(card).toBeVisible()
   expect(await card.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThanOrEqual(280)
   expect(await page.locator('html').evaluate((element) => element.scrollWidth)).toBe(320)
-  await expect(page.getByLabel('Work email')).toBeVisible()
+  await expect(page.getByLabel('Username or email')).toBeVisible()
   await expect(page.locator('input[name="password"]')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
 })

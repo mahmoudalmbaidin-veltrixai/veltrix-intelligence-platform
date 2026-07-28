@@ -851,7 +851,9 @@ onMounted(loadOverview)
     <VipDialog
       :open="manageOpen"
       :title="manageUser ? `Manage ${manageUser.display_name}` : ''"
-      :description="manageUser ? `@${manageUser.username}${manageUser.email ? ' · ' + manageUser.email : ' · no email'}` : ''"
+      :description="
+        manageUser ? `@${manageUser.username}${manageUser.email ? ' · ' + manageUser.email : ' · no email'}` : ''
+      "
       size="lg"
       @close="closeManage"
     >
@@ -893,14 +895,12 @@ onMounted(loadOverview)
             <VipButton variant="tertiary" size="sm" icon="refresh" @click="resetPwValue = generatePassword()"
               >Regenerate</VipButton
             >
-            <VipButton
-              variant="tertiary"
-              size="sm"
-              icon="copy"
-              @click="copyText(resetPwValue, 'Password')"
+            <VipButton variant="tertiary" size="sm" icon="copy" @click="copyText(resetPwValue, 'Password')"
               >Copy</VipButton
             >
-            <VipButton variant="tertiary" size="sm" :disabled="resetPwPending" @click="resetPwOpen = false">Cancel</VipButton>
+            <VipButton variant="tertiary" size="sm" :disabled="resetPwPending" @click="resetPwOpen = false"
+              >Cancel</VipButton
+            >
             <VipButton
               variant="primary"
               size="sm"
@@ -968,7 +968,12 @@ onMounted(loadOverview)
             :model-value="addWsForm.organization_id"
             :options="memberOrgOptions"
             size="sm"
-            @update:model-value="(v: string) => { addWsForm.organization_id = v; onAddWsOrgChange(v) }"
+            @update:model-value="
+              (v: string) => {
+                addWsForm.organization_id = v
+                onAddWsOrgChange(v)
+              }
+            "
           />
           <VipSelect v-model="addWsForm.workspace_id" :options="addWsWorkspaceOptions" size="sm" />
           <VipSelect v-model="addWsForm.workspace_role" :options="workspaceRoleOptions" size="sm" />
