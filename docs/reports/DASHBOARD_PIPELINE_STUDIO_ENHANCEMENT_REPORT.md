@@ -20,6 +20,24 @@ production-ready verdict is claimed** — status is tracked per area below.
 | 3 | Resolve the 10 failing backend tests (hermetic test fixture) | `2bd56e4` | Verified — root-caused + fixed; 132/132 unit pass |
 | 4 | Select/Rename schema-validation **integration** test (real DB) | `71e9c43` | Verified — DB-backed integration passing |
 | 5 | Select/Rename **worker-transform parity** with validation | `7046433` | Verified at transform level; live source-read/queue parity deferred |
+| 6 | Dashboard **lifecycle + version-integrity** regression test (real DB) | `4057352` | Verified — not reproduced; lifecycle protected by regression coverage |
+| 7 | Dashboard **frontend widget-identity/reconciliation** guards | `211dee4` | Verified — 13/13 editor tests |
+
+### Dashboard lifecycle regression (Deliverable 2 of the UAT sprint) — DONE
+`tests/integration/test_dashboard_lifecycle_integrity.py` drives the real
+services through create → save (2 pages, widgets A–D) → reload → edit A →
+delete B → add E → duplicate C → reorder widgets → resize/reposition → reorder
+pages → save → publish → edit → publish, asserting: stable widget ids after
+save/reload; unique duplicate identity; deleted widgets gone (and never in the
+snapshot); new widgets present; edited config current; exact widget + page
+order; exact layout coordinates; published `DashboardVersion` snapshot bound to
+the intended version and containing exactly the intended widgets (the snapshot
+the export worker reads); first published version immutable after later edits;
+stale `expected_version` → `DASHBOARD_VERSION_CONFLICT`. Frontend guards
+(`useDashboardEditor.spec.ts`): duplicate identity + deep-clone, no cross-widget
+mutation, and save-response reconciliation of temp `w_` ids to server UUIDs.
+**Result: Not reproduced; dashboard lifecycle is now protected by automated
+regression coverage.**
 
 ## UAT Test-Readiness verdict (this sprint)
 
@@ -36,7 +54,7 @@ severity and next action:
 | # | Blocker | Sev | Next action |
 |---|---------|-----|-------------|
 | B1 | Full Select/Rename worker+queue parity with a **live source read** not executed (only the real `transform()` + validation parity is covered) | High | Seed a real source table + connection secret; drive `execute_snapshot` / the pipeline-worker queue; compare worker result values |
-| B2 | Dashboard lifecycle regression test (create→edit→delete→add→duplicate→reorder→publish→export, with identity/version assertions) **not implemented** | High | Build a DB-backed test via dashboard services + export worker |
+| B2 | ~~Dashboard lifecycle regression test~~ **DONE** (`4057352`, `211dee4`) | — | Resolved — not reproduced, protected by regression coverage |
 | B3 | Per-widget exact data export (CSV/JSON/XLSX) **not implemented** (no endpoint, no widget action) | High | Implement export using `dashboards.query` + generic jobs/files framework |
 | B4 | Dashboard card-editing completeness/reliability **not implemented** this program | High | Audit + extend `WidgetInspector` with typed controls |
 | B5 | Dashboard PDF/PNG rendering fidelity + visual-regression fixtures **not done** | High | Add deterministic readiness signals + baseline image diffs |
