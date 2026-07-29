@@ -39,6 +39,12 @@ def settings() -> Settings:
         DATABASE_URL=os.environ["DATABASE_URL"],
         REDIS_URL=os.environ["REDIS_URL"],
         ENABLE_DOCS=False,
+        # Hermetic host allow-list. Without this, running the suite inside the
+        # live API container (which exports TRUSTED_HOSTS for the running server)
+        # would enable TrustedHostMiddleware and reject the TestClient "testserver"
+        # host with a 400, masking the real 422/readiness assertions. Matches the
+        # certified CI default (TRUSTED_HOSTS unset -> ["*"], middleware disabled).
+        TRUSTED_HOSTS=["*"],
         # Keep failure tests bounded without making normal Docker/Windows CI
         # connections flaky under concurrent browser and API verification.
         DATABASE_CONNECT_TIMEOUT=2.0,
