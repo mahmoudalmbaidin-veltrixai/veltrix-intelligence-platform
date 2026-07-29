@@ -70,9 +70,10 @@ Passwords, signing keys, cookies, and tokens are intentionally omitted.
 | Hosted browser worker topology incomplete | CI now starts and heartbeat-checks the generic/dashboard and pipeline workers before live Playwright journeys |
 | Hosted pipeline connection fixture missing | The B5 seeder accepts an explicit organization, workspace, database, and username; CI provisions the controlled connection in the active E2E tenant |
 | Dashboard action tests depended on retained data | Each menu test creates, targets, and archives its own tenant-scoped dashboard fixture |
-| Hosted browser storage roots unwritable | CI binds file, pipeline, dashboard, and email artifacts to the writable ephemeral runner directory |
+| Hosted browser storage roots implicit | CI binds file, pipeline, dashboard, and email artifacts to an explicit writable workspace directory |
+| Hosted seed used a prohibited loopback destination | CI discovers the runner's non-loopback private address; loopback and cloud-metadata protections remain enforced |
 
-Together with the 13 groups in the stabilization report, 26 defect groups were closed. No test was
+Together with the 13 groups in the stabilization report, 27 defect groups were closed. No test was
 disabled, skipped, reclassified, or weakened. Retries remain zero. The longest worker-backed
 browser journey has an explicit hosted-runtime budget while retaining every operation-level
 assertion and timeout.

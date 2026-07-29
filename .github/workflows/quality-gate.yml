@@ -119,8 +119,10 @@ jobs:
       - name: Seed B5 dataset and semantic demo
         run: |
           B5_DEMO_POSTGRES_PASSWORD="vip_test" python -m vip_api.cli seed-dataset-catalogs
+          runner_host="$(hostname -I | awk '{print $1}')"
           B5_DEMO_ORGANIZATION_SLUG="demo-alpha" \
           B5_DEMO_WORKSPACE_SLUG="workspace-1" \
+          B5_DEMO_POSTGRES_HOST="$runner_host" \
           B5_DEMO_POSTGRES_DATABASE="vip_test" \
           B5_DEMO_POSTGRES_PASSWORD="vip_test" \
             python -m vip_api.cli seed-dataset-catalogs
