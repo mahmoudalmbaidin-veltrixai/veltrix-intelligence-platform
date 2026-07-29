@@ -114,6 +114,11 @@ jobs:
       - name: Seed B5 dataset and semantic demo
         run: |
           B5_DEMO_POSTGRES_PASSWORD="vip_test" python -m vip_api.cli seed-dataset-catalogs
+          B5_DEMO_ORGANIZATION_SLUG="demo-alpha" \
+          B5_DEMO_WORKSPACE_SLUG="workspace-1" \
+          B5_DEMO_POSTGRES_DATABASE="vip_test" \
+          B5_DEMO_POSTGRES_PASSWORD="vip_test" \
+            python -m vip_api.cli seed-dataset-catalogs
           python -m vip_api.cli seed-semantic-layer
         working-directory: apps/api
       - name: Start API

@@ -68,8 +68,10 @@ Passwords, signing keys, cookies, and tokens are intentionally omitted.
 | Runtime image patch lag | PostgreSQL 17.10 and Redis 8.0.6 are digest pinned; vulnerable upstream privilege helper is replaced at runtime |
 | Cross-realm Blob contract assertion | Frontend download tests now verify the standard Blob brand, MIME type, and byte size across Node/jsdom realms |
 | Hosted browser worker topology incomplete | CI now starts and heartbeat-checks the generic/dashboard and pipeline workers before live Playwright journeys |
+| Hosted pipeline connection fixture missing | The B5 seeder accepts an explicit organization, workspace, database, and username; CI provisions the controlled connection in the active E2E tenant |
+| Dashboard action tests depended on retained data | Each menu test creates, targets, and archives its own tenant-scoped dashboard fixture |
 
-Together with the 13 groups in the stabilization report, 23 defect groups were closed. No test was
+Together with the 13 groups in the stabilization report, 25 defect groups were closed. No test was
 disabled, skipped, reclassified, or weakened. Retries remain zero. The longest worker-backed
 browser journey has an explicit hosted-runtime budget while retaining every operation-level
 assertion and timeout.
