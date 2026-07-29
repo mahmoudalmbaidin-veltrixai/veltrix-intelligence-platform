@@ -19,6 +19,33 @@ production-ready verdict is claimed** — status is tracked per area below.
 | 2 | Dashboard wrong-card / export-mismatch **investigation** | `ce2190f` | Investigated — no reproducible defect in current code |
 | 3 | Resolve the 10 failing backend tests (hermetic test fixture) | `2bd56e4` | Verified — root-caused + fixed; 132/132 unit pass |
 | 4 | Select/Rename schema-validation **integration** test (real DB) | `71e9c43` | Verified — DB-backed integration passing |
+| 5 | Select/Rename **worker-transform parity** with validation | `7046433` | Verified at transform level; live source-read/queue parity deferred |
+
+## UAT Test-Readiness verdict (this sprint)
+
+**NOT READY FOR UAT — BLOCKERS REMAIN.**
+
+Completed & verified this program: schema-aware Select/Rename frontend + backend
+validation, the hermetic test-fixture fix (full unit suite 132/132), a
+DB-backed Select/Rename validation integration test, and worker-transform parity
+for Select/Rename. These are real, tested, committed.
+
+The sprint's mandatory exit criteria are largely **not met**. Blockers, each with
+severity and next action:
+
+| # | Blocker | Sev | Next action |
+|---|---------|-----|-------------|
+| B1 | Full Select/Rename worker+queue parity with a **live source read** not executed (only the real `transform()` + validation parity is covered) | High | Seed a real source table + connection secret; drive `execute_snapshot` / the pipeline-worker queue; compare worker result values |
+| B2 | Dashboard lifecycle regression test (create→edit→delete→add→duplicate→reorder→publish→export, with identity/version assertions) **not implemented** | High | Build a DB-backed test via dashboard services + export worker |
+| B3 | Per-widget exact data export (CSV/JSON/XLSX) **not implemented** (no endpoint, no widget action) | High | Implement export using `dashboards.query` + generic jobs/files framework |
+| B4 | Dashboard card-editing completeness/reliability **not implemented** this program | High | Audit + extend `WidgetInspector` with typed controls |
+| B5 | Dashboard PDF/PNG rendering fidelity + visual-regression fixtures **not done** | High | Add deterministic readiness signals + baseline image diffs |
+| B6 | Remaining pipeline nodes (Join/Aggregate/Union/Pivot/Unpivot/Filter/Sort/Formula) schema propagation still **opaque** for join/aggregate/pivot | Medium | Extend `schema_flow` per node |
+| B7 | Builder productivity (undo/redo, copy/paste, multi-select, etc.) **not started** | Low | After B2–B4 |
+| B8 | Cross-browser E2E (Chrome/Edge/Firefox, 20 journeys), performance runs **not executed** | High | Playwright matrix + seeded perf data |
+
+No global production-ready or UAT-ready verdict is issued: only a subset of the
+required modules are complete and validated.
 
 ## Priority 0 — Closing validation gaps (this session)
 
