@@ -13,6 +13,8 @@ import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
 import FormulaEditor from './FormulaEditor.vue'
 import SourceConfigurationPanel from './SourceConfigurationPanel.vue'
+import NodeColumnSelect from './NodeColumnSelect.vue'
+import NodeRenameMap from './NodeRenameMap.vue'
 
 const props = defineProps<{ editor: PipelineEditor }>()
 
@@ -21,8 +23,12 @@ const node = props.editor.selectedNode
 const spec = computed(() => (node.value ? NODE_TYPES[node.value.kind] : null))
 const issues = computed(() => (node.value ? (props.editor.nodeIssues.value.get(node.value.id) ?? []) : []))
 
+// Nodes with a bespoke schema-aware editor; the generic field loop is skipped.
+const CUSTOM_EDITOR_KINDS = new Set(['select-columns', 'rename-columns'])
+
 const visibleFields = computed<NodeConfigField[]>(() => {
   if (!spec.value || !node.value) return []
+  if (CUSTOM_EDITOR_KINDS.has(node.value.kind)) return []
   return spec.value.config.filter((f) => {
     if (!f.visibleWhen) return true
     return node.value!.config[f.visibleWhen.key] === f.visibleWhen.equals
@@ -121,6 +127,18 @@ const columnsModel = (key: string) => ({
         <!-- CONFIG -->
         <div v-if="tab === 'config'" class="insp__fields">
           <SourceConfigurationPanel v-if="node.kind === 'source-dataset'" :editor="editor" :node="node" />
+          <NodeColumnSelect
+            v-else-if="node.kind === 'select-columns'"
+            :available="node.inputSchema ?? []"
+            :model-value="(val('columns') as string[]) ?? []"
+            @update:model-value="set('columns', $event)"
+          />
+          <NodeRenameMap
+            v-else-if="node.kind === 'rename-columns'"
+            :available="node.inputSchema ?? []"
+            :model-value="(val('renames') as Record<string, string>) ?? {}"
+            @update:model-value="set('renames', $event)"
+          />
           <template v-for="f in visibleFields" :key="f.key">
             <VipInput
               v-if="f.type === 'text'"
