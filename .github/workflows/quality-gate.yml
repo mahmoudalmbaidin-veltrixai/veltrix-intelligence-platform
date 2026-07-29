@@ -65,6 +65,11 @@ jobs:
       AUTH_MAX_ACTIVE_SESSIONS_PER_USER: '100'
       AUTH_LOGIN_RATE_LIMIT_PER_MINUTE: '1000'
       VIP_E2E_EMAIL: tenant-a@vip.demo
+      FILE_MALWARE_SCANNER: noop
+      FILE_STORAGE_ROOT: ${{ runner.temp }}/vip-files
+      PIPELINE_ARTIFACT_ROOT: ${{ runner.temp }}/vip-pipeline-artifacts
+      DASHBOARD_ARTIFACT_ROOT: ${{ runner.temp }}/vip-dashboard-artifacts
+      DASHBOARD_EMAIL_OUTBOX_ROOT: ${{ runner.temp }}/vip-email-outbox
       CONNECTION_ENCRYPTION_KEY: REREREREREREREREREREREREREREREREREREREREREQ=
       CONNECTION_ENCRYPTION_KEY_VERSION: ci-v1
       CONNECTION_ALLOW_PRIVATE_NETWORKS: 'true'
