@@ -138,7 +138,9 @@ describe('central API client contracts', () => {
     expect(result.fileName).toBe('report one.pdf')
     expect(result.mimeType).toBe('application/pdf')
     expect(result.correlationId).toBe('corr-1')
-    expect(result.blob).toBeInstanceOf(Blob)
+    expect(Object.prototype.toString.call(result.blob)).toBe('[object Blob]')
+    expect(result.blob.type).toBe('application/pdf')
+    expect(result.blob.size).toBe(3)
   })
 
   it('normalizes backend error statuses and keeps raw detail out of the friendly message', async () => {
