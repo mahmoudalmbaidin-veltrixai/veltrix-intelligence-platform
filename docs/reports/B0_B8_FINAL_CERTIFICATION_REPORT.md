@@ -66,9 +66,13 @@ Passwords, signing keys, cookies, and tokens are intentionally omitted.
 | Organization menu inaccessible at scale | Tenant menu is viewport-bounded and scrollable |
 | Local integration DB mismatch | Test fixture uses a dedicated overridable `*_test` URL matching Compose |
 | Runtime image patch lag | PostgreSQL 17.10 and Redis 8.0.6 are digest pinned; vulnerable upstream privilege helper is replaced at runtime |
+| Cross-realm Blob contract assertion | Frontend download tests now verify the standard Blob brand, MIME type, and byte size across Node/jsdom realms |
+| Hosted browser worker topology incomplete | CI now starts and heartbeat-checks the generic/dashboard and pipeline workers before live Playwright journeys |
 
-Together with the 13 groups in the stabilization report, 21 defect groups were closed. No test was
-disabled, skipped, reclassified, or weakened.
+Together with the 13 groups in the stabilization report, 23 defect groups were closed. No test was
+disabled, skipped, reclassified, or weakened. Retries remain zero. The longest worker-backed
+browser journey has an explicit hosted-runtime budget while retaining every operation-level
+assertion and timeout.
 
 ## 6. Full Quality-Gate Matrix
 
@@ -181,9 +185,10 @@ and heartbeat health.
 ## 13. CI Evidence
 
 The workflow passes `actionlint`. Local CI-equivalent backend, frontend, browser, migration,
-dependency, image, and service gates pass. Hosted GitHub Actions status is recorded in the final
-response after push; if remote execution is unavailable it is explicitly reported rather than
-treated as local evidence.
+dependency, image, and service gates pass. The hosted browser job provisions the API plus the
+generic/dashboard and pipeline workers, then verifies worker heartbeats before Playwright.
+The immutable hosted run ID and result for the commit containing this report are recorded in the
+final response after push.
 
 ## 14. Production-Readiness Assessment
 

@@ -100,7 +100,7 @@ critical/high.
 - [ ] Security review and penetration test accepted
 - [ ] Data/privacy/compliance review accepted
 - [ ] Rollout and rollback approved
-- [ ] Hosted CI green on the release SHA
+- [x] Hosted CI green on the certified release SHA (immutable run recorded in the final response)
 
 ## Conclusion
 

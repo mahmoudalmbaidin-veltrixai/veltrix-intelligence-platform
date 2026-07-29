@@ -119,6 +119,13 @@ jobs:
       - name: Start API
         run: uvicorn vip_api.main:app --host 127.0.0.1 --port 8000 > api.log 2>&1 &
         working-directory: apps/api
+      - name: Start browser-test workers
+        run: |
+          SKIP_PLATFORM_BOOTSTRAP=true JOB_WORKER_QUEUES=default,dashboard \
+            python -m vip_api.jobs.worker > dashboard-worker.log 2>&1 &
+          SKIP_PLATFORM_BOOTSTRAP=true \
+            python -m vip_api.pipelines.worker > pipeline-worker.log 2>&1 &
+        working-directory: apps/api
       - name: Wait for API readiness
         run: |
           for _ in {1..30}; do
@@ -127,6 +134,38 @@ jobs:
           done
           cat apps/api/api.log
           exit 1
+      - name: Wait for worker readiness
+        run: |
+          python - <<'PY'
+          import asyncio
+          import asyncpg
+
+          async def main() -> None:
+              for _ in range(30):
+                  connection = await asyncpg.connect(
+                      "postgresql://vip:vip_test@localhost:5432/vip_test"
+                  )
+                  queues = set(
+                      await connection.fetchval(
+                          """
+                          SELECT array_agg(queue_name)
+                          FROM worker_heartbeats
+                          WHERE status = 'running'
+                          """
+                      )
+                      or []
+                  )
+                  await connection.close()
+                  if "pipeline" in queues and any(
+                      "default" in queue and "dashboard" in queue for queue in queues
+                  ):
+                      return
+                  await asyncio.sleep(1)
+              raise RuntimeError("browser-test workers did not publish healthy heartbeats")
+
+          asyncio.run(main())
+          PY
+        working-directory: apps/api
       - run: npx playwright install --with-deps chromium firefox msedge
       - run: npm run test:e2e
       - run: npm run test:a11y
@@ -138,6 +177,9 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            apps/api/api.log
+            apps/api/dashboard-worker.log
+            apps/api/pipeline-worker.log
           retention-days: 14
 
   backend-static-and-unit:
