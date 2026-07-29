@@ -16,7 +16,53 @@ production-ready verdict is claimed** — status is tracked per area below.
 |---|-------|--------|--------|
 | 0 | Pipeline Select/Rename schema-aware **frontend** editors | `eee02dd` | Implemented, tested, live-verified |
 | 1 | Pipeline Select/Rename **backend** schema propagation + structured validation | `f1abea9` | Implemented but further (integration/live) validation required |
-| 2 | Dashboard wrong-card / export-mismatch **investigation** | (report) | Investigated — no reproducible defect in current code |
+| 2 | Dashboard wrong-card / export-mismatch **investigation** | `ce2190f` | Investigated — no reproducible defect in current code |
+| 3 | Resolve the 10 failing backend tests (hermetic test fixture) | `2bd56e4` | Verified — root-caused + fixed; 132/132 unit pass |
+| 4 | Select/Rename schema-validation **integration** test (real DB) | `71e9c43` | Verified — DB-backed integration passing |
+
+## Priority 0 — Closing validation gaps (this session)
+
+### The 10 previously-failing backend tests — resolved
+All 10 failures shared a single root cause: the suite was being executed **inside
+the live API container**, which exports `TRUSTED_HOSTS=localhost,127.0.0.1,api`
+for the running server. pydantic-settings read that env var, so
+`TrustedHostMiddleware` was enabled and rejected the TestClient `testserver`
+host with **400** — before requests reached FastAPI validation (expected 422) or
+the readiness endpoint. It was a **test-environment/config issue, not a code
+regression**. Fix: the `settings` fixture now forces `TRUSTED_HOSTS=["*"]`
+(matching the certified CI default, which leaves it unset), making the suite
+hermetic. No assertion weakened or skipped.
+
+Exact tests, cause, final status:
+
+| Test | Cause | Final status |
+|------|-------|--------------|
+| test_application.py::test_validation_error_uses_standard_error | TrustedHost 400 before 422 | Pass |
+| test_application.py::test_unexpected_exception_is_safe | TrustedHost 400 | Pass |
+| test_application.py::test_unknown_route_uses_standard_error | TrustedHost 400 | Pass |
+| test_application.py::test_cors_preflight_allows_frontend_context_and_csrf_headers | TrustedHost 400 | Pass |
+| test_application.py::test_health_is_live_without_starting_external_resources | TrustedHost 400 | Pass |
+| test_application.py::test_metrics_are_prometheus_compatible_and_can_require_bearer_auth | TrustedHost 400 | Pass |
+| test_application.py::test_version_schema | TrustedHost 400 | Pass |
+| test_readiness.py::test_ready_when_all_dependencies_are_healthy | /ready 400 via TrustedHost | Pass |
+| test_readiness.py::test_not_ready_when_database_is_unavailable | /ready 400 via TrustedHost | Pass |
+| test_readiness.py::test_not_ready_when_redis_is_unavailable | /ready 400 via TrustedHost | Pass |
+
+Evidence: full unit run in the raw dev container after the fix →
+**`132 passed`** (was 122 passed / 10 failed).
+
+### Select/Rename integration test (real DB)
+`tests/integration/test_pipeline_schema_validation.py` seeds a real
+ConnectionType→Connection→Dataset→DatasetField chain in `vip_test` and drives
+the actual `validate_graph` service path. Verifies real source-schema
+resolution, a valid Select→Rename chain, `PIPELINE_COLUMN_NOT_FOUND`,
+`PIPELINE_RENAME_COLLISION`, and `PIPELINE_INVALID_COLUMN_NAME`. Run with
+`RUN_INTEGRATION_TESTS=1 APP_ENV=test DATABASE_URL=…/vip_test` → **1 passed**.
+
+Deferred within Priority 0: live worker-execution parity (needs a real source
+table + worker run) and lineage assertion — validation-level parity is
+guaranteed by `schema_flow` mirroring the worker's Select/Rename semantics and
+is unit-covered.
 
 ## 4–5. Problems reproduced / root causes
 - **Select/Rename had no backend schema-aware validation.** `validate_graph`
@@ -105,7 +151,8 @@ production-ready verdict is claimed** — status is tracked per area below.
 | Area | Status |
 |------|--------|
 | Pipeline Select/Rename frontend | Implemented but further validation required |
-| Pipeline Select/Rename backend validation | Implemented but further validation required |
+| Pipeline Select/Rename backend validation | Implemented + integration-validated; worker-execution live parity deferred |
+| Backend unit-test environment (10 failures) | Verified production-ready (132/132) |
 | Dashboard wrong-card / export-mismatch | Investigated — mechanisms verified correct, no reproducible defect (integration regression test deferred) |
 | Per-card data export | Not started |
 | Dashboard card editing | Not started |
