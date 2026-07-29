@@ -1,7 +1,11 @@
 import path from 'node:path'
 import { test, expect } from './fixtures'
 
-test.setTimeout(120_000)
+// This is the longest live browser journey: it uploads and ingests a CSV,
+// publishes and executes a worker-backed pipeline, then profiles the result.
+// Hosted Edge can legitimately exceed two minutes while preserving every
+// operation-level assertion and timeout below.
+test.setTimeout(240_000)
 
 test('Pipeline Studio uploads, previews, persists, and publishes a governed CSV source', async ({
   authenticatedPage: page,
