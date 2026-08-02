@@ -64,6 +64,8 @@ class Settings(BaseSettings):
 
     BUILD_COMMIT_SHA: str | None = None
     BUILD_TIMESTAMP: str | None = None
+    METRICS_ENABLED: bool = True
+    METRICS_BEARER_TOKEN: SecretStr | None = None
 
     AUTH_ACCESS_SESSION_TTL_MINUTES: int = Field(default=15, ge=1, le=1440)
     AUTH_REFRESH_SESSION_TTL_DAYS: int = Field(default=14, ge=1, le=90)
@@ -256,6 +258,8 @@ class Settings(BaseSettings):
                 raise ValueError("FILE_DOWNLOAD_SIGNING_KEY is required in production")
             if self.DASHBOARD_EMAIL_PROVIDER != "smtp":
                 raise ValueError("SMTP dashboard delivery is required in production")
+            if self.METRICS_ENABLED and self.METRICS_BEARER_TOKEN is None:
+                raise ValueError("METRICS_BEARER_TOKEN is required when metrics are enabled")
         if self.AUTH_COOKIE_SAMESITE == "none" and not self.AUTH_COOKIE_SECURE:
             raise ValueError("SameSite=None cookies must be secure")
         if self.PASSWORD_MIN_LENGTH > self.PASSWORD_MAX_LENGTH:
@@ -301,6 +305,14 @@ class Settings(BaseSettings):
     @property
     def redis_url(self) -> str:
         return self.REDIS_URL.get_secret_value()
+
+    @property
+    def metrics_bearer_token(self) -> str | None:
+        return (
+            self.METRICS_BEARER_TOKEN.get_secret_value()
+            if self.METRICS_BEARER_TOKEN is not None
+            else None
+        )
 
     @property
     def dashboard_download_signing_key(self) -> str:

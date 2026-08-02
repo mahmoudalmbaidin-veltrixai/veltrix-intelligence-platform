@@ -8,13 +8,17 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from vip_api.auth.dependencies import require_csrf
+from vip_api.auth.dependencies import AuthenticatedContext, get_current_session, require_csrf
 from vip_api.core.config import Settings, get_settings
 from vip_api.core.errors import ApplicationError
 from vip_api.database.session import get_db_session
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
-from vip_api.governance.dependencies import RequireGovernance, require_governance
+from vip_api.governance.dependencies import (
+    RequireGovernance,
+    require_capability,
+    require_governance,
+)
 from vip_api.pipelines.formula import (
     FUNCTION_CATALOG,
     parse_formula,
@@ -51,6 +55,7 @@ from vip_api.pipelines.services import (
     list_runs,
     list_versions,
     publish_pipeline,
+    require_pipeline_access,
     restore_version,
     retry_run,
     run_detail,
@@ -74,6 +79,12 @@ def gate(permission: str, *, quota: str | None = None) -> RequireGovernance:
     )
 
 
+# Feature/entitlement-only gate (no broad pipeline.read). Read/list resolve the
+# actual decision per-resource via the centralized evaluator, so a resource ACL
+# grant elevates access without the broad workspace permission.
+pipeline_capability = require_capability("pipeline_studio", "pipeline_studio")
+
+
 @router.get("/formula-language")
 async def formula_language(
     _context: Annotated[AuthorizationContext, Depends(gate("pipeline.read"))],
@@ -82,7 +93,22 @@ async def formula_language(
         "version": 1,
         "field_syntax": "[field_name]",
         "functions": list(FUNCTION_CATALOG),
-        "operators": ["+", "-", "*", "/", "==", "!=", "<", "<=", ">", ">="],
+        "operators": [
+            "+",
+            "-",
+            "*",
+            "/",
+            "==",
+            "!=",
+            "<",
+            "<=",
+            ">",
+            ">=",
+            "and",
+            "or",
+            "not",
+            "IF..THEN..ELSEIF..ELSE..ENDIF",
+        ],
         "literals": ["number", "quoted string", "true", "false", "null"],
     }
 
@@ -119,7 +145,7 @@ async def formula_validate(
 @router.get("", response_model=ListPage)
 async def index(
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.read"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
 ) -> ListPage:
     return await list_pipelines(db, context, limit)
@@ -142,9 +168,15 @@ async def create(
 async def show(
     pipeline_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.read"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
+    auth: Annotated[AuthenticatedContext, Depends(get_current_session)],
 ) -> PipelineEditor:
-    return await get_editor(db, context, pipeline_id)
+    # Resource-aware: an ACL grant (direct/group) elevates read without broad
+    # pipeline.read; role, ownership, deny and expiration are all honoured. The
+    # response carries the caller's effective access so the client can render
+    # viewer/operator/developer/owner states from the enforced decision.
+    await require_pipeline_access(db, context, pipeline_id, "viewer")
+    return await get_editor(db, context, pipeline_id, is_platform_admin=auth.user.is_platform_admin)
 
 
 @router.put("/{pipeline_id}", response_model=PipelineEditor, dependencies=[Depends(require_csrf)])
@@ -152,7 +184,7 @@ async def update(
     pipeline_id: UUID,
     payload: PipelineEditorSave,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.update"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> PipelineEditor:
     return await save_editor(db, context, pipeline_id, payload)
 
@@ -162,7 +194,7 @@ async def archive(
     pipeline_id: UUID,
     expected_version: Annotated[int, Query(ge=1)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.delete"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> Response:
     await archive_pipeline(db, context, pipeline_id, expected_version)
     return Response(status_code=204)
@@ -176,7 +208,7 @@ async def archive(
 async def validate(
     pipeline_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.update"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> ValidationResponse:
     return await validate_pipeline(db, context, pipeline_id)
 
@@ -191,7 +223,7 @@ async def publish(
     pipeline_id: UUID,
     payload: PublishRequest,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.publish"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> VersionResponse:
     return await publish_pipeline(
         db, context, pipeline_id, payload.expected_version, payload.change_summary
@@ -202,7 +234,7 @@ async def publish(
 async def versions(
     pipeline_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.versions.read"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> list[VersionResponse]:
     return await list_versions(db, context, pipeline_id)
 
@@ -217,7 +249,7 @@ async def restore(
     version_id: UUID,
     payload: RestoreRequest,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.versions.restore"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> PipelineEditor:
     return await restore_version(db, context, pipeline_id, version_id, payload.expected_version)
 
@@ -243,7 +275,7 @@ async def run_create(
 async def runs(
     pipeline_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.runs.read"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
 ) -> RunListPage:
     return await list_runs(db, context, pipeline_id, limit)
@@ -254,7 +286,7 @@ async def run_show(
     pipeline_id: UUID,
     run_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.runs.read"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> RunDetail:
     return await run_detail(db, context, pipeline_id, run_id)
 
@@ -268,7 +300,7 @@ async def run_cancel(
     pipeline_id: UUID,
     run_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.runs.cancel"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> RunResponse:
     return await cancel_run(db, context, pipeline_id, run_id)
 
@@ -294,7 +326,7 @@ async def artifacts(
     pipeline_id: UUID,
     run_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.runs.read"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> list[ArtifactResponse]:
     return await list_artifacts(db, context, pipeline_id, run_id)
 
@@ -310,7 +342,7 @@ async def artifact_link(
     artifact_id: UUID,
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.runs.read"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> DownloadLink:
     allowed = await list_artifacts(db, context, pipeline_id, run_id)
@@ -335,7 +367,7 @@ async def artifact_download(
     token: str,
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(gate("pipeline.runs.read"))],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> FileResponse:
     try:

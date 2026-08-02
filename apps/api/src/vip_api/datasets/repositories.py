@@ -1,6 +1,7 @@
 """Strictly tenant-qualified dataset persistence."""
 
-from typing import cast
+from collections.abc import Sequence
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
@@ -26,12 +27,22 @@ class DatasetRepository:
         return cast(Dataset | None, await self.db.scalar(select(Dataset).where(*filters)))
 
     async def list_scoped(
-        self, *, page: int, page_size: int, search: str | None, status: str | None
+        self,
+        *,
+        page: int,
+        page_size: int,
+        search: str | None,
+        status: str | None,
+        extra_filters: Sequence[Any] = (),
     ) -> tuple[list[Dataset], int]:
+        # ``extra_filters`` carry the per-user resource-visibility predicate so the
+        # ACL filter is applied to BOTH the count and the paginated page — hidden
+        # datasets never leak through pagination or the reported total.
         filters = [
             Dataset.organization_id == self.organization_id,
             Dataset.workspace_id == self.workspace_id,
             Dataset.archived_at.is_(None),
+            *extra_filters,
         ]
         if status:
             filters.append(Dataset.status == status)

@@ -90,6 +90,9 @@ async def upload_file(
     temp_path = Path(temp_name)
     size = 0
     digest = hashlib.sha256()
+    scan_provider = settings.FILE_MALWARE_SCANNER
+    scan_status: str | None = None
+    scan_signature: str | None = None
     try:
         handle = await asyncio.to_thread(temp_path.open, "wb")
         try:
@@ -112,11 +115,16 @@ async def upload_file(
         await asyncio.to_thread(inspect_signature, temp_path, mime_type)
         upload.stage = "virus_scan"
         scan = await malware_scanner(settings).scan(temp_path)
+        scan_status = scan.status
+        scan_signature = scan.signature
+        upload.scan_provider = scan_provider
+        upload.scan_status = scan_status
+        upload.scan_signature = scan_signature
         if scan.status != "clean":
             raise ApplicationError(
-                code="FILE_SCAN_FAILED",
+                code="FILE_INFECTED" if scan.status == "infected" else "FILE_SCANNER_UNAVAILABLE",
                 message="The file did not pass security scanning.",
-                status_code=422,
+                status_code=422 if scan.status == "infected" else 503,
             )
         content_hash = digest.hexdigest()
         duplicate = await db.scalar(
@@ -189,6 +197,7 @@ async def upload_file(
             workspace_id=workspace_id,
             resource_type="file",
             resource_id=item.id,
+            metadata={"scan_provider": scan_provider, "scan_status": scan_status},
         )
         await db.commit()
         await db.refresh(item)
@@ -202,6 +211,9 @@ async def upload_file(
                 exc.code if isinstance(exc, ApplicationError) else "FILE_UPLOAD_FAILED"
             )
             persisted.safe_error_message = "The upload could not be completed."
+            persisted.scan_provider = scan_provider
+            persisted.scan_status = scan_status
+            persisted.scan_signature = scan_signature
             persisted.completed_at = datetime.now(UTC)
             await record_audit(
                 db,
@@ -213,6 +225,11 @@ async def upload_file(
                 reason_code=persisted.safe_error_code,
                 resource_type="file_upload",
                 resource_id=upload_id,
+                metadata={
+                    "scan_provider": scan_provider,
+                    "scan_status": scan_status or "not_run",
+                    "scan_signature": scan_signature,
+                },
             )
             await db.commit()
         raise

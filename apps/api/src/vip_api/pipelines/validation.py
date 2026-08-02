@@ -12,6 +12,7 @@ from vip_api.datasets.models import Dataset, DatasetField
 from vip_api.governance.context import AuthorizationContext
 from vip_api.pipelines.formula import parse_formula
 from vip_api.pipelines.registry import NODE_REGISTRY
+from vip_api.pipelines.schema_flow import ERROR_CODES, Column, propagate
 from vip_api.pipelines.schemas import EdgeInput, NodeInput, ValidationIssue, ValidationResponse
 
 _CONFIG_KEYS: dict[str, frozenset[str]] = {
@@ -34,6 +35,7 @@ _CONFIG_KEYS: dict[str, frozenset[str]] = {
     "union": frozenset({"distinct"}),
     "aggregate": frozenset({"group_by", "aggregations"}),
     "formula": frozenset({"field", "formula"}),
+    "row-validation": frozenset({"rules"}),
     "type-convert": frozenset({"field", "target_type"}),
     "deduplicate": frozenset({"fields"}),
     "null-handling": frozenset({"field", "strategy", "value"}),
@@ -179,6 +181,25 @@ def _typed_config_issues(node: NodeInput) -> list[ValidationIssue]:
             invalid("config.aggregations", "Aggregations must use approved fields and operations.")
     elif kind == "formula":
         string("field")
+    elif kind == "row-validation":
+        rules = config.get("rules")
+        if (
+            not isinstance(rules, list)
+            or not 1 <= len(rules) <= 50
+            or any(
+                not isinstance(rule, dict)
+                or set(rule) != {"formula", "reason"}
+                or not isinstance(rule.get("formula"), str)
+                or not 1 <= len(rule["formula"]) <= 4096
+                or not isinstance(rule.get("reason"), str)
+                or not 1 <= len(rule["reason"]) <= 255
+                for rule in rules
+            )
+        ):
+            invalid(
+                "config.rules",
+                "rules must contain 1 to 50 bounded formula and reason pairs.",
+            )
     elif kind == "type-convert":
         string("field")
         if config.get("target_type") not in {"string", "integer", "number", "boolean"}:
@@ -304,6 +325,23 @@ async def validate_graph(
                             field="config.formula",
                         )
                     )
+        if node.type == "row-validation":
+            rules = node.config.get("rules")
+            if isinstance(rules, list):
+                for index, rule in enumerate(rules):
+                    if not isinstance(rule, dict) or not isinstance(rule.get("formula"), str):
+                        continue
+                    try:
+                        parse_formula(rule["formula"])
+                    except Exception as exc:
+                        errors.append(
+                            ValidationIssue(
+                                code="INVALID_FORMULA",
+                                message=str(exc),
+                                node_key=node.key,
+                                field=f"config.rules.{index}.formula",
+                            )
+                        )
         if node.type == "file-export" and node.config.get("format") not in {"csv", "json"}:
             errors.append(
                 ValidationIssue(
@@ -324,6 +362,8 @@ async def validate_graph(
                 )
             )
     org, ws = context.organization_id, context.workspace_id
+    # Resolved source-node output schemas feed intra-graph schema propagation.
+    source_schemas: dict[str, list[Column] | None] = {}
     if ws is not None and dataset_refs:
         wanted = {dataset_id for _, dataset_id in dataset_refs}
         found_rows = (
@@ -427,6 +467,28 @@ async def validate_graph(
                             )
                         )
                         break
+            # Build the source node's resolved output schema for propagation.
+            ordered = sorted(current_fields.values(), key=lambda f: f.ordinal_position)
+            names = (
+                [name for name in selected if isinstance(name, str)]
+                if isinstance(selected, list) and selected
+                else [item.source_name for item in ordered]
+            )
+            aliases = node.config.get("aliases")
+            alias_map = aliases if isinstance(aliases, dict) else {}
+            resolved: list[Column] = []
+            for name in names:
+                dataset_field = current_fields.get(name)
+                if dataset_field is None:
+                    continue
+                resolved.append(
+                    Column(
+                        str(alias_map.get(name, name)),
+                        dataset_field.normalized_data_type or dataset_field.physical_data_type,
+                        dataset_field.is_nullable,
+                    )
+                )
+            source_schemas[node_key] = resolved
     indegree = {key: len(values) for key, values in incoming.items()}
     queue = sorted(key for key, degree in indegree.items() if degree == 0)
     order: list[str] = []
@@ -441,6 +503,13 @@ async def validate_graph(
         errors.append(
             ValidationIssue(code="PIPELINE_CYCLE", message="Pipeline graphs must be acyclic.")
         )
+    else:
+        # Propagate schemas through the acyclic graph and validate schema-aware
+        # nodes (Select/Rename) against their real upstream columns. Checks only
+        # fire where the upstream schema is known, so unresolved graphs are safe.
+        _, flow_issues = propagate(order, node_map, edges, source_schemas)
+        for issue in flow_issues:
+            (errors if issue.code in ERROR_CODES else warnings).append(issue)
     if nodes and not any(
         NODE_REGISTRY.get(node.type, None) and NODE_REGISTRY[node.type].category == "output"
         for node in nodes

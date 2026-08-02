@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, Uuid
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, Text, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from vip_api.database.base import Base
@@ -14,6 +14,11 @@ from vip_api.database.base import Base
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def normalize_username(username: str) -> str:
+    """Canonical form for globally-unique username lookups (case-insensitive)."""
+    return username.strip().casefold()
 
 
 class UserStatus(StrEnum):
@@ -35,16 +40,41 @@ user_status_enum = Enum(
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        # Username is the globally-unique primary login identifier.
+        Index("uq_users_normalized_username", "normalized_username", unique=True),
+        # Email is optional; uniqueness is enforced only when a value is present.
+        Index(
+            "uq_users_normalized_email_present",
+            "normalized_email",
+            unique=True,
+            postgresql_where=text("normalized_email IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
-    email: Mapped[str] = mapped_column(String(320), nullable=False)
-    normalized_email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
+    username: Mapped[str] = mapped_column(String(150), nullable=False)
+    normalized_username: Mapped[str] = mapped_column(String(150), nullable=False)
+    # Email is optional (nullable). Never store a placeholder; NULL means "no email".
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    normalized_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[UserStatus] = mapped_column(
         user_status_enum, default=UserStatus.ACTIVE, nullable=False
     )
+    account_type: Mapped[str] = mapped_column(String(50), nullable=False, default="standard")
     is_platform_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Enterprise profile fields (all optional).
+    default_organization_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    default_workspace_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    locale: Mapped[str | None] = mapped_column(String(20))
+    timezone: Mapped[str | None] = mapped_column(String(64))
+    job_title: Mapped[str | None] = mapped_column(String(150))
+    department: Mapped[str | None] = mapped_column(String(150))
+    phone: Mapped[str | None] = mapped_column(String(50))
+    avatar_url: Mapped[str | None] = mapped_column(String(1024))
     failed_login_count: Mapped[int] = mapped_column(default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -53,6 +83,8 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+    created_by: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    updated_by: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

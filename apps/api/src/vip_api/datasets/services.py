@@ -40,6 +40,8 @@ from vip_api.datasets.schemas import (
     QualityRuleResponse,
     QualitySummary,
 )
+from vip_api.governance import resource_access_service
+from vip_api.governance.access_view import ResourceEffectiveAccess
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.services import consume_quota
@@ -51,6 +53,42 @@ def _scope(context: AuthorizationContext) -> tuple[UUID, UUID]:
             code="WORKSPACE_REQUIRED", message="Select a workspace to continue.", status_code=422
         )
     return context.organization_id, context.workspace_id
+
+
+async def _guard(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    dataset_id: UUID,
+    action_level: str,
+) -> None:
+    """Authoritative per-dataset decision via the centralized evaluator.
+
+    Combines role level, direct/group ACL grants, ownership, explicit deny and
+    expiration so a resource ACL grant *elevates* access without a broad
+    ``dataset.*`` workspace permission. Explicit deny -> 403; any other denial ->
+    non-disclosing 404. Ownership is resolved by the evaluator (no duplicate
+    precedence)."""
+    _scope(context)
+    await resource_access_service.authorize_resource(
+        db,
+        context,
+        resource_type="dataset",
+        resource_id=dataset_id,
+        action_level=action_level,
+    )
+
+
+async def require_dataset_access(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    dataset_id: UUID,
+    action_level: str = "query",
+) -> None:
+    """Resource-aware guard for routes that stream/preview a dataset directly.
+
+    Elevates via ACL as well as restricts; a denied decision is a non-disclosing
+    404 (or 403 for an explicit deny)."""
+    await _guard(db, context, dataset_id, action_level)
 
 
 def source_key(connection_id: UUID, catalog: str, schema: str, name: str, object_type: str) -> str:
@@ -104,8 +142,24 @@ async def list_datasets(
     status: str | None,
 ) -> DatasetListResponse:
     org, ws = _scope(context)
+    extra_filters: list[object] = []
+    # Broad-role users (dataset.read etc.) see the whole workspace, unchanged.
+    # Everyone else sees only datasets reachable through ownership or a non-expired
+    # ACL allow (direct or group), minus lowest-level denies — filtered in SQL so
+    # pagination and totals never leak hidden datasets (no N+1).
+    if resource_access_service.role_level("dataset", context.permissions) is None:
+        subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
+            db, org, context.user_id
+        )
+        allowed_ids, denied_ids = resource_access_service.collection_visibility_subqueries(
+            "dataset", subjects, now=datetime.now(UTC)
+        )
+        extra_filters.append(
+            or_(Dataset.owner_user_id == context.user_id, Dataset.id.in_(allowed_ids))
+        )
+        extra_filters.append(Dataset.id.notin_(denied_ids))
     items, total = await DatasetRepository(db, org, ws).list_scoped(
-        page=page, page_size=page_size, search=search, status=status
+        page=page, page_size=page_size, search=search, status=status, extra_filters=extra_filters
     )
     return DatasetListResponse(
         items=[DatasetResponse.model_validate(item) for item in items],
@@ -116,7 +170,11 @@ async def list_datasets(
 
 
 async def get_dataset(
-    db: AsyncSession, context: AuthorizationContext, dataset_id: UUID
+    db: AsyncSession,
+    context: AuthorizationContext,
+    dataset_id: UUID,
+    *,
+    is_platform_admin: bool = False,
 ) -> DatasetResponse:
     org, ws = _scope(context)
     item = await DatasetRepository(db, org, ws).get(dataset_id)
@@ -124,7 +182,17 @@ async def get_dataset(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
-    return DatasetResponse.model_validate(item)
+    await _guard(db, context, dataset_id, "query")
+    response = DatasetResponse.model_validate(item)
+    summary = await resource_access_service.resource_access_summary(
+        db,
+        context,
+        resource_type="dataset",
+        resource_id=item.id,
+        is_platform_admin=is_platform_admin,
+    )
+    response.access = ResourceEffectiveAccess.from_summary(summary)
+    return response
 
 
 async def create_dataset(
@@ -197,6 +265,7 @@ async def update_dataset(
             message="The resource was changed by another request.",
             status_code=409,
         )
+    await _guard(db, context, dataset_id, "edit")
     changes = payload.model_dump(exclude_unset=True, exclude={"version"})
     if "documentation_url" in changes and changes["documentation_url"] is not None:
         changes["documentation_url"] = str(changes["documentation_url"])
@@ -227,6 +296,7 @@ async def archive_dataset(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    await _guard(db, context, dataset_id, "manage")
     item.status = "archived"
     item.archived_at = datetime.now(UTC)
     item.version += 1
@@ -250,6 +320,7 @@ async def list_fields(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    await _guard(db, context, dataset_id, "query")
     return [
         DatasetFieldResponse.model_validate(item)
         for item in await DatasetRepository(db, org, ws).fields(dataset_id)
@@ -282,6 +353,7 @@ async def update_field(
             message="The resource was changed by another request.",
             status_code=409,
         )
+    await _guard(db, context, dataset_id, "edit")
     for key, value in payload.model_dump(exclude_unset=True, exclude={"version"}).items():
         setattr(item, key, value)
     item.version += 1
@@ -429,6 +501,7 @@ async def quality_summary(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    await _guard(db, context, dataset_id, "query")
     latest = await db.scalar(
         select(DatasetQualityEvaluation)
         .where(
@@ -481,6 +554,7 @@ async def create_quality_evaluation(
 ) -> DatasetQualityEvaluation:
     org, ws = _scope(context)
     await get_dataset(db, context, dataset_id)
+    await _guard(db, context, dataset_id, "certify")
     item = DatasetQualityEvaluation(
         organization_id=org,
         workspace_id=ws,
@@ -551,6 +625,7 @@ async def create_quality_rule(
 ) -> QualityRuleResponse:
     org, ws = _scope(context)
     await get_dataset(db, context, dataset_id)
+    await _guard(db, context, dataset_id, "certify")
     if (
         payload.field_id
         and await db.scalar(
@@ -616,6 +691,7 @@ async def update_quality_rule(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    await _guard(db, context, dataset_id, "certify")
     for key, value in payload.model_dump().items():
         setattr(item, key, value)
     item.updated_by_user_id = context.user_id
@@ -669,6 +745,7 @@ async def delete_quality_rule(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    await _guard(db, context, dataset_id, "certify")
     await db.delete(item)
     await record_audit(
         db,
@@ -697,6 +774,8 @@ async def create_lineage(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    # Authoring lineage on a dataset is an Edit-level capability on the source.
+    await _guard(db, context, source_id, "edit")
     item = DatasetLineageEdge(
         organization_id=org,
         workspace_id=ws,
@@ -740,6 +819,7 @@ async def delete_lineage(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    await _guard(db, context, dataset_id, "edit")
     await db.delete(item)
     await record_audit(
         db,
@@ -768,6 +848,7 @@ async def lineage_graph(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    await _guard(db, context, dataset_id, "query")
     nodes: dict[UUID, Dataset] = {root.id: root}
     edges: dict[UUID, DatasetLineageEdge] = {}
     frontier = {root.id}

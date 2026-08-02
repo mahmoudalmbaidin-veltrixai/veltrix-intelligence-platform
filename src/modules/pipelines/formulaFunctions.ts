@@ -2,7 +2,7 @@ import { apiClient } from '@/shared/lib/apiClient'
 
 export interface FormulaFn {
   name: string
-  category: 'Math' | 'Text' | 'Logical'
+  category: 'Math' | 'Text' | 'Logical' | 'Conversion' | 'Date'
   signature: string
   description: string
   example: string
@@ -89,6 +89,356 @@ export const FORMULA_FUNCTIONS: FormulaFn[] = [
     description: 'Converts text to uppercase.',
     example: 'upper([region])',
   },
+  {
+    name: 'mod',
+    category: 'Math',
+    signature: 'mod(number, divisor)',
+    description: 'Remainder after division (null if the divisor is 0).',
+    example: 'mod([row_id], 10)',
+  },
+  {
+    name: 'pow',
+    category: 'Math',
+    signature: 'pow(base, exponent)',
+    description: 'Raises a base to the power of an exponent.',
+    example: 'pow([side], 2)',
+  },
+  {
+    name: 'sqrt',
+    category: 'Math',
+    signature: 'sqrt(number)',
+    description: 'Square root (null for negative numbers).',
+    example: 'sqrt([area])',
+  },
+  {
+    name: 'exp',
+    category: 'Math',
+    signature: 'exp(number)',
+    description: 'Returns e raised to the given power.',
+    example: 'exp([rate])',
+  },
+  {
+    name: 'ln',
+    category: 'Math',
+    signature: 'ln(number)',
+    description: 'Natural logarithm (null for values <= 0).',
+    example: 'ln([value])',
+  },
+  {
+    name: 'log',
+    category: 'Math',
+    signature: 'log(number, base)',
+    description: 'Logarithm of a number in the given base (default 10).',
+    example: 'log([value], 2)',
+  },
+  {
+    name: 'log10',
+    category: 'Math',
+    signature: 'log10(number)',
+    description: 'Base-10 logarithm (null for values <= 0).',
+    example: 'log10([value])',
+  },
+  {
+    name: 'min',
+    category: 'Math',
+    signature: 'min(number, ...)',
+    description: 'Smallest of the given numbers.',
+    example: 'min([a], [b], 0)',
+  },
+  {
+    name: 'max',
+    category: 'Math',
+    signature: 'max(number, ...)',
+    description: 'Largest of the given numbers.',
+    example: 'max([a], [b], 0)',
+  },
+  {
+    name: 'sign',
+    category: 'Math',
+    signature: 'sign(number)',
+    description: 'Returns -1, 0, or 1 for the sign of a number.',
+    example: 'sign([variance])',
+  },
+  {
+    name: 'trunc',
+    category: 'Math',
+    signature: 'trunc(number)',
+    description: 'Truncates toward zero (drops the fractional part).',
+    example: 'trunc([amount])',
+  },
+  {
+    name: 'clamp',
+    category: 'Math',
+    signature: 'clamp(number, min, max)',
+    description: 'Constrains a number to the range [min, max].',
+    example: 'clamp([score], 0, 100)',
+  },
+  {
+    name: 'length',
+    category: 'Text',
+    signature: 'length(text)',
+    description: 'Number of characters in the text.',
+    example: 'length([name])',
+  },
+  {
+    name: 'trim',
+    category: 'Text',
+    signature: 'trim(text)',
+    description: 'Removes leading and trailing whitespace.',
+    example: 'trim([name])',
+  },
+  {
+    name: 'ltrim',
+    category: 'Text',
+    signature: 'ltrim(text)',
+    description: 'Removes leading whitespace.',
+    example: 'ltrim([code])',
+  },
+  {
+    name: 'rtrim',
+    category: 'Text',
+    signature: 'rtrim(text)',
+    description: 'Removes trailing whitespace.',
+    example: 'rtrim([code])',
+  },
+  {
+    name: 'left',
+    category: 'Text',
+    signature: 'left(text, count)',
+    description: 'First N characters of the text.',
+    example: 'left([sku], 3)',
+  },
+  {
+    name: 'right',
+    category: 'Text',
+    signature: 'right(text, count)',
+    description: 'Last N characters of the text.',
+    example: 'right([sku], 4)',
+  },
+  {
+    name: 'substring',
+    category: 'Text',
+    signature: 'substring(text, start, length)',
+    description: 'Substring from a 0-based start position (length optional).',
+    example: 'substring([code], 2, 4)',
+  },
+  {
+    name: 'replace',
+    category: 'Text',
+    signature: 'replace(text, find, replacement)',
+    description: 'Replaces every occurrence of a substring.',
+    example: 'replace([phone], "-", "")',
+  },
+  {
+    name: 'contains',
+    category: 'Text',
+    signature: 'contains(text, search)',
+    description: 'True if the text contains the search value.',
+    example: 'contains([email], "@")',
+  },
+  {
+    name: 'startswith',
+    category: 'Text',
+    signature: 'startswith(text, prefix)',
+    description: 'True if the text starts with the prefix.',
+    example: 'startswith([sku], "US-")',
+  },
+  {
+    name: 'endswith',
+    category: 'Text',
+    signature: 'endswith(text, suffix)',
+    description: 'True if the text ends with the suffix.',
+    example: 'endswith([filename], ".csv")',
+  },
+  {
+    name: 'indexof',
+    category: 'Text',
+    signature: 'indexof(text, search)',
+    description: '0-based position of the search value, or -1 if absent.',
+    example: 'indexof([email], "@")',
+  },
+  {
+    name: 'padleft',
+    category: 'Text',
+    signature: 'padleft(text, width, pad)',
+    description: 'Pads text on the left to a fixed width (default space).',
+    example: 'padleft([id], 6, "0")',
+  },
+  {
+    name: 'padright',
+    category: 'Text',
+    signature: 'padright(text, width, pad)',
+    description: 'Pads text on the right to a fixed width (default space).',
+    example: 'padright([code], 6, " ")',
+  },
+  {
+    name: 'title',
+    category: 'Text',
+    signature: 'title(text)',
+    description: 'Converts text to Title Case.',
+    example: 'title([name])',
+  },
+  {
+    name: 'reverse',
+    category: 'Text',
+    signature: 'reverse(text)',
+    description: 'Reverses the characters in the text.',
+    example: 'reverse([code])',
+  },
+  {
+    name: 'if',
+    category: 'Logical',
+    signature: 'if(condition, when_true, when_false)',
+    description: 'Returns one value when the condition is true, another when false.',
+    example: 'if([score] >= 50, "pass", "fail")',
+  },
+  {
+    name: 'isnull',
+    category: 'Logical',
+    signature: 'isnull(value)',
+    description: 'True if the value is null.',
+    example: 'isnull([email])',
+  },
+  {
+    name: 'isempty',
+    category: 'Logical',
+    signature: 'isempty(value)',
+    description: 'True if the value is null or an empty string.',
+    example: 'isempty([note])',
+  },
+  {
+    name: 'isnumber',
+    category: 'Logical',
+    signature: 'isnumber(value)',
+    description: 'True if the value is numeric.',
+    example: 'isnumber([amount])',
+  },
+  {
+    name: 'istext',
+    category: 'Logical',
+    signature: 'istext(value)',
+    description: 'True if the value is text.',
+    example: 'istext([code])',
+  },
+  {
+    name: 'ifnull',
+    category: 'Logical',
+    signature: 'ifnull(value, fallback)',
+    description: 'Returns the value, or the fallback when it is null.',
+    example: 'ifnull([discount], 0)',
+  },
+  {
+    name: 'tonumber',
+    category: 'Conversion',
+    signature: 'tonumber(value)',
+    description: 'Converts a value to a number (null if not numeric).',
+    example: 'tonumber([amount_text])',
+  },
+  {
+    name: 'tostring',
+    category: 'Conversion',
+    signature: 'tostring(value)',
+    description: 'Converts a value to text.',
+    example: 'tostring([row_id])',
+  },
+  {
+    name: 'toint',
+    category: 'Conversion',
+    signature: 'toint(value)',
+    description: 'Converts a value to an integer, truncating decimals.',
+    example: 'toint([price])',
+  },
+  {
+    name: 'tobool',
+    category: 'Conversion',
+    signature: 'tobool(value)',
+    description: 'Converts a value to true or false.',
+    example: 'tobool([flag])',
+  },
+  {
+    name: 'in',
+    category: 'Logical',
+    signature: 'in(value, option, ...)',
+    description: 'True if the value equals one of the following options.',
+    example: 'in([status], "active", "trial")',
+  },
+  {
+    name: 'now',
+    category: 'Date',
+    signature: 'now()',
+    description: 'Current UTC date and time.',
+    example: 'now()',
+  },
+  {
+    name: 'today',
+    category: 'Date',
+    signature: 'today()',
+    description: 'Current UTC date (no time component).',
+    example: 'today()',
+  },
+  {
+    name: 'year',
+    category: 'Date',
+    signature: 'year(date)',
+    description: 'Four-digit year of a date.',
+    example: 'year([created_at])',
+  },
+  {
+    name: 'month',
+    category: 'Date',
+    signature: 'month(date)',
+    description: 'Month number (1-12) of a date.',
+    example: 'month([created_at])',
+  },
+  {
+    name: 'day',
+    category: 'Date',
+    signature: 'day(date)',
+    description: 'Day of the month (1-31) of a date.',
+    example: 'day([created_at])',
+  },
+  {
+    name: 'hour',
+    category: 'Date',
+    signature: 'hour(date)',
+    description: 'Hour (0-23) of a timestamp.',
+    example: 'hour([created_at])',
+  },
+  {
+    name: 'minute',
+    category: 'Date',
+    signature: 'minute(date)',
+    description: 'Minute (0-59) of a timestamp.',
+    example: 'minute([created_at])',
+  },
+  {
+    name: 'datediff',
+    category: 'Date',
+    signature: 'datediff(start, end, unit)',
+    description: 'Whole units from start to end (days, hours, minutes, seconds).',
+    example: 'datediff([opened_at], [closed_at], "days")',
+  },
+  {
+    name: 'dateadd',
+    category: 'Date',
+    signature: 'dateadd(date, amount, unit)',
+    description: 'Adds an amount of units to a date (days, hours, minutes, seconds, weeks).',
+    example: 'dateadd([start_date], 7, "days")',
+  },
+  {
+    name: 'dateformat',
+    category: 'Date',
+    signature: 'dateformat(date, pattern)',
+    description: 'Formats a date to text using a strftime pattern.',
+    example: 'dateformat([created_at], "%Y-%m-%d")',
+  },
+  {
+    name: 'dateparse',
+    category: 'Date',
+    signature: 'dateparse(text, pattern)',
+    description: 'Parses text into a date using a strftime pattern.',
+    example: 'dateparse([raw_date], "%m/%d/%Y")',
+  },
 ]
 
 let catalogPromise: Promise<FormulaLanguage> | null = null
@@ -152,7 +502,7 @@ class FormulaParser {
   constructor(private readonly items: FormulaToken[]) {}
 
   parse(): void {
-    this.comparison()
+    this.expression()
     if (this.peek().kind !== 'eof') throw new Error('Unexpected formula content')
   }
   private peek(): FormulaToken {
@@ -160,6 +510,61 @@ class FormulaParser {
   }
   private take(): FormulaToken {
     return this.items[this.index++]
+  }
+  private keyword(): string | null {
+    const token = this.peek()
+    return token.kind === 'name' ? token.value.toLowerCase() : null
+  }
+  private expectKeyword(kw: string): void {
+    if (this.keyword() !== kw) throw new Error(`Expected ${kw.toUpperCase()}`)
+    this.take()
+  }
+  private expression(): void {
+    this.and()
+    while (this.keyword() === 'or') {
+      this.take()
+      this.and()
+    }
+  }
+  private and(): void {
+    this.notExpr()
+    while (this.keyword() === 'and') {
+      this.take()
+      this.notExpr()
+    }
+  }
+  private notExpr(): void {
+    if (this.keyword() === 'not') {
+      this.take()
+      this.notExpr()
+      return
+    }
+    this.comparison()
+  }
+  private ifKeyword(): void {
+    // 'if' already consumed: IF <cond> THEN <expr> [ELSEIF..THEN..] [ELSE <expr>] ENDIF
+    this.expression()
+    this.expectKeyword('then')
+    this.expression()
+    for (;;) {
+      const kw = this.keyword()
+      if (kw === 'elseif') {
+        this.take()
+        this.expression()
+        this.expectKeyword('then')
+        this.expression()
+      } else if (kw === 'else') {
+        this.take()
+        this.expression()
+        this.expectKeyword('endif')
+        break
+      } else if (kw === 'endif') {
+        this.take()
+        break
+      } else {
+        throw new Error('Expected ELSEIF, ELSE, or ENDIF')
+      }
+    }
   }
   private comparison(): void {
     this.sum()
@@ -196,6 +601,10 @@ class FormulaParser {
     if (token.kind === 'name') {
       const name = token.value.toLowerCase()
       if (['true', 'false', 'null'].includes(name)) return
+      if (name === 'if' && this.peek().value !== '(') {
+        this.ifKeyword()
+        return
+      }
       const allowed = new Set(FORMULA_FUNCTIONS.map((item) => item.name))
       if (!allowed.has(name) || this.peek().value !== '(') throw new Error(`Function '${token.value}' is not allowed`)
       this.functions.add(name)
@@ -205,7 +614,7 @@ class FormulaParser {
       let argumentCount = 0
       if (this.peek().value !== ')') {
         for (;;) {
-          this.comparison()
+          this.expression()
           argumentCount++
           if (argumentCount > 20) throw new Error('Function has too many arguments')
           if (this.peek().value !== ',') break
@@ -217,7 +626,7 @@ class FormulaParser {
       return
     }
     if (token.value === '(') {
-      this.comparison()
+      this.expression()
       if (this.take().value !== ')') throw new Error('Expected closing parenthesis')
       return
     }

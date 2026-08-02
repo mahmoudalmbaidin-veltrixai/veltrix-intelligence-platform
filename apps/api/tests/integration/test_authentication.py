@@ -58,6 +58,8 @@ async def add_user(
     try:
         async with database.session_factory() as db:
             user = User(
+                username="admin",
+                normalized_username="admin",
                 email=email,
                 normalized_email=email.casefold(),
                 password_hash=PasswordService(settings).hash_password(password),

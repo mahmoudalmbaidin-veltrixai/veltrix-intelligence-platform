@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
+import pytest
 from fastapi import Query
+from pydantic import SecretStr
 from starlette.testclient import TestClient
 
 from vip_api.core.config import Settings
@@ -24,6 +26,39 @@ def test_health_is_live_without_starting_external_resources(settings: Settings) 
     response = local_client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "healthy", "service": "vip-api", "version": "0.1.0"}
+
+
+def test_metrics_are_prometheus_compatible_and_can_require_bearer_auth(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def platform_metrics(*_args: object) -> str:
+        return "vip_workers_active 1\n"
+
+    async def healthy(*_args: object) -> bool:
+        return True
+
+    monkeypatch.setattr(
+        "vip_api.api.routes.operational._platform_metrics",
+        platform_metrics,
+    )
+    monkeypatch.setattr("vip_api.api.routes.operational.check_database", healthy)
+    monkeypatch.setattr("vip_api.api.routes.operational.check_redis", healthy)
+    secured = settings.model_copy(update={"METRICS_BEARER_TOKEN": SecretStr("metrics-test-token")})
+    with TestClient(create_application(secured), raise_server_exceptions=False) as local_client:
+        denied = local_client.get("/metrics")
+        response = local_client.get(
+            "/metrics", headers={"Authorization": "Bearer metrics-test-token"}
+        )
+
+    assert denied.status_code == 401
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    assert "vip_http_requests_total" in response.text
+    assert "vip_http_active_requests" in response.text
+    assert "vip_authentication_failures_total" in response.text
+    assert "vip_database_healthy" in response.text
+    assert "vip_sse_active_connections" in response.text
+    assert "vip_workers_active 1" in response.text
 
 
 def test_version_schema(client: TestClient) -> None:

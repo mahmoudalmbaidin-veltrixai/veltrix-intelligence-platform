@@ -14,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import delete, select
 
 from vip_api.auth.authentication import normalize_email
-from vip_api.auth.models import User, UserStatus, utc_now
+from vip_api.auth.models import User, UserStatus, normalize_username, utc_now
 from vip_api.auth.password import PasswordService
 from vip_api.auth.sessions import cleanup_expired_sessions, revoke_all_user_sessions
 from vip_api.connections.seed import seed_connection_types as sync_connection_types
@@ -59,7 +59,17 @@ def read_password(*, password_stdin: bool) -> str:
     return password
 
 
-async def create_user(email: str, display_name: str, *, password_stdin: bool = False) -> None:
+async def create_user(
+    display_name: str,
+    *,
+    username: str | None = None,
+    email: str | None = None,
+    password_stdin: bool = False,
+) -> None:
+    if not username and not email:
+        raise SystemExit("Provide --username (email is optional).")
+    resolved_username = (username or (email.split("@", 1)[0] if email else "")).strip()
+    norm_username = normalize_username(resolved_username)
     settings = get_settings()
     password = read_password(password_stdin=password_stdin)
     password_service = PasswordService(settings)
@@ -67,13 +77,19 @@ async def create_user(email: str, display_name: str, *, password_stdin: bool = F
     database = Database(settings)
     try:
         async with database.session_factory() as db:
-            normalized = normalize_email(email)
-            if await db.scalar(select(User.id).where(User.normalized_email == normalized)):
+            if await db.scalar(select(User.id).where(User.normalized_username == norm_username)):
+                raise SystemExit("A user with that username already exists.")
+            norm_email = normalize_email(email) if email else None
+            if norm_email and await db.scalar(
+                select(User.id).where(User.normalized_email == norm_email)
+            ):
                 raise SystemExit("A user with that email already exists.")
             db.add(
                 User(
-                    email=email.strip(),
-                    normalized_email=normalized,
+                    username=resolved_username,
+                    normalized_username=norm_username,
+                    email=email.strip() if email else None,
+                    normalized_email=norm_email,
                     display_name=display_name.strip(),
                     password_hash=password_hash,
                     status=UserStatus.ACTIVE,
@@ -227,6 +243,8 @@ async def seed_multitenancy_demo() -> None:
                     password = passwords[key]
                     assert password is not None
                     user = User(
+                        username=email.split("@", 1)[0],
+                        normalized_username=normalize_username(email.split("@", 1)[0]),
                         email=email,
                         normalized_email=email,
                         display_name=name,
@@ -426,6 +444,8 @@ async def configure_governance_demo() -> None:
                     password = passwords[key]
                     assert password is not None
                     user = User(
+                        username=email.split("@", 1)[0],
+                        normalized_username=normalize_username(email.split("@", 1)[0]),
                         email=email,
                         normalized_email=email,
                         display_name=name,
@@ -594,7 +614,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m vip_api.cli")
     subparsers = parser.add_subparsers(dest="command", required=True)
     create = subparsers.add_parser("create-user", help="Create an active local-password user")
-    create.add_argument("--email", required=True)
+    create.add_argument("--username", help="Primary login identifier (required if no email).")
+    create.add_argument("--email", help="Optional email address.")
     create.add_argument("--display-name", required=True)
     create.add_argument(
         "--password-stdin",
@@ -639,7 +660,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "create-user":
-        asyncio.run(create_user(args.email, args.display_name, password_stdin=args.password_stdin))
+        asyncio.run(
+            create_user(
+                args.display_name,
+                username=args.username,
+                email=args.email,
+                password_stdin=args.password_stdin,
+            )
+        )
     elif args.command == "revoke-all-sessions":
         asyncio.run(revoke_user_sessions(args.email))
     elif args.command == "cleanup-expired-sessions":

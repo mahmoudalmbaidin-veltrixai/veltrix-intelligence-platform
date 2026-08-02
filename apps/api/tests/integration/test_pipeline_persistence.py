@@ -3,16 +3,24 @@
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import delete, text
+from sqlalchemy import delete, select, text
 
 from vip_api.auth.models import User, UserStatus
 from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
 from vip_api.database.session import Database
 from vip_api.governance.context import AuthorizationContext
+from vip_api.governance.models import Role
 from vip_api.pipelines.schemas import EdgeInput, NodeInput, PipelineCreate, PipelineEditorSave
 from vip_api.pipelines.services import create_pipeline, get_editor, list_pipelines, save_editor
-from vip_api.tenancy.models import Organization, OrganizationStatus, Workspace, WorkspaceStatus
+from vip_api.tenancy.models import (
+    MembershipStatus,
+    Organization,
+    OrganizationMembership,
+    OrganizationStatus,
+    Workspace,
+    WorkspaceStatus,
+)
 
 
 def context(user: UUID, organization: UUID, workspace: UUID) -> AuthorizationContext:
@@ -60,6 +68,8 @@ async def test_pipeline_tables_tenant_isolation_and_conflict(settings: Settings)
                 "pipeline_outbox_events",
             } <= tables
             user = User(
+                username="pipeline-test",
+                normalized_username="pipeline-test",
                 email=f"pipeline-{uuid4().hex}@vip.test",
                 normalized_email=f"pipeline-{uuid4().hex}@vip.test",
                 display_name="Pipeline Test",
@@ -99,6 +109,22 @@ async def test_pipeline_tables_tenant_isolation_and_conflict(settings: Settings)
                 created_by_user_id=user.id,
             )
             db.add_all((alpha_ws, beta_ws))
+            await db.flush()
+            # The acting user is an active member of both tenants. Resource access
+            # is evaluated through the centralized authorization engine, which
+            # fails closed for non-members, so membership must be seeded (ACLs and
+            # ownership never bypass tenant membership).
+            role_id = await db.scalar(select(Role.id).where(Role.key == "organization_member"))
+            assert role_id is not None
+            db.add_all(
+                OrganizationMembership(
+                    organization_id=org_id,
+                    user_id=user.id,
+                    role_id=role_id,
+                    status=MembershipStatus.ACTIVE,
+                )
+                for org_id in (alpha.id, beta.id)
+            )
             await db.commit()
             alpha_context, beta_context = (
                 context(user.id, alpha.id, alpha_ws.id),

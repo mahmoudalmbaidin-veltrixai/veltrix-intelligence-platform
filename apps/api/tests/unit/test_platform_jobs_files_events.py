@@ -12,6 +12,7 @@ import pytest
 
 from vip_api.core.errors import ApplicationError
 from vip_api.events.broker import PlatformEvent, RedisEventBroker
+from vip_api.files.scanning import ClamAvScanner, DefenderScanner
 from vip_api.files.storage import LocalStorageProvider, StorageProviderError
 from vip_api.files.validation import inspect_signature, sanitize_filename, validate_file_type
 from vip_api.jobs.models import Job
@@ -54,6 +55,118 @@ def test_renamed_executable_is_rejected_before_scanning(tmp_path: Path) -> None:
     with pytest.raises(ApplicationError) as error:
         inspect_signature(disguised, "text/plain")
     assert error.value.code == "FILE_CONTENT_MISMATCH"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("return_code", "expected"),
+    [(0, "clean"), (2, "infected"), (1, "error")],
+)
+async def test_defender_scan_is_non_remediating_and_fail_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    return_code: int,
+    expected: str,
+) -> None:
+    arguments: tuple[object, ...] = ()
+
+    class Process:
+        async def wait(self) -> int:
+            return return_code
+
+        def kill(self) -> None:
+            pass
+
+    async def create_process(*args: object, **_kwargs: object) -> Process:
+        nonlocal arguments
+        arguments = args
+        return Process()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", create_process)
+    target = tmp_path / "sample.txt"
+    target.write_text("safe", encoding="utf-8")
+    result = await DefenderScanner("MpCmdRun.exe", 2).scan(target)
+
+    assert result.status == expected
+    assert "-DisableRemediation" in arguments
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("reply", "expected_status", "expected_signature"),
+    [
+        (b"stream: OK\0", "clean", None),
+        (b"stream: Eicar-Signature FOUND\0", "infected", "Eicar-Signature"),
+        (b"stream: malformed\0", "error", None),
+    ],
+)
+async def test_clamav_scan_maps_protocol_responses_fail_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reply: bytes,
+    expected_status: str,
+    expected_signature: str | None,
+) -> None:
+    class Reader:
+        async def read(self, _size: int) -> bytes:
+            return reply
+
+    class Writer:
+        def write(self, _data: bytes) -> None:
+            pass
+
+        async def drain(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+        async def wait_closed(self) -> None:
+            pass
+
+    async def open_connection(_host: str, _port: int) -> tuple[Reader, Writer]:
+        return Reader(), Writer()
+
+    monkeypatch.setattr(asyncio, "open_connection", open_connection)
+    target = tmp_path / "sample.txt"
+    target.write_text("safe", encoding="utf-8")
+
+    result = await ClamAvScanner("clamav", 3310, 2).scan(target)
+
+    assert result.status == expected_status
+    assert result.signature == expected_signature
+
+
+@pytest.mark.asyncio
+async def test_clamav_scan_returns_error_when_service_is_unreachable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def unreachable(_host: str, _port: int) -> None:
+        raise ConnectionRefusedError
+
+    monkeypatch.setattr(asyncio, "open_connection", unreachable)
+    target = tmp_path / "sample.txt"
+    target.write_text("safe", encoding="utf-8")
+
+    result = await ClamAvScanner("clamav", 3310, 2).scan(target)
+
+    assert result.status == "error"
+
+
+@pytest.mark.asyncio
+async def test_clamav_scan_returns_error_on_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def stalled(_host: str, _port: int) -> None:
+        await asyncio.sleep(1)
+
+    monkeypatch.setattr(asyncio, "open_connection", stalled)
+    target = tmp_path / "sample.txt"
+    target.write_text("safe", encoding="utf-8")
+
+    result = await ClamAvScanner("clamav", 3310, 0.01).scan(target)
+
+    assert result.status == "error"
 
 
 @pytest.mark.asyncio

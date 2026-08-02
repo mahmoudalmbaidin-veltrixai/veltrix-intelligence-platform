@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from vip_api.governance.access_view import ResourceEffectiveAccess
+
 SemanticKey = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{1,99}$")]
 
 
@@ -42,6 +44,10 @@ class SemanticModelResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     version: int
+    # Populated on single-model reads with the caller's effective access so the
+    # Studio renders view/query/edit/publish/manager states from the enforced
+    # decision. Absent on list items (the list is already visibility-filtered).
+    access: ResourceEffectiveAccess | None = None
 
 
 class SemanticModelVersionResponse(BaseModel):

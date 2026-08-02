@@ -88,7 +88,8 @@ class WorkspaceUpdate(BaseModel):
 class MemberSummary(BaseModel):
     id: UUID
     user_id: UUID
-    email: str
+    username: str = ""
+    email: str | None = None
     display_name: str
     role: str
     status: MembershipStatus

@@ -26,15 +26,28 @@ import VipSpinner from '@/shared/ui/VipSpinner.vue'
 import VipSwitch from '@/shared/ui/VipSwitch.vue'
 import VipTabs from '@/shared/ui/VipTabs.vue'
 import VipTextarea from '@/shared/ui/VipTextarea.vue'
+import ResourceShareButton from '@/modules/access/ResourceShareButton.vue'
+import { mapResourceAccess, resourceCan } from '@/shared/lib/resourceAccess'
 
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
 const platform = usePlatformStore()
 const modelId = computed(() => String(route.params.id))
-const canEdit = computed(() => platform.can('semantic_model.update'))
-const canPublish = computed(() => platform.can('semantic_model.publish'))
-const canArchive = computed(() => platform.can('semantic_model.archive'))
+// Resource-aware capabilities from the backend effective-access decision
+// (authoritative). Edit/publish map to the model's edit/manage levels; sharing to
+// the manage-access authority. Fall back to broad permissions until access loads.
+const effectiveAccess = computed(() => mapResourceAccess(definition.value?.model.access))
+const canEdit = computed(() =>
+  effectiveAccess.value ? resourceCan(effectiveAccess.value, 'edit') : platform.can('semantic_model.update'),
+)
+const canPublish = computed(() =>
+  effectiveAccess.value ? resourceCan(effectiveAccess.value, 'manage') : platform.can('semantic_model.publish'),
+)
+const canArchive = computed(() =>
+  effectiveAccess.value ? resourceCan(effectiveAccess.value, 'manage') : platform.can('semantic_model.archive'),
+)
+const canManageAccess = computed(() => effectiveAccess.value?.canManageAccess ?? false)
 
 const {
   data: definition,
@@ -311,6 +324,13 @@ async function remove(kind: EditorKind, id: string, name: string): Promise<void>
         >
           Publish
         </VipButton>
+        <ResourceShareButton
+          v-if="definition?.model.id && canManageAccess"
+          resource-type="semantic_model"
+          :resource-id="definition.model.id"
+          :resource-name="definition.model.name"
+          variant="secondary"
+        />
       </template>
       <template #tabs><VipTabs v-model="tab" :tabs="tabs" /></template>
     </VipPageHeader>

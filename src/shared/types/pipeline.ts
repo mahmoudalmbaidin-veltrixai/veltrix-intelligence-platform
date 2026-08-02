@@ -18,6 +18,7 @@ export type PipelineNodeKind =
   | 'union'
   | 'aggregate'
   | 'formula'
+  | 'row-validation'
   | 'type-convert'
   | 'deduplicate'
   | 'null-handling'
@@ -109,6 +110,26 @@ export interface PipelineEdge {
 
 export type PipelineStatus = 'draft' | 'published'
 
+export type PipelineAccessLevel = 'viewer' | 'operator' | 'developer' | 'owner'
+
+/**
+ * The caller's effective access to a pipeline, resolved by the backend's
+ * centralized authorization engine and echoed on the pipeline read response.
+ * The client renders viewer/operator/developer/owner (and denied) states from
+ * this — it is a UX convenience, never the security boundary (the API enforces
+ * every action independently).
+ */
+export interface PipelineAccess {
+  level: PipelineAccessLevel | null
+  allowedLevels: PipelineAccessLevel[]
+  canView: boolean
+  canRun: boolean
+  canEdit: boolean
+  canManage: boolean
+  source: string
+  reason: string
+}
+
 export interface Pipeline {
   id: string
   name: string
@@ -125,6 +146,8 @@ export interface Pipeline {
   lastRunAt?: string
   lastRunStatus?: NodeExecStatus
   nextSchedule?: string
+  /** Present on live reads; absent for local drafts and in mock mode. */
+  access?: PipelineAccess
 }
 
 export interface PipelineListItem {

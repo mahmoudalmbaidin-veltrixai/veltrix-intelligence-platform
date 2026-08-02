@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import cast
+from collections.abc import Sequence
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -23,10 +24,14 @@ class ConnectionRepository:
         page: int,
         page_size: int,
         include_archived: bool = False,
+        extra_filters: Sequence[Any] = (),
     ) -> tuple[list[tuple[Connection, ConnectionType]], int]:
+        # ``extra_filters`` carry the per-user resource-visibility predicate,
+        # applied to both count and page so hidden connections never leak.
         filters = [
             Connection.organization_id == organization_id,
             Connection.workspace_id == workspace_id,
+            *extra_filters,
         ]
         if not include_archived:
             filters.append(Connection.archived_at.is_(None))

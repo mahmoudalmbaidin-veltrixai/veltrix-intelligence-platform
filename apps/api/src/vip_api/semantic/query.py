@@ -21,6 +21,7 @@ from vip_api.connections.secrets import SecretProvider
 from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
 from vip_api.datasets.models import Dataset, DatasetField
+from vip_api.governance import resource_access_service
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.services import consume_quota
@@ -266,6 +267,19 @@ async def execute_query(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    # A user must never EXECUTE a semantic model they cannot access. This is the
+    # single chokepoint for every execution path (direct query, dashboard widgets,
+    # dashboard exports, scheduled delivery, background workers), so enforcing the
+    # centralized query-level decision here covers them all. The decision is live —
+    # a revoked grant or new deny blocks future executions immediately. Explicit
+    # deny -> 403; no grant / insufficient level -> non-disclosing 404.
+    await resource_access_service.authorize_resource(
+        db,
+        context,
+        resource_type="semantic_model",
+        resource_id=model.id,
+        action_level="query",
+    )
     dataset = await db.scalar(
         select(Dataset).where(
             Dataset.id == model.primary_dataset_id,

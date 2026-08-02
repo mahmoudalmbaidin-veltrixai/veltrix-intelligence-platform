@@ -144,9 +144,9 @@ onBeforeUnmount(() => {
           <VipTooltip
             v-for="item in group.items"
             :key="item.to"
-            :text="expanded ? '' : item.label"
-            :description="expanded ? '' : item.description"
-            :shortcut="expanded ? '' : item.shortcut"
+            :text="collapsed ? item.label : ''"
+            :description="collapsed ? item.description : ''"
+            :shortcut="collapsed ? item.shortcut : ''"
             placement="right"
           >
             <RouterLink
@@ -165,8 +165,8 @@ onBeforeUnmount(() => {
 
       <div class="vip-sidebar__footer">
         <VipTooltip
-          :text="expanded ? '' : 'Help & docs'"
-          :description="expanded ? '' : 'Guides, API reference and support.'"
+          :text="collapsed ? 'Help & docs' : ''"
+          :description="collapsed ? 'Guides, API reference and support.' : ''"
           placement="right"
         >
           <RouterLink to="/developer" class="vip-sidebar__item" :aria-label="!expanded ? 'Help & docs' : undefined">

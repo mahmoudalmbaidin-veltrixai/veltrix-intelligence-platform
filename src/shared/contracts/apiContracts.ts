@@ -7,7 +7,9 @@ const isoDate = z.string().datetime({ offset: true })
 export const userSchema = z.object({
   id,
   name: z.string().min(1),
-  email: z.string().email(),
+  username: z.string().optional(),
+  // Email is optional — users can exist without one (username login).
+  email: z.string().email().nullable().optional(),
   avatarColor: z.string().optional(),
   jobTitle: z.string().optional(),
   timezone: z.string().min(1),
@@ -49,7 +51,8 @@ export const sessionSchema = z.object({
 export const authenticationResponseSchema = z.object({
   user: z.object({
     id,
-    email: z.string().email(),
+    username: z.string().optional(),
+    email: z.string().email().nullable().optional(),
     display_name: z.string().min(1),
     status: z.enum(['pending', 'active', 'locked', 'disabled', 'suspended', 'deleted']),
     is_platform_admin: z.boolean().optional().default(false),

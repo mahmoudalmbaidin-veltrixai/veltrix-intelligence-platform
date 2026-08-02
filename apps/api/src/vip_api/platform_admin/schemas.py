@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class PlatformOverview(BaseModel):
@@ -38,7 +38,8 @@ class PlatformOrganizationList(BaseModel):
 
 class PlatformMemberRow(BaseModel):
     user_id: UUID
-    email: str
+    username: str = ""
+    email: str | None = None
     display_name: str
     role: str
     status: str
@@ -64,7 +65,8 @@ class PlatformOrganizationDetail(BaseModel):
 
 class PlatformUserRow(BaseModel):
     id: UUID
-    email: str
+    username: str
+    email: str | None = None
     display_name: str
     status: str
     is_platform_admin: bool
@@ -97,17 +99,100 @@ class CreatePlatformUserRequest(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-    email: str = Field(min_length=3, max_length=320)
+    username: str = Field(min_length=3, max_length=150)
     display_name: str = Field(min_length=1, max_length=200)
     password: str = Field(min_length=12, max_length=200)
+    email: str | None = Field(default=None, max_length=320)
     is_platform_admin: bool = False
     organization_id: UUID | None = None
     organization_role: str | None = Field(default=None, max_length=100)
 
 
 class AddOrgMemberRequest(BaseModel):
-    """Add an existing user to an organization with a role (platform-admin)."""
+    """Add an existing user to an organization with a role (platform-admin).
+
+    Identify the user by username (primary) or email; at least one is required.
+    """
 
     model_config = ConfigDict(extra="forbid")
-    email: str = Field(min_length=3, max_length=320)
+    username: str | None = Field(default=None, max_length=150)
+    email: str | None = Field(default=None, max_length=320)
     organization_role: str = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def _require_identifier(self) -> AddOrgMemberRequest:
+        if not (self.username or self.email):
+            raise ValueError("A username or email is required.")
+        return self
+
+
+class UpdatePlatformUserRequest(BaseModel):
+    """Edit a user's profile. Only provided fields change. Email "" clears it."""
+
+    model_config = ConfigDict(extra="forbid")
+    display_name: str | None = Field(default=None, min_length=1, max_length=200)
+    email: str | None = Field(default=None, max_length=320)
+    job_title: str | None = Field(default=None, max_length=150)
+    department: str | None = Field(default=None, max_length=150)
+    phone: str | None = Field(default=None, max_length=50)
+    must_change_password: bool | None = None
+    default_organization_id: UUID | None = None
+    default_workspace_id: UUID | None = None
+
+
+class AdminResetPasswordRequest(BaseModel):
+    """Administrator-set password reset (never emails)."""
+
+    model_config = ConfigDict(extra="forbid")
+    password: str = Field(min_length=12, max_length=200)
+    must_change_password: bool = True
+
+
+class AddWorkspaceMemberRequest(BaseModel):
+    """Add a user (by username or email) to a workspace with a role."""
+
+    model_config = ConfigDict(extra="forbid")
+    username: str | None = Field(default=None, max_length=150)
+    email: str | None = Field(default=None, max_length=320)
+    workspace_role: str = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def _require_identifier(self) -> AddWorkspaceMemberRequest:
+        if not (self.username or self.email):
+            raise ValueError("A username or email is required.")
+        return self
+
+
+class OrgAssignment(BaseModel):
+    organization_id: UUID
+    organization_name: str
+    organization_slug: str
+    role: str
+    status: str
+
+
+class WorkspaceAssignment(BaseModel):
+    organization_id: UUID
+    workspace_id: UUID
+    workspace_name: str
+    organization_name: str
+    role: str
+    status: str
+
+
+class UserAccessSummary(BaseModel):
+    user_id: UUID
+    username: str
+    display_name: str
+    email: str | None = None
+    status: str
+    default_organization_id: UUID | None = None
+    default_workspace_id: UUID | None = None
+    organizations: list[OrgAssignment]
+    workspaces: list[WorkspaceAssignment]
+
+
+class CreateWorkspaceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=200)
+    slug: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")

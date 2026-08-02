@@ -20,7 +20,7 @@ const search = ref('')
 const activeCat = ref<'All' | FormulaFn['category']>('All')
 const taRef = ref<HTMLTextAreaElement>()
 
-const categories: ('All' | FormulaFn['category'])[] = ['All', 'Math', 'Text', 'Logical']
+const categories: ('All' | FormulaFn['category'])[] = ['All', 'Math', 'Text', 'Logical', 'Conversion', 'Date']
 
 const fns = computed(() => {
   const q = search.value.trim().toLowerCase()

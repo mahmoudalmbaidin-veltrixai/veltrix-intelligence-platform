@@ -173,3 +173,21 @@ Redis queue behavior, resumable tenant channels, and clean migration upgrade/dow
   adapter extensions.
 - Pipeline APIs remain on the proven B7 worker during this compatibility phase; new long-running
   modules must use the B8 worker, and pipeline migration can be performed without an API change.
+For pipeline-run status, the current B7 client uses a bounded polling fallback: one request at a
+time, a one-second normal interval, exponential error backoff capped at ten seconds, a fifteen
+minute overall timeout, cancellation of an in-flight request on teardown/cancel, and a
+visibility-aware pause. The existing authenticated tenant-scoped SSE stream remains the migration
+target for pipeline progress; the fallback must not be changed back to an unbounded interval.
+
+## Operational metrics and worker health
+
+`GET /metrics` exposes Prometheus text for HTTP, dependency, worker, queue, job, pipeline,
+dashboard export/delivery, and SSE health. Metrics use only bounded operational labels—never tenant,
+workspace, user, resource IDs, credentials, or raw query text. Set `METRICS_ENABLED=false` to
+disable the endpoint. Set `METRICS_BEARER_TOKEN` for protected scraping; production configuration
+is rejected when metrics are enabled without that token.
+
+The generic, dashboard, and pipeline worker containers use the same database-backed heartbeat
+probe. A process is unhealthy when its own hostname has no running heartbeat within three
+heartbeat periods (at least thirty seconds). This distinguishes a live-but-stuck worker from a
+healthy consumer and also proves database reachability.

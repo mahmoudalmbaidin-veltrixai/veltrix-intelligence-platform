@@ -31,7 +31,8 @@ describe('central API client contracts', () => {
     await apiClient.post('/resources', { name: 'A' })
     const [url, init] = fetchMock.mock.calls[0]
     const headers = init?.headers as Headers
-    expect(url).toBe('/resources')
+    // Bare application paths resolve under the single canonical /api/v1 prefix.
+    expect(url).toBe('/api/v1/resources')
     expect(init?.method).toBe('POST')
     expect(init?.credentials).toBe('include')
     expect(init?.body).toBe(JSON.stringify({ name: 'A' }))
@@ -138,7 +139,9 @@ describe('central API client contracts', () => {
     expect(result.fileName).toBe('report one.pdf')
     expect(result.mimeType).toBe('application/pdf')
     expect(result.correlationId).toBe('corr-1')
-    expect(result.blob).toBeInstanceOf(Blob)
+    expect(Object.prototype.toString.call(result.blob)).toBe('[object Blob]')
+    expect(result.blob.type).toBe('application/pdf')
+    expect(result.blob.size).toBe(3)
   })
 
   it('normalizes backend error statuses and keeps raw detail out of the friendly message', async () => {

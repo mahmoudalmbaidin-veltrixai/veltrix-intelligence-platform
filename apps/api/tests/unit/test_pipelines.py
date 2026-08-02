@@ -12,7 +12,7 @@ from redis.asyncio import Redis
 from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
 from vip_api.database.session import Database
-from vip_api.pipelines.execution import normalize, transform
+from vip_api.pipelines.execution import normalize, transform, validate_rows
 from vip_api.pipelines.formula import evaluate, parse_formula, referenced_fields
 from vip_api.pipelines.registry import NODE_REGISTRY
 from vip_api.pipelines.schemas import NodeInput
@@ -69,6 +69,45 @@ def test_pipeline_preserves_database_numerics_for_formulas() -> None:
     )
     assert calculated == [
         {"revenue": Decimal("1250000.50"), "adjusted_revenue": Decimal("1375000.55")}
+    ]
+
+
+def test_row_validation_preserves_valid_rows_and_rejection_reasons() -> None:
+    node = NodeInput(
+        key="validate",
+        type="row-validation",
+        title="Validate source rows",
+        x=0,
+        y=0,
+        config={
+            "rules": [
+                {"formula": "not isempty([customer])", "reason": "CUSTOMER_REQUIRED"},
+                {"formula": "tonumber([amount]) >= 0", "reason": "AMOUNT_NON_NEGATIVE"},
+            ]
+        },
+    )
+    valid, rejected = validate_rows(
+        node,
+        [
+            {"id": "1", "customer": "Ada", "amount": "12.50"},
+            {"id": "2", "customer": "", "amount": "9"},
+            {"id": "3", "customer": "Lin", "amount": "-1"},
+        ],
+    )
+    assert valid == [{"id": "1", "customer": "Ada", "amount": "12.50"}]
+    assert rejected == [
+        {
+            "id": "2",
+            "customer": "",
+            "amount": "9",
+            "_invalid_reasons": ["CUSTOMER_REQUIRED"],
+        },
+        {
+            "id": "3",
+            "customer": "Lin",
+            "amount": "-1",
+            "_invalid_reasons": ["AMOUNT_NON_NEGATIVE"],
+        },
     ]
 
 

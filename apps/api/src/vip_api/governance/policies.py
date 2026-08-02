@@ -45,6 +45,16 @@ ORGANIZATION_PERMISSION_KEYS = (
     "settings.update",
     "audit.read",
     "governance.read",
+    "group.read",
+    "group.create",
+    "group.update",
+    "group.delete",
+    "group.members.manage",
+    "role.read",
+    "role.create",
+    "role.update",
+    "role.delete",
+    "role.assign",
 )
 WORKSPACE_PERMISSION_KEYS = (
     "workspace.read",
@@ -52,6 +62,8 @@ WORKSPACE_PERMISSION_KEYS = (
     "workspace.archive",
     "workspace.members.read",
     "workspace.members.manage",
+    "resource.permissions.read",
+    "resource.permissions.manage",
     "dashboard.read",
     "dashboard.create",
     "dashboard.update",
@@ -181,6 +193,8 @@ _ALL_WORKSPACE = frozenset(WORKSPACE_PERMISSION_KEYS)
 _WORKSPACE_EDITOR = frozenset(
     {
         "workspace.read",
+        "resource.permissions.read",
+        "resource.permissions.manage",
         "dashboard.read",
         "dashboard.create",
         "dashboard.update",
@@ -260,6 +274,7 @@ _WORKSPACE_EDITOR = frozenset(
 _WORKSPACE_VIEWER = frozenset(
     {
         "workspace.read",
+        "resource.permissions.read",
         "dashboard.read",
         "dashboard.versions.read",
         "dashboard.snapshot.read",

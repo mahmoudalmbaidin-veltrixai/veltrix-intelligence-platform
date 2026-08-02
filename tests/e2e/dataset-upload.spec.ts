@@ -12,7 +12,9 @@ test('Datasets: Import CSV accepts a device file and fills the form', async ({ a
   await expect(dialog).toBeVisible()
 
   // The file input is hidden behind the "Upload CSV file…" button; set files directly.
-  await dialog.locator('input[type="file"]').setInputFiles(path.resolve('e2e', 'data', 'b8_5_certification.csv'))
+  await dialog
+    .locator('input[type="file"]')
+    .setInputFiles(path.resolve('tests', 'e2e', 'data', 'b8_5_certification.csv'))
 
   // Selected filename is surfaced.
   await expect(dialog.getByText('b8_5_certification.csv')).toBeVisible()

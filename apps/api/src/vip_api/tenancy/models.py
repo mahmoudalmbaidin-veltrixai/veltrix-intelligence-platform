@@ -34,6 +34,7 @@ class OrganizationStatus(StrEnum):
 
 class WorkspaceStatus(StrEnum):
     ACTIVE = "active"
+    SUSPENDED = "suspended"
     ARCHIVED = "archived"
     DELETED = "deleted"
 

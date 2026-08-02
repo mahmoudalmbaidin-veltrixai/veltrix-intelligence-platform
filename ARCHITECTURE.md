@@ -102,8 +102,8 @@ colors. Reduced-motion is respected globally.
   findings, NL query entry, explain, pin/save/share. Clearly labelled simulated.
 - **Explore** (`modules/explore`) — lightweight ad-hoc analysis workspace.
 
-See `MODULE_STATUS.md` for per-module depth and `BACKEND_INTEGRATION.md` for the
-endpoint map.
+See `docs/reports/MODULE_STATUS.md` for per-module depth and `docs/BACKEND_INTEGRATION.md`
+for the endpoint map.
 
 ## Commands
 

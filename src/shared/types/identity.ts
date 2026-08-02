@@ -26,6 +26,8 @@ export type PermissionMatcher = Permission | '*'
 export interface UserProfile {
   id: Id
   name: string
+  username: string
+  /** Optional — users can exist without an email (username login). */
   email: string
   avatarColor: string
   jobTitle: string

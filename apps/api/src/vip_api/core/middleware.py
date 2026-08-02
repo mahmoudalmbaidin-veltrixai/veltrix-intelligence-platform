@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from vip_api.core.context import bind_request_context, reset_request_context
+from vip_api.core.metrics import metrics
 
 logger = logging.getLogger("vip_api.request")
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -44,6 +45,7 @@ class RequestContextMiddleware:
         request_id = str(uuid4())
         tokens = bind_request_context(correlation_id, request_id)
         started = time.perf_counter()
+        metrics.request_started()
         status_code = 500
         response_started = False
 
@@ -135,7 +137,11 @@ class RequestContextMiddleware:
             )
             await send({"type": "http.response.body", "body": body})
         finally:
-            duration_ms = round((time.perf_counter() - started) * 1000, 3)
+            duration_seconds = time.perf_counter() - started
+            duration_ms = round(duration_seconds * 1000, 3)
+            metrics.request_finished(scope["method"], status_code, duration_seconds)
+            if scope["path"].endswith("/auth/login") and status_code in {401, 423}:
+                metrics.authentication_failed()
             log_level = logging.ERROR if status_code >= 500 else logging.INFO
             if scope["path"] not in {"/health", "/ready"} or status_code >= 400:
                 logger.log(

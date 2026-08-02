@@ -19,6 +19,7 @@ import VipTabs from '@/shared/ui/VipTabs.vue'
 import VipSpinner from '@/shared/ui/VipSpinner.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
 import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
+import ResourceShareButton from '@/modules/access/ResourceShareButton.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -44,6 +45,11 @@ const { data: profile, isLoading: profileLoading } = useQuery(
 )
 
 const datasetRules = computed<QualityRule[]>(() => (rules.value ?? []).filter((r) => r.dataset === dataset.value?.name))
+
+// Resource-aware access from the backend (authoritative). Only owners / managers
+// (or holders of the manage permission) may share; the API enforces this too.
+const effectiveAccess = computed(() => dataset.value?.access)
+const canManageAccess = computed(() => effectiveAccess.value?.canManageAccess ?? false)
 
 const tabs = [
   { value: 'overview', label: 'Overview' },
@@ -179,6 +185,13 @@ const activity: ActivityItem[] = [
           <VipButton variant="secondary" icon="lineage" @click="router.push('/datasets/lineage')"
             >View lineage</VipButton
           >
+          <ResourceShareButton
+            v-if="canManageAccess"
+            resource-type="dataset"
+            :resource-id="id"
+            :resource-name="dataset.name"
+            variant="secondary"
+          />
         </template>
         <template #tabs>
           <VipTabs v-model="activeTab" :tabs="tabs" />

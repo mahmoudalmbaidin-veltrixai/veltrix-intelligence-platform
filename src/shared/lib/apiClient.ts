@@ -94,14 +94,53 @@ function buildQuery(query: RequestOptions['query']): string {
   return s ? `?${s}` : ''
 }
 
+/** The single API version prefix every versioned application route resolves under. */
+export const API_VERSION_PREFIX = '/api/v1'
+
+/**
+ * Paths that are served at the API root, NOT under `/api/v1`. Authentication is
+ * deliberately unversioned (session cookies are platform infrastructure), and
+ * health/readiness are infra probes. These pass through with the configured
+ * origin and never receive the version prefix.
+ */
+function isUnversionedRootPath(path: string): boolean {
+  return path === '/auth' || path.startsWith('/auth/') || path === '/health' || path === '/ready' || path === '/healthz'
+}
+
+/**
+ * Canonical URL resolver — the ONE rule for turning an adapter path into a full
+ * request URL. Adapters must NOT re-implement prefix logic.
+ *
+ * Behaviour (robust to how `VITE_API_BASE_URL` is configured):
+ *  - Absolute URLs (`http(s)://…`, e.g. signed downloads / external hosts) pass
+ *    through untouched.
+ *  - The configured base is normalized to an API *origin* by stripping trailing
+ *    slashes and a trailing `/api/v1`, so `http://host` and `http://host/api/v1`
+ *    resolve identically.
+ *  - Unversioned root paths (`/auth/*`, `/health`, `/ready`) keep the origin only.
+ *  - Already-versioned paths (`/api/v1/…`) are used as-is (never duplicated).
+ *  - Every other application path receives `/api/v1` exactly once.
+ *  - Query strings are appended after the resolved path.
+ *
+ * Pure and side-effect free so it can be unit-tested with any base URL.
+ */
+export function resolveApiUrl(baseUrl: string, path: string, query?: RequestOptions['query']): string {
+  const suffix = buildQuery(query)
+  // Absolute URL (signed download, external host, SSE origin) — never rewrite.
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path)) return `${path}${suffix}`
+
+  const origin = baseUrl.replace(/\/+$/, '').replace(/\/api\/v1$/, '')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+
+  if (isUnversionedRootPath(normalizedPath)) return `${origin}${normalizedPath}${suffix}`
+  if (normalizedPath === API_VERSION_PREFIX || normalizedPath.startsWith(`${API_VERSION_PREFIX}/`)) {
+    return `${origin}${normalizedPath}${suffix}`
+  }
+  return `${origin}${API_VERSION_PREFIX}${normalizedPath}${suffix}`
+}
+
 function buildUrl(path: string, query: RequestOptions['query']): string {
-  const base = config.apiBaseUrl.replace(/\/$/, '')
-  // Authentication is deliberately unversioned on the backend because session
-  // cookies are platform infrastructure. Some established tenant adapters use
-  // explicit `/api/v1` paths, so avoid duplicating the configured prefix.
-  const absolutePlatformPath = path.startsWith('/auth/') || path.startsWith('/api/v1/')
-  const resolvedBase = absolutePlatformPath ? base.replace(/\/api\/v1$/, '') : base
-  return `${resolvedBase}${path}${buildQuery(query)}`
+  return resolveApiUrl(config.apiBaseUrl, path, query)
 }
 
 function buildHeaders(opts: RequestOptions): Headers {

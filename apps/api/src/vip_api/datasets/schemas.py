@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
+from vip_api.governance.access_view import ResourceEffectiveAccess
+
 Classification = Literal[
     "public", "internal", "confidential", "restricted", "personal", "financial", "operational"
 ]
@@ -132,6 +134,10 @@ class DatasetResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     version: int
+    # Populated on single-dataset reads with the caller's effective access so the
+    # Studio renders viewer/editor/certifier/manager states from the enforced
+    # decision. Absent on list items (the list is already visibility-filtered).
+    access: ResourceEffectiveAccess | None = None
 
 
 class DatasetListResponse(BaseModel):

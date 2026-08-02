@@ -28,6 +28,7 @@ export type TenancyStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 const EMPTY_USER: UserProfile = {
   id: '',
   name: '',
+  username: '',
   email: '',
   avatarColor: '#6d5efc',
   jobTitle: '',
@@ -218,7 +219,8 @@ export const usePlatformStore = defineStore('platform', () => {
     user.value = {
       ...user.value,
       id: authenticatedUser.id,
-      email: authenticatedUser.email,
+      username: authenticatedUser.username ?? '',
+      email: authenticatedUser.email ?? '',
       name: authenticatedUser.displayName,
       isPlatformAdmin: authenticatedUser.isPlatformAdmin,
     }

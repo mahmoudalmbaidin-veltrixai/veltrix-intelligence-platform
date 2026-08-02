@@ -77,4 +77,46 @@ describe('useDashboardEditor', () => {
     editor.markSaved()
     expect(editor.dirty.value).toBe(false)
   })
+
+  // --- widget identity + reconciliation guards ---
+
+  it('gives a duplicated widget a new unique id with equivalent config', () => {
+    const original = editor.addWidget('bar')
+    editor.patchWidget(original.id, { general: { ...original.general, name: 'Revenue' } })
+    editor.duplicateWidget(original.id)
+    const [a, b] = editor.widgets.value
+    expect(a.id).not.toBe(b.id) // unique identity
+    expect(b.type).toBe(a.type) // equivalent config (type carried over)
+    expect(b.general.name).toBe('Revenue copy') // distinguishable copy label
+    expect(b).not.toBe(a) // not the same object reference
+    expect(b.general).not.toBe(a.general) // deep-cloned, no shared references
+  })
+
+  it('editing one widget never mutates another', () => {
+    const first = editor.addWidget('bar')
+    const second = editor.addWidget('line')
+    editor.patchWidget(first.id, { general: { ...first.general, name: 'Only first' } })
+    const secondAfter = editor.widgets.value.find((w) => w.id === second.id)!
+    expect(secondAfter.general.name).not.toBe('Only first')
+    expect(editor.widgets.value.find((w) => w.id === first.id)!.general.name).toBe('Only first')
+  })
+
+  it('reconciles editor state from a save response (server ids replace temp ids)', () => {
+    // Simulate the studio hydrating from the persisted server payload after save.
+    const local = useDashboardEditor({ ...newDashboard(), id: 'db_test' })
+    const tmp = local.addWidget('kpi')
+    expect(tmp.id.startsWith('w_')).toBe(true) // temporary client id before save
+    // Server returns the same widget with a stable UUID under the same page.
+    const serverId = '11111111-1111-4111-8111-111111111111'
+    const persisted = {
+      ...local.dashboard,
+      pages: local.dashboard.pages.map((p, i) =>
+        i === 0 ? { ...p, widgets: p.widgets.map((w) => ({ ...w, id: serverId })) } : p,
+      ),
+    }
+    const rebuilt = useDashboardEditor(persisted)
+    expect(rebuilt.widgets.value).toHaveLength(1)
+    expect(rebuilt.widgets.value[0].id).toBe(serverId) // reconciled to the server id
+    expect(rebuilt.dirty.value).toBe(false) // freshly hydrated state is clean
+  })
 })

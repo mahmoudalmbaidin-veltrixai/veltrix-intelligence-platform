@@ -46,11 +46,11 @@ export const useAuthStore = defineStore('auth', () => {
     return bootstrapPromise
   }
 
-  async function login(email: string, password: string): Promise<boolean> {
+  async function login(identifier: string, password: string): Promise<boolean> {
     error.value = null
     status.value = 'loading'
     try {
-      await applySession(await authService.login({ email, password }))
+      await applySession(await authService.login({ username: identifier, password }))
       initialized.value = true
       return true
     } catch (cause) {

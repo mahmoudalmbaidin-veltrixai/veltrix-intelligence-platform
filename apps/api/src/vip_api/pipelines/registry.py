@@ -23,6 +23,7 @@ NODE_REGISTRY: dict[str, NodeDefinition] = {
         NodeDefinition("union", "transform", 2, 20),
         NodeDefinition("aggregate", "transform", 1, 1),
         NodeDefinition("formula", "transform", 1, 1),
+        NodeDefinition("row-validation", "transform", 1, 1),
         NodeDefinition("type-convert", "transform", 1, 1),
         NodeDefinition("deduplicate", "transform", 1, 1),
         NodeDefinition("null-handling", "transform", 1, 1),

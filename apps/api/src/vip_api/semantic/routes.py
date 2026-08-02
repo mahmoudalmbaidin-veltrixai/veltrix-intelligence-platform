@@ -6,13 +6,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from vip_api.auth.dependencies import require_csrf
+from vip_api.auth.dependencies import AuthenticatedContext, get_current_session, require_csrf
 from vip_api.connections.dependencies import get_secret_provider
 from vip_api.connections.secrets import DatabaseEncryptedSecretProvider
 from vip_api.core.config import Settings, get_settings
 from vip_api.database.session import get_db_session
 from vip_api.datasets.dependencies import RequireB5Governance
 from vip_api.governance.context import AuthorizationContext
+from vip_api.governance.dependencies import require_capability
 from vip_api.semantic.query import execute_query
 from vip_api.semantic.schemas import (
     DimensionCreate,
@@ -87,10 +88,20 @@ def _policy(permission: str, feature: str = "semantic_layer", quota: str | None 
     return RequireB5Governance(permission, feature=feature, quota=quota)
 
 
+# Feature/entitlement-only gates for resource-bound model routes: the specific
+# model's access (view/query/edit/publish=manage) is decided per-resource by the
+# centralized evaluator in the service, so an ACL grant elevates without a broad
+# semantic_model.* permission. Model/metric creation keep their RBAC + quota gates;
+# glossary (not an ACL resource type) keeps its RBAC gates. Query execution is
+# authorized on the model inside execute_query (which also consumes the quota).
+semantic_capability = require_capability("semantic_layer", "semantic_layer")
+semantic_query_capability = require_capability("semantic_query", "semantic_layer")
+
+
 @models_router.get("", response_model=list[SemanticModelResponse])
 async def models_index(
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.read"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> list[SemanticModelResponse]:
     return await list_models(db, context)
 
@@ -112,9 +123,10 @@ async def models_create(
 async def models_detail(
     model_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.read"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
+    auth: Annotated[AuthenticatedContext, Depends(get_current_session)],
 ) -> SemanticModelResponse:
-    return await get_model(db, context, model_id)
+    return await get_model(db, context, model_id, is_platform_admin=auth.user.is_platform_admin)
 
 
 @models_router.get(
@@ -124,7 +136,7 @@ async def models_detail(
 async def models_versions(
     model_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.read"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> list[SemanticModelVersionResponse]:
     return await list_model_versions(db, context, model_id)
 
@@ -136,7 +148,7 @@ async def models_update(
     model_id: UUID,
     payload: SemanticModelUpdate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.update"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> SemanticModelResponse:
     return await update_model(db, context, model_id, payload)
 
@@ -149,7 +161,7 @@ async def models_update(
 async def models_validate(
     model_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.update"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> SemanticValidationResponse:
     return await validate_model(db, context, model_id)
 
@@ -162,7 +174,7 @@ async def models_validate(
 async def models_publish(
     model_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.publish"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> SemanticModelResponse:
     return await publish_model(db, context, model_id)
 
@@ -171,7 +183,7 @@ async def models_publish(
 async def models_archive(
     model_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.archive"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> Response:
     await archive_model(db, context, model_id)
     return Response(status_code=204)
@@ -181,7 +193,7 @@ async def models_archive(
 async def dimensions_index(
     model_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.read"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> list[DimensionResponse]:
     return await list_dimensions(db, context, model_id)
 
@@ -196,7 +208,7 @@ async def dimensions_create(
     model_id: UUID,
     payload: DimensionCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_dimension.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> DimensionResponse:
     return await create_dimension(db, context, model_id, payload)
 
@@ -211,7 +223,7 @@ async def dimensions_update(
     dimension_id: UUID,
     payload: DimensionCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_dimension.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> DimensionResponse:
     return await update_dimension(db, context, model_id, dimension_id, payload)
 
@@ -223,7 +235,7 @@ async def dimensions_delete(
     model_id: UUID,
     dimension_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_dimension.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> Response:
     await delete_dimension(db, context, model_id, dimension_id)
     return Response(status_code=204)
@@ -233,7 +245,7 @@ async def dimensions_delete(
 async def measures_index(
     model_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.read"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> list[MeasureResponse]:
     return await list_measures(db, context, model_id)
 
@@ -248,7 +260,7 @@ async def measures_create(
     model_id: UUID,
     payload: MeasureCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_measure.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> MeasureResponse:
     return await create_measure(db, context, model_id, payload)
 
@@ -263,7 +275,7 @@ async def measures_update(
     measure_id: UUID,
     payload: MeasureCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_measure.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> MeasureResponse:
     return await update_measure(db, context, model_id, measure_id, payload)
 
@@ -275,7 +287,7 @@ async def measures_delete(
     model_id: UUID,
     measure_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_measure.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> Response:
     await delete_measure(db, context, model_id, measure_id)
     return Response(status_code=204)
@@ -285,7 +297,7 @@ async def measures_delete(
 async def metrics_index(
     model_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.read"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> list[MetricResponse]:
     return await list_metrics(db, context, model_id)
 
@@ -317,7 +329,7 @@ async def metrics_update(
     metric_id: UUID,
     payload: MetricCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_metric.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> MetricResponse:
     return await update_metric(db, context, model_id, metric_id, payload)
 
@@ -329,7 +341,7 @@ async def metrics_delete(
     model_id: UUID,
     metric_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_metric.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> Response:
     await delete_metric(db, context, model_id, metric_id)
     return Response(status_code=204)
@@ -339,7 +351,7 @@ async def metrics_delete(
 async def kpis_index(
     model_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_model.read"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> list[KpiResponse]:
     return await list_kpis(db, context, model_id)
 
@@ -354,7 +366,7 @@ async def kpis_create(
     model_id: UUID,
     payload: KpiCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_kpi.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> KpiResponse:
     return await create_kpi(db, context, model_id, payload)
 
@@ -367,7 +379,7 @@ async def kpis_update(
     kpi_id: UUID,
     payload: KpiCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_kpi.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> KpiResponse:
     return await update_kpi(db, context, model_id, kpi_id, payload)
 
@@ -379,7 +391,7 @@ async def kpis_delete(
     model_id: UUID,
     kpi_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("semantic_kpi.manage"))],
+    context: Annotated[AuthorizationContext, Depends(semantic_capability)],
 ) -> Response:
     await delete_kpi(db, context, model_id, kpi_id)
     return Response(status_code=204)
@@ -586,7 +598,7 @@ async def semantic_query(
     db: Annotated[AsyncSession, Depends(get_db_session)],
     context: Annotated[
         AuthorizationContext,
-        Depends(_policy("semantic.query", "semantic_query", "semantic_queries.per_day")),
+        Depends(semantic_query_capability),
     ],
     settings: Annotated[Settings, Depends(get_settings)],
     provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],

@@ -9,7 +9,13 @@ import pytest
 from starlette.testclient import TestClient
 
 os.environ.setdefault("APP_ENV", "test")
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://vip:vip_test@localhost:5432/vip_test")
+os.environ.setdefault(
+    "DATABASE_URL",
+    os.getenv(
+        "TEST_DATABASE_URL",
+        "postgresql+asyncpg://vip:vip_local_dev_only@localhost:5432/vip_test",
+    ),
+)
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("ENABLE_DOCS", "false")
 
@@ -33,6 +39,12 @@ def settings() -> Settings:
         DATABASE_URL=os.environ["DATABASE_URL"],
         REDIS_URL=os.environ["REDIS_URL"],
         ENABLE_DOCS=False,
+        # Hermetic host allow-list. Without this, running the suite inside the
+        # live API container (which exports TRUSTED_HOSTS for the running server)
+        # would enable TrustedHostMiddleware and reject the TestClient "testserver"
+        # host with a 400, masking the real 422/readiness assertions. Matches the
+        # certified CI default (TRUSTED_HOSTS unset -> ["*"], middleware disabled).
+        TRUSTED_HOSTS=["*"],
         # Keep failure tests bounded without making normal Docker/Windows CI
         # connections flaky under concurrent browser and API verification.
         DATABASE_CONNECT_TIMEOUT=2.0,

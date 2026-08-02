@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuery, invalidateQueries } from '@/shared/lib/query'
 import { usePlatformStore } from '@/shared/stores/platform'
+import { mapResourceAccess, resourceCan } from '@/shared/lib/resourceAccess'
 import { useUiStore } from '@/shared/stores/ui'
 import { formatDateTime, formatDuration } from '@/shared/lib/format'
 import { connectionService, type ConnectionHealth, type ConnectionTestResult } from './connections.service'
@@ -15,6 +16,7 @@ import VipDialog from '@/shared/ui/VipDialog.vue'
 import VipInput from '@/shared/ui/VipInput.vue'
 import VipSpinner from '@/shared/ui/VipSpinner.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
+import ResourceShareButton from '@/modules/access/ResourceShareButton.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,6 +35,17 @@ const {
   () => connectionService.get(id.value),
   { enabled: hasValidId },
 )
+// Resource-aware capabilities from the backend effective-access decision (the
+// authoritative source). Fall back to broad workspace permissions only until the
+// detail response has loaded. Backend still enforces every action independently.
+const access = computed(() => mapResourceAccess(connection.value?.access))
+const canEdit = computed(() => (access.value ? resourceCan(access.value, 'edit') : platform.can('connection.update')))
+const canTest = computed(() => (access.value ? resourceCan(access.value, 'test') : platform.can('connection.test')))
+const canRotate = computed(() =>
+  access.value ? resourceCan(access.value, 'rotate') : platform.can('connection.credentials.update'),
+)
+const canManageAccess = computed(() => access.value?.canManageAccess ?? false)
+
 const testing = ref(false)
 const replacing = ref(false)
 const updating = ref(false)
@@ -186,18 +199,18 @@ async function archive() {
         >
         <template #actions>
           <VipButton variant="tertiary" @click="router.push('/connections')">Back</VipButton>
-          <VipButton v-if="platform.can('connection.update')" variant="secondary" @click="openEdit">Edit</VipButton>
-          <VipButton
-            v-if="platform.can('connection.test')"
-            variant="primary"
-            icon="play"
-            :loading="testing"
-            @click="runTest"
+          <VipButton v-if="canEdit" variant="secondary" @click="openEdit">Edit</VipButton>
+          <VipButton v-if="canTest" variant="primary" icon="play" :loading="testing" @click="runTest"
             >Test connection</VipButton
           >
-          <VipButton v-if="platform.can('connection.archive')" variant="danger" :loading="archiving" @click="archive"
-            >Archive</VipButton
-          >
+          <VipButton v-if="canManageAccess" variant="danger" :loading="archiving" @click="archive">Archive</VipButton>
+          <ResourceShareButton
+            v-if="canManageAccess"
+            resource-type="connection"
+            :resource-id="connection.id"
+            :resource-name="connection.name"
+            variant="secondary"
+          />
         </template>
       </VipPageHeader>
       <div class="detail__grid">
@@ -242,12 +255,7 @@ async function archive() {
             {{ connection.credential_version }}
           </p>
           <p class="detail__safe">Stored credentials are never returned or prefilled.</p>
-          <form
-            v-if="platform.can('connection.credentials.update')"
-            class="detail__credentials"
-            autocomplete="off"
-            @submit.prevent="replaceCredentials"
-          >
+          <form v-if="canRotate" class="detail__credentials" autocomplete="off" @submit.prevent="replaceCredentials">
             <VipInput
               v-for="(_state, key) in connection.secret_fields"
               :key="key"

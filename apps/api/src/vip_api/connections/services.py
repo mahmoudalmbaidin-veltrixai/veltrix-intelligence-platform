@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -37,6 +38,7 @@ from vip_api.connections.testers import ConnectionTesterRegistry, TesterResult
 from vip_api.core.config import Settings
 from vip_api.core.context import get_correlation_id
 from vip_api.core.errors import ApplicationError
+from vip_api.governance.access_view import ResourceEffectiveAccess
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.services import (
@@ -66,6 +68,28 @@ def _workspace(context: AuthorizationContext) -> UUID:
             status_code=400,
         )
     return context.workspace_id
+
+
+async def _guard(
+    db: AsyncSession, context: AuthorizationContext, connection_id: UUID, action_level: str
+) -> None:
+    """Authoritative per-connection decision via the centralized evaluator.
+
+    Combines role level, direct/group ACL grants, explicit deny and expiration so
+    a resource ACL grant *elevates* access without a broad ``connection.*``
+    workspace permission. Connections have no owner column, so ownership never
+    short-circuits. Explicit deny -> 403; any other denial -> non-disclosing 404.
+    """
+    from vip_api.governance import resource_access_service
+
+    _workspace(context)
+    await resource_access_service.authorize_resource(
+        db,
+        context,
+        resource_type="connection",
+        resource_id=connection_id,
+        action_level=action_level,
+    )
 
 
 def _normalize_name(name: str) -> str:
@@ -140,7 +164,11 @@ def _validate_type_payload(
 
 
 def serialize_connection(
-    connection: Connection, connection_type: ConnectionType, *, detail: bool
+    connection: Connection,
+    connection_type: ConnectionType,
+    *,
+    detail: bool,
+    access: ResourceEffectiveAccess | None = None,
 ) -> ConnectionResponse:
     properties = connection_type.secret_schema.get("properties", {})
     property_names = properties.keys() if isinstance(properties, dict) else ()
@@ -166,6 +194,7 @@ def serialize_connection(
         created_at=connection.created_at,
         updated_at=connection.updated_at,
         version=connection.version,
+        access=access,
     )
 
 
@@ -214,9 +243,25 @@ async def list_connections(
     page: int,
     page_size: int,
 ) -> ConnectionListResponse:
-    await authorize(db, context, requirement("connection.read"))
+    from vip_api.governance import resource_access_service
+
+    org = context.organization_id
+    ws = _workspace(context)
+    extra_filters: list[object] = []
+    # Broad-role users see the whole workspace; everyone else sees only connections
+    # reachable through a non-expired ACL allow (direct or group), minus lowest-level
+    # denies — filtered in SQL (no owner column for connections; no N+1).
+    if resource_access_service.role_level("connection", context.permissions) is None:
+        subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
+            db, org, context.user_id
+        )
+        allowed_ids, denied_ids = resource_access_service.collection_visibility_subqueries(
+            "connection", subjects, now=datetime.now(UTC)
+        )
+        extra_filters.append(Connection.id.in_(allowed_ids))
+        extra_filters.append(Connection.id.notin_(denied_ids))
     rows, total = await ConnectionRepository(db).list_scoped(
-        context.organization_id, _workspace(context), page=page, page_size=page_size
+        org, ws, page=page, page_size=page_size, extra_filters=extra_filters
     )
     return ConnectionListResponse(
         items=[serialize_connection(*row, detail=False) for row in rows],
@@ -322,9 +367,14 @@ async def create_connection(
 
 
 async def get_connection(
-    db: AsyncSession, context: AuthorizationContext, connection_id: UUID
+    db: AsyncSession,
+    context: AuthorizationContext,
+    connection_id: UUID,
+    *,
+    is_platform_admin: bool = False,
 ) -> ConnectionResponse:
-    await authorize(db, context, requirement("connection.read"))
+    from vip_api.governance import resource_access_service
+
     row = await ConnectionRepository(db).get_scoped(
         context.organization_id, _workspace(context), connection_id
     )
@@ -332,7 +382,17 @@ async def get_connection(
         raise ApplicationError(
             code="CONNECTION_NOT_FOUND", message="The connection was not found.", status_code=404
         )
-    return serialize_connection(*row, detail=True)
+    await _guard(db, context, connection_id, "use")
+    summary = await resource_access_service.resource_access_summary(
+        db,
+        context,
+        resource_type="connection",
+        resource_id=connection_id,
+        is_platform_admin=is_platform_admin,
+    )
+    return serialize_connection(
+        *row, detail=True, access=ResourceEffectiveAccess.from_summary(summary)
+    )
 
 
 async def update_connection(
@@ -342,7 +402,6 @@ async def update_connection(
     payload: ConnectionUpdateRequest,
     settings: Settings,
 ) -> ConnectionResponse:
-    await authorize(db, context, requirement("connection.update"))
     workspace_id = _workspace(context)
     repository = ConnectionRepository(db)
     row = await repository.get_scoped(
@@ -359,6 +418,7 @@ async def update_connection(
             message="The connection was modified by another request.",
             status_code=409,
         )
+    await _guard(db, context, connection_id, "edit")
     if payload.name is not None:
         normalized = _normalize_name(payload.name)
         if await repository.name_exists(
@@ -413,10 +473,8 @@ async def archive_connection(
     context: AuthorizationContext,
     connection_id: UUID,
     *,
-    permission: str = "connection.archive",
     audit_event: str = "connection.archived",
 ) -> None:
-    await authorize(db, context, requirement(permission))
     workspace_id = _workspace(context)
     row = await ConnectionRepository(db).get_scoped(
         context.organization_id, workspace_id, connection_id, for_update=True
@@ -426,6 +484,7 @@ async def archive_connection(
             code="CONNECTION_NOT_FOUND", message="The connection was not found.", status_code=404
         )
     connection, connection_type = row
+    await _guard(db, context, connection_id, "manage")
     was_active = connection.status != "archived"
     connection.status = "archived"
     connection.archived_at = utc_now()
@@ -456,8 +515,8 @@ async def replace_credentials(
     *,
     rotated: bool = False,
 ) -> CredentialReplaceResponse:
-    permission = "connection.credentials.rotate" if rotated else "connection.credentials.update"
-    await authorize(db, context, requirement(permission))
+    # Authorization is resolved per-resource by ``_guard`` below (rotate vs edit
+    # level); no separate broad-permission check is needed.
     workspace_id = _workspace(context)
     row = await ConnectionRepository(db).get_scoped(
         context.organization_id, workspace_id, connection_id, for_update=True
@@ -473,6 +532,7 @@ async def replace_credentials(
             message="The connection was modified by another request.",
             status_code=409,
         )
+    await _guard(db, context, connection_id, "rotate" if rotated else "edit")
     raw = _safe_credentials(payload.credentials)
     _, credentials = _validate_type_payload(
         connection_type.key, connection.configuration, raw, settings
@@ -532,7 +592,6 @@ async def test_connection(
     secret_provider: SecretProvider,
     testers: ConnectionTesterRegistry,
 ) -> ConnectionTestResponse:
-    await authorize(db, context, requirement("connection.test"))
     workspace_id = _workspace(context)
     row = await ConnectionRepository(db).get_scoped(
         context.organization_id, workspace_id, connection_id, for_update=True
@@ -542,6 +601,7 @@ async def test_connection(
             code="CONNECTION_NOT_FOUND", message="The connection was not found.", status_code=404
         )
     connection, connection_type = row
+    await _guard(db, context, connection_id, "test")
     if connection.status == "archived":
         raise ApplicationError(
             code="CONNECTION_ARCHIVED",

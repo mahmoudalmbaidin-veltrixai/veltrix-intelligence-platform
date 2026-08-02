@@ -104,6 +104,10 @@ All endpoints require authentication, organization/workspace context, RBAC, `pip
 ```powershell
 docker compose up -d postgres redis api dashboard-worker pipeline-worker
 docker compose logs -f pipeline-worker
+
+The pipeline worker publishes a database heartbeat and Compose evaluates it with
+`scripts/worker-health.py`. A merely running process is not considered healthy when its heartbeat
+is stale or the database cannot be reached.
 docker compose exec api alembic upgrade head
 docker compose exec api python -m vip_api.cli seed-governance
 ```

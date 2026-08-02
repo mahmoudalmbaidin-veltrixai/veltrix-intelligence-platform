@@ -58,6 +58,8 @@ async def test_governance_personas_denials_quota_and_tenant_isolation(
             roles = {role.key: role for role in (await db.scalars(select(Role))).all()}
             users = {
                 key: User(
+                    username=f"governance-{key}",
+                    normalized_username=f"governance-{key}",
                     email=f"governance-{key}@vip.test",
                     normalized_email=f"governance-{key}@vip.test",
                     password_hash="not-used",

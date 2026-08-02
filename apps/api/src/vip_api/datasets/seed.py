@@ -19,18 +19,22 @@ from vip_api.tenancy.models import Organization, Workspace
 
 async def seed_dataset_catalogs(db: AsyncSession, settings: Settings, password: str) -> UUID:
     """Seed a harmless local relational source and its real catalog metadata."""
+    organization_slug = os.getenv("B5_DEMO_ORGANIZATION_SLUG", "governance-demo")
+    workspace_slug = os.getenv("B5_DEMO_WORKSPACE_SLUG", "default")
     organization = await db.scalar(
-        select(Organization).where(Organization.slug == "governance-demo")
+        select(Organization).where(Organization.slug == organization_slug)
     )
     if organization is None:
-        raise RuntimeError("Run configure-governance-demo before seeding B5")
+        raise RuntimeError(f"Organization {organization_slug!r} is unavailable for the B5 seed")
     workspace = await db.scalar(
         select(Workspace).where(
-            Workspace.organization_id == organization.id, Workspace.slug == "default"
+            Workspace.organization_id == organization.id, Workspace.slug == workspace_slug
         )
     )
     if workspace is None:
-        raise RuntimeError("The governance demo workspace is unavailable")
+        raise RuntimeError(
+            f"Workspace {workspace_slug!r} is unavailable for organization {organization_slug!r}"
+        )
     connection_type = await db.scalar(
         select(ConnectionType).where(ConnectionType.key == "postgresql")
     )
@@ -73,8 +77,8 @@ async def seed_dataset_catalogs(db: AsyncSession, settings: Settings, password: 
             configuration={
                 "host": os.getenv("B5_DEMO_POSTGRES_HOST", "localhost"),
                 "port": 5432,
-                "database": "vip",
-                "username": "vip",
+                "database": os.getenv("B5_DEMO_POSTGRES_DATABASE", "vip"),
+                "username": os.getenv("B5_DEMO_POSTGRES_USERNAME", "vip"),
                 "ssl_mode": "disable",
                 "connect_timeout_seconds": 10,
             },

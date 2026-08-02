@@ -1,7 +1,11 @@
 import path from 'node:path'
 import { test, expect } from './fixtures'
 
-test.setTimeout(120_000)
+// This is the longest live browser journey: it uploads and ingests a CSV,
+// publishes and executes a worker-backed pipeline, then profiles the result.
+// Hosted Edge can legitimately exceed two minutes while preserving every
+// operation-level assertion and timeout below.
+test.setTimeout(240_000)
 
 test('Pipeline Studio uploads, previews, persists, and publishes a governed CSV source', async ({
   authenticatedPage: page,
@@ -22,9 +26,7 @@ test('Pipeline Studio uploads, previews, persists, and publishes a governed CSV 
   await page.getByLabel('Destination schema').fill('public')
   await page.getByLabel('Destination table').fill(tableName)
   await page.getByLabel('Dataset name').fill(datasetName)
-  await page
-    .getByLabel('CSV file')
-    .setInputFiles(path.resolve('e2e', 'data', 'b8_5_certification.csv'))
+  await page.getByLabel('CSV file').setInputFiles(path.resolve('tests', 'e2e', 'data', 'b8_5_certification.csv'))
   await page.getByRole('button', { name: 'Upload and register' }).click()
 
   await expect(page.getByText(/Bound \d+ fields to this source/)).toBeVisible({ timeout: 30_000 })

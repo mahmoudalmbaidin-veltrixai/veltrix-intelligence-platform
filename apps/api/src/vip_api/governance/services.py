@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
-from typing import Never
+from typing import Any, Never
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
@@ -18,6 +18,9 @@ from vip_api.governance.models import (
     Entitlement,
     FeatureFlag,
     FeatureFlagOverride,
+    Group,
+    GroupMembership,
+    GroupRoleAssignment,
     OrganizationEntitlement,
     OrganizationQuota,
     Permission,
@@ -25,6 +28,7 @@ from vip_api.governance.models import (
     QuotaUsage,
     Role,
     RolePermission,
+    UserRoleAssignment,
 )
 from vip_api.governance.policies import SYSTEM_PERMISSION_KEYS
 from vip_api.tenancy.context import TenantContext
@@ -52,6 +56,87 @@ async def _permission_keys(db: AsyncSession, role_ids: set[UUID]) -> frozenset[s
     return frozenset(keys.all())
 
 
+async def assigned_role_ids_for(
+    db: AsyncSession,
+    *,
+    organization_id: UUID,
+    workspace_id: UUID | None,
+    user_id: UUID,
+) -> set[UUID]:
+    """Role IDs assigned to a user directly or via their groups.
+
+    Includes only active (non-archived, non-deleted) roles. Organization-scoped
+    assignments (``workspace_id IS NULL``) apply everywhere in the org; workspace
+    -scoped assignments apply only in the matching workspace. This is the single
+    place custom + group role grants enter the permission set, so all existing
+    route guards enforce them without duplicated logic.
+    """
+
+    def _scope_ok(column: Any) -> Any:
+        if workspace_id is None:
+            return column.is_(None)
+        return or_(column.is_(None), column == workspace_id)
+
+    direct = (
+        await db.scalars(
+            select(UserRoleAssignment.role_id).where(
+                UserRoleAssignment.organization_id == organization_id,
+                UserRoleAssignment.user_id == user_id,
+                _scope_ok(UserRoleAssignment.workspace_id),
+            )
+        )
+    ).all()
+
+    group_ids = (
+        await db.scalars(
+            select(GroupMembership.group_id)
+            .join(Group, Group.id == GroupMembership.group_id)
+            .where(
+                Group.organization_id == organization_id,
+                Group.deleted_at.is_(None),
+                Group.archived_at.is_(None),
+                GroupMembership.user_id == user_id,
+            )
+        )
+    ).all()
+
+    via_group: list[UUID] = []
+    if group_ids:
+        via_group = list(
+            (
+                await db.scalars(
+                    select(GroupRoleAssignment.role_id).where(
+                        GroupRoleAssignment.organization_id == organization_id,
+                        GroupRoleAssignment.group_id.in_(group_ids),
+                        _scope_ok(GroupRoleAssignment.workspace_id),
+                    )
+                )
+            ).all()
+        )
+
+    candidate_ids = set(direct) | set(via_group)
+    if not candidate_ids:
+        return set()
+    active = await db.scalars(
+        select(Role.id).where(
+            Role.id.in_(candidate_ids),
+            Role.deleted_at.is_(None),
+            Role.archived_at.is_(None),
+            Role.status == "active",
+        )
+    )
+    return set(active.all())
+
+
+async def _assigned_role_ids(db: AsyncSession, tenant: TenantContext) -> set[UUID]:
+    return await assigned_role_ids_for(
+        db,
+        organization_id=tenant.organization_id,
+        workspace_id=tenant.workspace_id,
+        user_id=tenant.user_id,
+    )
+
+
 async def resolve_authorization_context(
     db: AsyncSession, tenant: TenantContext
 ) -> AuthorizationContext:
@@ -69,7 +154,9 @@ async def resolve_authorization_context(
             message="Authorization could not be evaluated.",
             status_code=503,
         )
-    permissions = await _permission_keys(db, {role.id for role in roles})
+    membership_role_ids = {role.id for role in roles}
+    assigned_role_ids = await _assigned_role_ids(db, tenant)
+    permissions = await _permission_keys(db, membership_role_ids | assigned_role_ids)
 
     entitlement_keys = await db.scalars(
         select(Entitlement.key)

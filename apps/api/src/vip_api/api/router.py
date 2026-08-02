@@ -13,6 +13,8 @@ from vip_api.dashboards.routes import router as dashboards_router
 from vip_api.datasets.routes import router as datasets_router
 from vip_api.events.routes import router as events_router
 from vip_api.files.routes import router as files_router
+from vip_api.governance.access_routes import router as access_router
+from vip_api.governance.role_routes import router as role_router
 from vip_api.governance.routes import router as governance_router
 from vip_api.home.routes import notifications_router
 from vip_api.home.routes import router as home_router
@@ -30,6 +32,8 @@ def register_routers(app: FastAPI, settings: Settings) -> None:
     app.include_router(version_router, prefix=settings.API_V1_PREFIX, tags=["version"])
     app.include_router(tenancy_router, prefix=settings.API_V1_PREFIX)
     app.include_router(governance_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(access_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(role_router, prefix=settings.API_V1_PREFIX)
     app.include_router(platform_admin_router, prefix=settings.API_V1_PREFIX)
     app.include_router(home_router, prefix=settings.API_V1_PREFIX)
     app.include_router(notifications_router, prefix=settings.API_V1_PREFIX)

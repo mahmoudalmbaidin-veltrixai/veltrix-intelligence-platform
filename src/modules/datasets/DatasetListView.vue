@@ -53,22 +53,23 @@ function triggerCsvFilePicker(): void {
 async function onCsvFileSelected(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  input.value = '' // allow re-selecting the same file
   if (!file) return
   discoverError.value = ''
   const name = file.name
   const lower = name.toLowerCase()
+  const hasDelimitedTextExtension = lower.endsWith('.csv') || lower.endsWith('.tsv') || lower.endsWith('.txt')
   const isExcel =
     lower.endsWith('.xlsx') ||
     lower.endsWith('.xls') ||
-    file.type.includes('spreadsheetml') ||
-    file.type === 'application/vnd.ms-excel'
+    (!hasDelimitedTextExtension && (file.type.includes('spreadsheetml') || file.type === 'application/vnd.ms-excel'))
   if (isExcel) {
+    input.value = '' // allow re-selecting the same file
     discoverError.value =
       'Excel workbooks are not parsed in the browser. In Excel, choose File → Save As → CSV UTF-8, then upload the .csv file.'
     return
   }
   if (file.size > 10 * 1024 * 1024) {
+    input.value = ''
     discoverError.value = 'The file is larger than 10 MB. Import a smaller extract or split it.'
     return
   }
@@ -88,6 +89,7 @@ async function onCsvFileSelected(event: Event): Promise<void> {
         .join('\n')
     }
     if (!text.trim()) {
+      input.value = ''
       discoverError.value = 'The selected file is empty.'
       return
     }
@@ -103,7 +105,9 @@ async function onCsvFileSelected(event: Event): Promise<void> {
           .replace(/^_+|_+$/g, '')
           .slice(0, 60) || 'imported_table'
     }
+    input.value = ''
   } catch {
+    input.value = ''
     discoverError.value = 'The file could not be read. Ensure it is a UTF-8 encoded CSV file.'
   }
 }

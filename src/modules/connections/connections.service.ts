@@ -1,5 +1,6 @@
 /** Live B4 connection API. Credentials are accepted only by write methods and never cached. */
 import { apiClient } from '@/shared/lib/apiClient'
+import type { ResourceEffectiveAccessDto } from '@/shared/lib/resourceAccess'
 
 export type ConnectionHealth = 'unknown' | 'healthy' | 'degraded' | 'unhealthy' | 'testing'
 export type ConnectionStatus = 'active' | 'inactive' | 'archived'
@@ -99,6 +100,8 @@ export interface Connection {
   created_at: string
   updated_at: string
   version: number
+  /** Present on single-connection reads: the caller's effective access (raw DTO). */
+  access?: ResourceEffectiveAccessDto | null
 }
 
 export interface ConnectionListResponse {

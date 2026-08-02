@@ -67,7 +67,10 @@ class ClamAvScanner:
                 return ScanResult("infected", signature[:200] or None)
             return ScanResult("error")
 
-        return await asyncio.wait_for(execute(), timeout=self._timeout)
+        try:
+            return await asyncio.wait_for(execute(), timeout=self._timeout)
+        except (OSError, TimeoutError, UnicodeError):
+            return ScanResult("error")
 
 
 class DefenderScanner:
@@ -85,6 +88,7 @@ class DefenderScanner:
             "3",
             "-File",
             str(path),
+            "-DisableRemediation",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -94,7 +98,11 @@ class DefenderScanner:
             process.kill()
             await process.wait()
             return ScanResult("error")
-        return ScanResult("clean" if return_code == 0 else "infected")
+        if return_code == 0:
+            return ScanResult("clean")
+        if return_code == 2:
+            return ScanResult("infected")
+        return ScanResult("error")
 
 
 def malware_scanner(settings: Settings) -> MalwareScanner:
