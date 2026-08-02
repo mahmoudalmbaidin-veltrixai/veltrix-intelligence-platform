@@ -4,12 +4,13 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { pipelineService, newDraft } from './pipelines.service'
 import { usePipelineEditor } from './usePipelineEditor'
 import { usePipelineRunner } from './usePipelineRunner'
+import { usePipelinePermissions } from './usePipelinePermissions'
 import { useResizable } from '@/shared/composables/useResizable'
 import { useIsCompact } from '@/shared/composables/useMediaQuery'
 import { announce } from '@/shared/composables/useAnnouncer'
 import { useUiStore } from '@/shared/stores/ui'
-import { usePlatformStore } from '@/shared/stores/platform'
 import type { NodeExecStatus, Pipeline, PipelineNodeKind, ValidationReport } from '@/shared/types/pipeline'
+import { ApiError } from '@/shared/types/api'
 import { relativeTime, formatDuration } from '@/shared/lib/format'
 import NodePalette from './NodePalette.vue'
 import PipelineCanvas from './PipelineCanvas.vue'
@@ -20,11 +21,11 @@ import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipSpinner from '@/shared/ui/VipSpinner.vue'
 import VipSegmented from '@/shared/ui/VipSegmented.vue'
 import VipMenu from '@/shared/ui/VipMenu.vue'
+import ResourceShareButton from '@/modules/access/ResourceShareButton.vue'
 
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
-const platform = usePlatformStore()
 
 const loading = ref(true)
 // shallowRef (not ref) so the composable's inner refs are NOT unwrapped by
@@ -69,7 +70,15 @@ function addPaletteNode(kind: PipelineNodeKind) {
   if (compact.value) paletteOpen.value = false
 }
 
-const canEdit = computed(() => platform.can('pipeline.create') || platform.can('pipeline.update'))
+// Resource-aware permission states from the backend's effective-access decision
+// (echoed on the pipeline read). This is a UX convenience — the API enforces
+// every action independently — but it keeps the toolbar honest per persona.
+const pipelineRef = computed(() => editor.value?.pipeline as Pipeline | undefined)
+const perms = usePipelinePermissions(pipelineRef)
+const canEdit = computed(() => perms.canEdit.value)
+const canRun = computed(() => perms.canRun.value)
+const canManage = computed(() => perms.canManage.value)
+const accessLevel = computed(() => perms.level.value)
 
 // Unwrapped accessors for template use (composable exposes refs).
 const dirty = computed(() => editor.value?.dirty.value ?? false)
@@ -96,10 +105,23 @@ watch(
 async function load() {
   loading.value = true
   const id = route.params.id as string | undefined
-  const pipeline: Pipeline = id && id !== 'new' ? await pipelineService.get(id) : newDraft()
-  editor.value = usePipelineEditor(pipeline)
-  validation.value = editor.value.validate()
-  loading.value = false
+  try {
+    const pipeline: Pipeline = id && id !== 'new' ? await pipelineService.get(id) : newDraft()
+    editor.value = usePipelineEditor(pipeline)
+    validation.value = editor.value.validate()
+  } catch (error) {
+    // The backend is the authority on per-resource access: an explicit deny or a
+    // pipeline the user cannot see surfaces as forbidden/not-found. Route to the
+    // standard forbidden page instead of leaving a broken studio.
+    const kind = error instanceof ApiError ? error.kind : undefined
+    if (kind === 'forbidden' || kind === 'not-found') {
+      await router.replace({ name: 'forbidden', query: { from: route.fullPath } })
+      return
+    }
+    throw error
+  } finally {
+    loading.value = false
+  }
 }
 
 /* ---- execution status map for canvas ---- */
@@ -152,7 +174,7 @@ async function save() {
 }
 
 async function runValidation() {
-  if (!editor.value) return
+  if (!editor.value || !canEdit.value) return
   await persist()
   validation.value = await pipelineService.validate(editor.value.pipeline.id)
   bottomTab.value = 'validation'
@@ -172,7 +194,7 @@ async function runValidation() {
 }
 
 async function publish() {
-  if (!editor.value) return
+  if (!editor.value || !canEdit.value) return
   await persist()
   const report = await pipelineService.validate(editor.value.pipeline.id)
   validation.value = report
@@ -188,7 +210,7 @@ async function publish() {
 }
 
 async function run() {
-  if (!editor.value) return
+  if (!editor.value || !canRun.value) return
   await persist()
   const report = await pipelineService.validate(editor.value.pipeline.id)
   if (!report.valid) {
@@ -204,7 +226,7 @@ async function run() {
 }
 
 async function retry() {
-  if (!runner.run.value) return
+  if (!runner.run.value || !canRun.value) return
   await runner.retry()
 }
 
@@ -358,6 +380,15 @@ onBeforeUnmount(() => {
             <VipBadge :tone="editor?.pipeline.status === 'published' ? 'success' : 'neutral'" size="sm">{{
               editor?.pipeline.status
             }}</VipBadge>
+            <VipBadge
+              v-if="accessLevel && accessLevel !== 'owner'"
+              tone="info"
+              size="sm"
+              :title="`Your access to this pipeline: ${accessLevel}`"
+              data-testid="pstudio-access-badge"
+              >{{ accessLevel }}</VipBadge
+            >
+            <span v-if="!canEdit" class="pstudio__readonly" data-testid="pstudio-readonly">Read-only</span>
             <span class="pstudio__ver">v{{ editor?.pipeline.version }}</span>
             <span v-if="dirty" class="pstudio__dirty">● Unsaved</span>
             <span v-else-if="autosaveAt" class="pstudio__saved">Saved {{ relativeTime(autosaveAt) }}</span>
@@ -407,13 +438,32 @@ onBeforeUnmount(() => {
           />
         </div>
         <div class="pstudio__group">
-          <VipButton variant="secondary" size="sm" icon="check" @click="runValidation">Validate</VipButton>
+          <VipButton
+            variant="secondary"
+            size="sm"
+            icon="check"
+            :disabled="!canEdit"
+            title="Validate the pipeline (requires edit access)"
+            @click="runValidation"
+            >Validate</VipButton
+          >
           <VipButton variant="secondary" size="sm" icon="save" :loading="saving" :disabled="!canEdit" @click="save"
             >Save</VipButton
           >
         </div>
-        <VipButton v-if="!runner.isRunning.value" variant="primary" size="sm" icon="play" @click="run">Run</VipButton>
-        <VipButton v-else variant="danger" size="sm" icon="close" @click="runner.cancel()">Cancel</VipButton>
+        <VipButton
+          v-if="!runner.isRunning.value"
+          variant="primary"
+          size="sm"
+          icon="play"
+          :disabled="!canRun"
+          title="Run the pipeline (requires operator access)"
+          @click="run"
+          >Run</VipButton
+        >
+        <VipButton v-else variant="danger" size="sm" icon="close" :disabled="!canRun" @click="runner.cancel()"
+          >Cancel</VipButton
+        >
         <VipButton
           variant="secondary"
           size="sm"
@@ -422,6 +472,14 @@ onBeforeUnmount(() => {
           @click="publish"
           >Publish</VipButton
         >
+        <ResourceShareButton
+          v-if="canManage && editor?.pipeline.id && editor.pipeline.id !== 'new'"
+          resource-type="pipeline"
+          :resource-id="editor.pipeline.id"
+          :resource-name="editor.pipeline.name"
+          variant="secondary"
+          size="sm"
+        />
         <VipMenu :items="runMenuItems" @select="onRunMenu">
           <template #trigger><VipButton variant="ghost" size="sm" icon="dotsV" title="More" /></template>
         </VipMenu>
@@ -663,6 +721,16 @@ onBeforeUnmount(() => {
 .pstudio__dirty {
   font-size: var(--vip-fs-xs);
   color: var(--vip-warning-text);
+}
+.pstudio__readonly {
+  font-size: var(--vip-fs-2xs);
+  font-weight: var(--vip-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vip-text-muted);
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-sm);
+  padding: 0 6px;
 }
 .pstudio__saved {
   font-size: var(--vip-fs-xs);

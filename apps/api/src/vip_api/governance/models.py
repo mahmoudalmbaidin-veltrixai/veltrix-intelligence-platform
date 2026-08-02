@@ -41,6 +41,11 @@ class Permission(Base):
 
 class Role(Base):
     __tablename__ = "roles"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "slug", name="uq_roles_org_slug"),
+        Index("ix_roles_org_scope", "organization_id", "scope"),
+        Index("ix_roles_workspace", "workspace_id"),
+    )
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
@@ -49,6 +54,26 @@ class Role(Base):
     is_system: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_assignable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Tenant-configurable custom roles (Slice C). System roles keep these NULL/false
+    # so all existing behavior is preserved; only tenant-owned rows populate them.
+    organization_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    workspace_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE")
+    )
+    slug: Mapped[str | None] = mapped_column(String(160))
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    is_editable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    updated_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    row_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
@@ -251,3 +276,192 @@ class AuditEvent(Base):
     event_metadata: Mapped[dict[str, object]] = mapped_column(
         "metadata", JSON, default=dict, nullable=False
     )
+
+
+class ResourceAccessEntry(Base):
+    """Reusable, tenant-scoped resource ACL (Slice A authorization foundation).
+
+    A single, extensible grant/deny record for any resource type. The subject is
+    a user or (from Slice B) a group; ``effect`` supports explicit deny, and
+    ``expires_at`` supports time-bound access. This is additive and is NOT yet
+    wired into the existing role-permission decision path — resource enforcement
+    is layered in a later slice.
+    """
+
+    __tablename__ = "resource_access_entries"
+    __table_args__ = (
+        UniqueConstraint(
+            "resource_type",
+            "resource_id",
+            "subject_type",
+            "subject_id",
+            "access_level",
+            "effect",
+            name="uq_resource_access_unique_entry",
+        ),
+        Index(
+            "ix_resource_access_resource",
+            "organization_id",
+            "workspace_id",
+            "resource_type",
+            "resource_id",
+        ),
+        Index("ix_resource_access_subject", "subject_type", "subject_id"),
+        Index("ix_resource_access_expires", "expires_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    workspace_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE")
+    )
+    resource_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    resource_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    subject_type: Mapped[str] = mapped_column(String(16), nullable=False)  # user | group
+    subject_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    access_level: Mapped[str] = mapped_column(String(32), nullable=False)
+    effect: Mapped[str] = mapped_column(String(8), default="allow", nullable=False)  # allow | deny
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    granted_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class Group(Base):
+    """Tenant-scoped team/group of users used for role and resource grants.
+
+    Groups are organization-scoped and may optionally be pinned to a single
+    workspace. Membership drives group-based resource permissions in the
+    resource-access engine. Soft-deleted and archived groups are retained for
+    audit continuity.
+    """
+
+    __tablename__ = "groups"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "slug", name="uq_groups_org_slug"),
+        Index("ix_groups_org", "organization_id"),
+        Index("ix_groups_workspace", "workspace_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    workspace_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE")
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    slug: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    row_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class GroupMembership(Base):
+    """A single user's membership in a :class:`Group`."""
+
+    __tablename__ = "group_memberships"
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_group_memberships_group_user"),
+        Index("ix_group_memberships_user", "user_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    group_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    added_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class UserRoleAssignment(Base):
+    """A role (system or custom) assigned directly to a user at org/workspace scope."""
+
+    __tablename__ = "user_role_assignments"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "workspace_id",
+            "user_id",
+            "role_id",
+            name="uq_user_role_assignment",
+        ),
+        Index("ix_user_role_assignments_user", "user_id"),
+        Index("ix_user_role_assignments_role", "role_id"),
+        Index("ix_user_role_assignments_tenant", "organization_id", "workspace_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    workspace_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    role_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), nullable=False
+    )
+    scope: Mapped[str] = mapped_column(String(20), nullable=False)
+    assigned_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class GroupRoleAssignment(Base):
+    """A role (system or custom) assigned to a group at org/workspace scope."""
+
+    __tablename__ = "group_role_assignments"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "workspace_id",
+            "group_id",
+            "role_id",
+            name="uq_group_role_assignment",
+        ),
+        Index("ix_group_role_assignments_group", "group_id"),
+        Index("ix_group_role_assignments_role", "role_id"),
+        Index("ix_group_role_assignments_tenant", "organization_id", "workspace_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    workspace_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE")
+    )
+    group_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
+    )
+    role_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), nullable=False
+    )
+    scope: Mapped[str] = mapped_column(String(20), nullable=False)
+    assigned_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

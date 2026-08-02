@@ -51,11 +51,11 @@ SOURCE_COLS = [
 ]
 
 
-def _node(key: str, node_type: str, config: dict) -> NodeInput:
+def _node(key: str, node_type: str, config: dict[str, object]) -> NodeInput:
     return NodeInput(key=key, type=node_type, title=key, x=0, y=0, config=config)
 
 
-def _propagate_names(order, nodes, edges) -> list[str]:
+def _propagate_names(order: list[str], nodes: list[NodeInput], edges: list[EdgeInput]) -> list[str]:
     node_map = {n.key: n for n in nodes}
     schemas, _ = propagate(order, node_map, edges, {"src": SOURCE_COLS})
     return [c.name for c in schemas[order[-1]] or []]

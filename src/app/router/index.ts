@@ -115,10 +115,12 @@ const routes: RouteRecordRaw[] = [
     name: 'pipelines',
     component: () => import('@/modules/pipelines/PipelineListView.vue'),
     meta: {
+      // Entitlement-only: the backend list is visibility-filtered, so a user with
+      // only resource-ACL grants (no broad pipeline.read) still sees exactly the
+      // pipelines shared with them.
       title: 'Pipelines',
       layout: 'app',
       requiresAuth: true,
-      permission: 'pipeline.read',
       entitlement: 'pipeline_studio',
     },
   },
@@ -143,7 +145,11 @@ const routes: RouteRecordRaw[] = [
       title: 'Pipeline Studio',
       layout: 'studio',
       requiresAuth: true,
-      permission: 'pipeline.read',
+      // No broad-permission gate here: access to a specific pipeline is decided
+      // per-resource by the backend (role, ownership, or a resource ACL grant),
+      // so a shared user without `pipeline.read` can still open a pipeline they
+      // were granted. The entitlement gates the capability; the studio shows a
+      // forbidden state if the backend denies the load.
       entitlement: 'pipeline_studio',
       fullBleed: true,
     },
@@ -152,7 +158,9 @@ const routes: RouteRecordRaw[] = [
     path: '/pipelines/:id/runs',
     name: 'pipeline-runs',
     component: () => import('@/modules/pipelines/PipelineRunsView.vue'),
-    meta: { title: 'Pipeline Runs', layout: 'app', requiresAuth: true, permission: 'pipeline.read' },
+    // Per-resource: a viewer-level ACL grant confers run history, so gate on the
+    // entitlement and let the backend authorize the specific pipeline.
+    meta: { title: 'Pipeline Runs', layout: 'app', requiresAuth: true, entitlement: 'pipeline_studio' },
   },
 
   // Datasets / semantic / quality / lineage
@@ -519,6 +527,29 @@ const routes: RouteRecordRaw[] = [
     name: 'admin-members',
     component: () => import('@/modules/admin/MembersView.vue'),
     meta: { title: 'Members & Roles', layout: 'app', requiresAuth: true, permission: 'governance.read' },
+  },
+  {
+    path: '/admin/roles',
+    name: 'admin-roles',
+    component: () => import('@/modules/access/RolesView.vue'),
+    meta: { title: 'Roles', layout: 'app', requiresAuth: true, permission: 'role.read' },
+  },
+  {
+    path: '/admin/groups',
+    name: 'admin-groups',
+    component: () => import('@/modules/access/GroupsView.vue'),
+    meta: { title: 'Groups & Teams', layout: 'app', requiresAuth: true, permission: 'group.read' },
+  },
+  {
+    path: '/admin/access',
+    name: 'admin-access',
+    component: () => import('@/modules/access/AccessControlView.vue'),
+    meta: {
+      title: 'Access Control',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'resource.permissions.read',
+    },
   },
   {
     path: '/admin/feature-flags',

@@ -31,7 +31,8 @@ describe('central API client contracts', () => {
     await apiClient.post('/resources', { name: 'A' })
     const [url, init] = fetchMock.mock.calls[0]
     const headers = init?.headers as Headers
-    expect(url).toBe('/resources')
+    // Bare application paths resolve under the single canonical /api/v1 prefix.
+    expect(url).toBe('/api/v1/resources')
     expect(init?.method).toBe('POST')
     expect(init?.credentials).toBe('include')
     expect(init?.body).toBe(JSON.stringify({ name: 'A' }))

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.core.errors import ApplicationError
 from vip_api.datasets.models import Dataset, DatasetField
+from vip_api.governance.access_view import ResourceEffectiveAccess
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.services import consume_quota
@@ -62,8 +63,15 @@ def _scope(context: AuthorizationContext) -> tuple[UUID, UUID]:
 
 
 async def _model(
-    db: AsyncSession, context: AuthorizationContext, model_id: UUID, *, editable: bool = False
+    db: AsyncSession,
+    context: AuthorizationContext,
+    model_id: UUID,
+    *,
+    editable: bool = False,
+    action_level: str | None = None,
 ) -> SemanticModel:
+    from vip_api.governance import resource_access_service
+
     org, ws = _scope(context)
     item = await db.scalar(
         select(SemanticModel).where(
@@ -77,6 +85,16 @@ async def _model(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    # Authoritative per-model decision: role level, direct/group ACL, explicit deny
+    # and expiration in one place, so an ACL grant elevates access without a broad
+    # semantic_model.* permission. Explicit deny -> 403; other denial -> 404.
+    await resource_access_service.authorize_resource(
+        db,
+        context,
+        resource_type="semantic_model",
+        resource_id=item.id,
+        action_level=action_level or ("edit" if editable else "view"),
+    )
     if editable and item.status != "draft":
         raise ApplicationError(
             code="SEMANTIC_MODEL_IMMUTABLE",
@@ -89,25 +107,49 @@ async def _model(
 async def list_models(
     db: AsyncSession, context: AuthorizationContext
 ) -> list[SemanticModelResponse]:
+    from vip_api.governance import resource_access_service
+
     org, ws = _scope(context)
-    rows = (
-        await db.scalars(
-            select(SemanticModel)
-            .where(
-                SemanticModel.organization_id == org,
-                SemanticModel.workspace_id == ws,
-                SemanticModel.archived_at.is_(None),
-            )
-            .order_by(SemanticModel.name)
+    query = select(SemanticModel).where(
+        SemanticModel.organization_id == org,
+        SemanticModel.workspace_id == ws,
+        SemanticModel.archived_at.is_(None),
+    )
+    # Broad-role users see every model; everyone else sees only models reachable
+    # through a non-expired ACL allow (direct or group) minus lowest-level denies
+    # (semantic models have no owner column). Filtered in SQL — no N+1, no leak.
+    if resource_access_service.role_level("semantic_model", context.permissions) is None:
+        subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
+            db, org, context.user_id
         )
-    ).all()
+        allowed_ids, denied_ids = resource_access_service.collection_visibility_subqueries(
+            "semantic_model", subjects, now=datetime.now(UTC)
+        )
+        query = query.where(SemanticModel.id.in_(allowed_ids), SemanticModel.id.notin_(denied_ids))
+    rows = (await db.scalars(query.order_by(SemanticModel.name))).all()
     return [SemanticModelResponse.model_validate(row) for row in rows]
 
 
 async def get_model(
-    db: AsyncSession, context: AuthorizationContext, model_id: UUID
+    db: AsyncSession,
+    context: AuthorizationContext,
+    model_id: UUID,
+    *,
+    is_platform_admin: bool = False,
 ) -> SemanticModelResponse:
-    return SemanticModelResponse.model_validate(await _model(db, context, model_id))
+    from vip_api.governance import resource_access_service
+
+    item = await _model(db, context, model_id)
+    response = SemanticModelResponse.model_validate(item)
+    summary = await resource_access_service.resource_access_summary(
+        db,
+        context,
+        resource_type="semantic_model",
+        resource_id=item.id,
+        is_platform_admin=is_platform_admin,
+    )
+    response.access = ResourceEffectiveAccess.from_summary(summary)
+    return response
 
 
 async def list_model_versions(
@@ -259,7 +301,7 @@ async def publish_model(
     db: AsyncSession, context: AuthorizationContext, model_id: UUID
 ) -> SemanticModelResponse:
     org, ws = _scope(context)
-    item = await _model(db, context, model_id, editable=True)
+    item = await _model(db, context, model_id, editable=True, action_level="manage")
     result = await validate_model(db, context, model_id)
     if not result.valid:
         raise ApplicationError(
@@ -312,7 +354,7 @@ async def publish_model(
 
 async def archive_model(db: AsyncSession, context: AuthorizationContext, model_id: UUID) -> None:
     org, ws = _scope(context)
-    item = await _model(db, context, model_id)
+    item = await _model(db, context, model_id, action_level="manage")
     item.status = "archived"
     item.archived_at = datetime.now(UTC)
     item.version += 1

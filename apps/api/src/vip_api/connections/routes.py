@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from vip_api.auth.dependencies import require_csrf
+from vip_api.auth.dependencies import AuthenticatedContext, get_current_session, require_csrf
 from vip_api.connections.dependencies import (
     RequireConnectionGovernance,
     get_secret_provider,
@@ -37,12 +37,20 @@ from vip_api.connections.testers import ConnectionTesterRegistry
 from vip_api.core.config import Settings, get_settings
 from vip_api.database.session import get_db_session
 from vip_api.governance.context import AuthorizationContext
+from vip_api.governance.dependencies import require_capability
 
 router = APIRouter(prefix="/connections", tags=["connections"])
 
 
 def _policy(permission: str, *, quota: str | None = None) -> object:
     return RequireConnectionGovernance(permission, quota=quota)
+
+
+# Feature/entitlement-only gate for resource-bound routes: the specific
+# connection's access (use/test/edit/rotate/delete) is decided per-resource by the
+# centralized evaluator in the service, so an ACL grant elevates without a broad
+# connection.* permission. Creation and type-catalog keep their RBAC + quota gates.
+connection_capability = require_capability("connection_studio", "connection_studio")
 
 
 @router.get("/types", response_model=list[ConnectionTypeResponse])
@@ -56,7 +64,7 @@ async def get_connection_types(
 @router.get("", response_model=ConnectionListResponse, response_model_exclude_none=True)
 async def get_connections(
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("connection.read"))],
+    context: Annotated[AuthorizationContext, Depends(connection_capability)],
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 25,
 ) -> ConnectionListResponse:
@@ -85,9 +93,12 @@ async def post_connection(
 async def get_connection_detail(
     connection_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("connection.read"))],
+    context: Annotated[AuthorizationContext, Depends(connection_capability)],
+    auth: Annotated[AuthenticatedContext, Depends(get_current_session)],
 ) -> ConnectionResponse:
-    return await get_connection(db, context, connection_id)
+    return await get_connection(
+        db, context, connection_id, is_platform_admin=auth.user.is_platform_admin
+    )
 
 
 @router.patch(
@@ -99,7 +110,7 @@ async def patch_connection(
     connection_id: UUID,
     payload: ConnectionUpdateRequest,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("connection.update"))],
+    context: Annotated[AuthorizationContext, Depends(connection_capability)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ConnectionResponse:
     return await update_connection(db, context, connection_id, payload, settings)
@@ -113,7 +124,7 @@ async def patch_connection(
 async def post_archive_connection(
     connection_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("connection.archive"))],
+    context: Annotated[AuthorizationContext, Depends(connection_capability)],
 ) -> Response:
     await archive_connection(db, context, connection_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -127,13 +138,12 @@ async def post_archive_connection(
 async def delete_connection(
     connection_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("connection.delete"))],
+    context: Annotated[AuthorizationContext, Depends(connection_capability)],
 ) -> Response:
     await archive_connection(
         db,
         context,
         connection_id,
-        permission="connection.delete",
         audit_event="connection.deleted",
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -148,7 +158,7 @@ async def put_credentials(
     connection_id: UUID,
     payload: CredentialReplaceRequest,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("connection.credentials.update"))],
+    context: Annotated[AuthorizationContext, Depends(connection_capability)],
     settings: Annotated[Settings, Depends(get_settings)],
     secret_provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
 ) -> CredentialReplaceResponse:
@@ -164,7 +174,7 @@ async def post_rotate_credentials(
     connection_id: UUID,
     payload: CredentialReplaceRequest,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("connection.credentials.rotate"))],
+    context: Annotated[AuthorizationContext, Depends(connection_capability)],
     settings: Annotated[Settings, Depends(get_settings)],
     secret_provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
 ) -> CredentialReplaceResponse:
@@ -181,7 +191,7 @@ async def post_rotate_credentials(
 async def post_test_connection(
     connection_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("connection.test"))],
+    context: Annotated[AuthorizationContext, Depends(connection_capability)],
     secret_provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
     testers: Annotated[ConnectionTesterRegistry, Depends(get_tester_registry)],
 ) -> ConnectionTestResponse:

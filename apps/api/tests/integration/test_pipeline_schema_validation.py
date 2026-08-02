@@ -15,7 +15,7 @@ from vip_api.core.config import Settings
 from vip_api.database.session import Database
 from vip_api.datasets.models import Dataset, DatasetField
 from vip_api.governance.context import AuthorizationContext
-from vip_api.pipelines.schemas import EdgeInput, NodeInput
+from vip_api.pipelines.schemas import EdgeInput, NodeInput, ValidationIssue
 from vip_api.pipelines.validation import validate_graph
 from vip_api.tenancy.models import Organization, OrganizationStatus, Workspace, WorkspaceStatus
 
@@ -35,7 +35,7 @@ def _context(user: UUID, org: UUID, ws: UUID) -> AuthorizationContext:
     )
 
 
-def _codes(issues: list) -> list[str]:
+def _codes(issues: list[ValidationIssue]) -> list[str]:
     return [issue.code for issue in issues]
 
 
@@ -153,7 +153,9 @@ async def test_select_rename_validation_against_real_dataset_fields(settings: Se
                 config={"dataset_id": str(dataset.id)},
             )
 
-            def graph(*extra: NodeInput, edges: list[EdgeInput]):
+            def graph(
+                *extra: NodeInput, edges: list[EdgeInput]
+            ) -> tuple[list[NodeInput], list[EdgeInput]]:
                 return [source, *extra], edges
 
             # (a) Valid select(keep id,email) -> rename(email->email_address)
@@ -232,9 +234,7 @@ async def test_select_rename_validation_against_real_dataset_fields(settings: Se
         async with database.session_factory() as db:
             if org_id is not None:
                 # FK-safe order: fields -> datasets -> connections -> org.
-                await db.execute(
-                    delete(DatasetField).where(DatasetField.organization_id == org_id)
-                )
+                await db.execute(delete(DatasetField).where(DatasetField.organization_id == org_id))
                 await db.execute(delete(Dataset).where(Dataset.organization_id == org_id))
                 await db.execute(delete(Connection).where(Connection.organization_id == org_id))
                 await db.execute(delete(Organization).where(Organization.id == org_id))

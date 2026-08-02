@@ -11,6 +11,7 @@ at the snapshot level.
 
 from __future__ import annotations
 
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -66,6 +67,16 @@ def _ids(page: PageInput) -> list[UUID | None]:
 
 def _titles(page: PageInput) -> list[str]:
     return [w.title for w in page.widgets]
+
+
+def _snapshot_overview_titles(snapshot: dict[str, object]) -> list[object]:
+    pages = cast("list[dict[str, object]]", snapshot["pages"])
+    return [
+        widget["title"]
+        for page in pages
+        if page["key"] == "overview"
+        for widget in cast("list[dict[str, object]]", page["widgets"])
+    ]
 
 
 @pytest.mark.integration
@@ -194,12 +205,9 @@ async def test_dashboard_lifecycle_widget_and_version_integrity(settings: Settin
             v1 = await publish(db, ctx, dash_id, saved2.version, "first publish")
             dash_row = await db.get(Dashboard, dash_id)
             assert dash_row is not None and dash_row.published_version_id == v1.id
-            snap1 = (
-                await db.scalar(select(DashboardVersion).where(DashboardVersion.id == v1.id))
-            ).snapshot
-            snap1_titles = [
-                w["title"] for p in snap1["pages"] if p["key"] == "overview" for w in p["widgets"]
-            ]
+            version1 = await db.scalar(select(DashboardVersion).where(DashboardVersion.id == v1.id))
+            assert version1 is not None
+            snap1_titles = _snapshot_overview_titles(version1.snapshot)
             assert snap1_titles == ["Card C", "Card A", "Card E", "Card C"]
 
             # ---- edit again after publish, then confirm v1 snapshot is immutable ----
@@ -222,15 +230,11 @@ async def test_dashboard_lifecycle_widget_and_version_integrity(settings: Settin
                 ],
             )
             await save_editor(db, ctx, dash_id, save3)
-            snap1_again = (
-                await db.scalar(select(DashboardVersion).where(DashboardVersion.id == v1.id))
-            ).snapshot
-            resnap_titles = [
-                w["title"]
-                for p in snap1_again["pages"]
-                if p["key"] == "overview"
-                for w in p["widgets"]
-            ]
+            version1_again = await db.scalar(
+                select(DashboardVersion).where(DashboardVersion.id == v1.id)
+            )
+            assert version1_again is not None
+            resnap_titles = _snapshot_overview_titles(version1_again.snapshot)
             assert resnap_titles == [
                 "Card C",
                 "Card A",

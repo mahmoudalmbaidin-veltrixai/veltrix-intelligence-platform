@@ -2,6 +2,8 @@
 import { apiClient } from '@/shared/lib/apiClient'
 import type {
   Pipeline,
+  PipelineAccess,
+  PipelineAccessLevel,
   PipelineListItem,
   PipelineNode,
   PipelineRun,
@@ -40,11 +42,22 @@ interface EdgeDto {
   source_port?: string | null
   target_port?: string | null
 }
+interface AccessDto {
+  level: string | null
+  allowed_levels: string[]
+  can_view: boolean
+  can_run: boolean
+  can_edit: boolean
+  can_manage: boolean
+  source: string
+  reason: string
+}
 interface EditorDto {
   pipeline: SummaryDto
   canvas: Record<string, unknown>
   nodes: NodeDto[]
   edges: EdgeDto[]
+  access?: AccessDto | null
 }
 interface RunDto {
   id: string
@@ -75,6 +88,19 @@ interface RunDto {
 }
 
 const nodeId = (node: NodeDto) => node.key
+function mapAccess(dto: AccessDto | null | undefined): PipelineAccess | undefined {
+  if (!dto) return undefined
+  return {
+    level: (dto.level as PipelineAccessLevel | null) ?? null,
+    allowedLevels: (dto.allowed_levels ?? []) as PipelineAccessLevel[],
+    canView: dto.can_view,
+    canRun: dto.can_run,
+    canEdit: dto.can_edit,
+    canManage: dto.can_manage,
+    source: dto.source,
+    reason: dto.reason,
+  }
+}
 function mapEditor(dto: EditorDto): Pipeline {
   return {
     id: dto.pipeline.id,
@@ -110,6 +136,7 @@ function mapEditor(dto: EditorDto): Pipeline {
     updatedAt: dto.pipeline.updated_at,
     lastRunAt: dto.pipeline.last_run_at ?? undefined,
     lastRunStatus: (dto.pipeline.last_run_status as Pipeline['lastRunStatus']) ?? undefined,
+    access: mapAccess(dto.access),
   }
 }
 function mapSummary(dto: SummaryDto): PipelineListItem {

@@ -37,6 +37,7 @@ from vip_api.dashboards.schemas import (
     VersionResponse,
     WidgetInput,
 )
+from vip_api.governance import resource_access_service
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.models import Role
@@ -164,17 +165,51 @@ async def _access(
         "manage",
     }
     can_edit = "dashboard.update" in context.permissions or level in {"edit", "manage"}
+    can_interact = can_view and (
+        "dashboard.query" in context.permissions
+        or "semantic.query" in context.permissions
+        or level in {"interact", "edit", "manage"}
+    )
+    can_manage_sharing = "dashboard.share" in context.permissions and level != "edit"
+
+    # Resource-ACL overlay: ownership and explicit grants broaden access; an
+    # explicit deny overrides inherited/role-derived access (see the resource
+    # access engine precedence). This is additive to the RBAC + share decision.
+    overlay = await resource_access_service.access_overlay(
+        db,
+        resource_type="dashboard",
+        resource_id=dashboard.id,
+        organization_id=context.organization_id,
+        workspace_id=context.workspace_id,
+        user_id=context.user_id,
+        owner_user_id=dashboard.owner_user_id,
+    )
+    if overlay.is_owner:
+        can_view = can_edit = can_interact = can_manage_sharing = True
+    if overlay.allow_rank >= 0:
+        can_view = True
+    if overlay.allow_rank >= 1:
+        can_interact = True
+    if overlay.allow_rank >= 2:
+        can_edit = True
+    if overlay.allow_rank >= 3:
+        can_manage_sharing = True
+    if overlay.deny_rank is not None:
+        if overlay.deny_rank <= 0:
+            can_view = False
+        if overlay.deny_rank <= 1:
+            can_interact = False
+        if overlay.deny_rank <= 2:
+            can_edit = False
+        if overlay.deny_rank <= 3:
+            can_manage_sharing = False
+
     return {
         "can_view": can_view,
-        "can_interact": can_view
-        and (
-            "dashboard.query" in context.permissions
-            or "semantic.query" in context.permissions
-            or level in {"interact", "edit", "manage"}
-        ),
+        "can_interact": can_interact,
         "can_edit": can_edit,
         "can_publish": "dashboard.publish" in context.permissions,
-        "can_manage_sharing": "dashboard.share" in context.permissions and level != "edit",
+        "can_manage_sharing": can_manage_sharing,
         "can_snapshot": "dashboard.snapshot.create" in context.permissions,
     }
 

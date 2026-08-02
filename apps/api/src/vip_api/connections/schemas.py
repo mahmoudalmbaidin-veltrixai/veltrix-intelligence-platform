@@ -8,6 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
+from vip_api.governance.access_view import ResourceEffectiveAccess
+
 
 class ConnectionTypeSummary(BaseModel):
     key: str
@@ -57,6 +59,9 @@ class ConnectionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     version: int
+    # Populated on single-connection reads with the caller's effective access so
+    # the Studio renders use/test/edit/rotate/manager states. Never carries secrets.
+    access: ResourceEffectiveAccess | None = None
 
 
 class ConnectionListResponse(BaseModel):

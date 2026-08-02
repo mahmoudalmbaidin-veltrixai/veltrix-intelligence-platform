@@ -10,7 +10,7 @@ from vip_api.pipelines.schema_flow import (
     rename_output,
     select_output,
 )
-from vip_api.pipelines.schemas import EdgeInput, NodeInput
+from vip_api.pipelines.schemas import EdgeInput, NodeInput, ValidationIssue
 
 pytestmark = pytest.mark.unit
 
@@ -21,7 +21,7 @@ COLS = [
 ]
 
 
-def _codes(issues: list) -> list[str]:
+def _codes(issues: list[ValidationIssue]) -> list[str]:
     return [issue.code for issue in issues]
 
 
@@ -88,7 +88,7 @@ def test_rename_collision_with_existing_column_is_error() -> None:
 # --- Propagation through the graph ---
 
 
-def _node(key: str, node_type: str, config: dict | None = None) -> NodeInput:
+def _node(key: str, node_type: str, config: dict[str, object] | None = None) -> NodeInput:
     return NodeInput(key=key, type=node_type, title=key, x=0, y=0, config=config or {})
 
 

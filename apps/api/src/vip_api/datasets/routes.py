@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from vip_api.auth.dependencies import require_csrf
+from vip_api.auth.dependencies import AuthenticatedContext, get_current_session, require_csrf
 from vip_api.connections.dependencies import get_secret_provider
 from vip_api.connections.secrets import DatabaseEncryptedSecretProvider
 from vip_api.core.config import Settings, get_settings
@@ -55,11 +55,13 @@ from vip_api.datasets.services import (
     list_quality_results,
     list_quality_rules,
     quality_summary,
+    require_dataset_access,
     update_dataset,
     update_field,
     update_quality_rule,
 )
 from vip_api.governance.context import AuthorizationContext
+from vip_api.governance.dependencies import require_capability
 from vip_api.jobs import handlers as _handlers  # noqa: F401
 from vip_api.jobs.queue import RedisJobQueue
 from vip_api.jobs.registry import registry
@@ -76,6 +78,15 @@ def _policy(
     return RequireB5Governance(permission, feature=feature, quota=quota)
 
 
+# Feature/entitlement-only gates (no broad dataset.* permission) for resource-bound
+# routes: the specific dataset's access is decided per-resource by the centralized
+# evaluator inside the service, so an ACL grant elevates access without the broad
+# workspace permission. Creation/discovery keep their RBAC + quota gates.
+dataset_capability = require_capability("dataset_studio", "dataset_studio")
+quality_capability = require_capability("data_quality", "dataset_studio")
+lineage_capability = require_capability("data_lineage", "dataset_studio")
+
+
 @lru_cache(maxsize=1)
 def get_discovery_registry() -> MetadataDiscoveryAdapterRegistry:
     return MetadataDiscoveryAdapterRegistry(get_settings())
@@ -90,7 +101,7 @@ def _queue(request: Request) -> RedisJobQueue:
 @router.get("", response_model=DatasetListResponse)
 async def datasets_index(
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("dataset.read"))],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 25,
     search: Annotated[str | None, Query(max_length=200)] = None,
@@ -175,9 +186,10 @@ async def datasets_ingest_file(
 async def datasets_detail(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("dataset.read"))],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
+    auth: Annotated[AuthenticatedContext, Depends(get_current_session)],
 ) -> DatasetResponse:
-    return await get_dataset(db, context, dataset_id)
+    return await get_dataset(db, context, dataset_id, is_platform_admin=auth.user.is_platform_admin)
 
 
 @router.patch("/{dataset_id}", response_model=DatasetResponse, dependencies=[Depends(require_csrf)])
@@ -185,7 +197,7 @@ async def datasets_update(
     dataset_id: UUID,
     payload: DatasetUpdate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("dataset.update"))],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
 ) -> DatasetResponse:
     return await update_dataset(db, context, dataset_id, payload)
 
@@ -194,7 +206,7 @@ async def datasets_update(
 async def datasets_archive(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("dataset.archive"))],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
 ) -> Response:
     await archive_dataset(db, context, dataset_id)
     return Response(status_code=204)
@@ -204,7 +216,7 @@ async def datasets_archive(
 async def datasets_delete(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("dataset.delete"))],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
 ) -> Response:
     await archive_dataset(db, context, dataset_id)
     return Response(status_code=204)
@@ -214,7 +226,7 @@ async def datasets_delete(
 async def fields_index(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("dataset.fields.read"))],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
 ) -> list[DatasetFieldResponse]:
     return await list_fields(db, context, dataset_id)
 
@@ -223,12 +235,14 @@ async def fields_index(
 async def preview_show(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("dataset.read"))],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
     provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
     settings: Annotated[Settings, Depends(get_settings)],
     page: Annotated[int, Query(ge=1, le=1000)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 25,
 ) -> DatasetPreviewResponse:
+    # Preview streams sample rows; enforce read access on the specific dataset.
+    await require_dataset_access(db, context, dataset_id, "query")
     return await preview_dataset(db, context, dataset_id, page, page_size, provider, settings)
 
 
@@ -236,10 +250,11 @@ async def preview_show(
 async def profile_show(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("dataset.read"))],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
     provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> DatasetProfileResponse:
+    await require_dataset_access(db, context, dataset_id, "query")
     return await profile_dataset(db, context, dataset_id, provider, settings)
 
 
@@ -253,7 +268,7 @@ async def fields_update(
     field_id: UUID,
     payload: DatasetFieldUpdate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[AuthorizationContext, Depends(_policy("dataset.fields.update"))],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
 ) -> DatasetFieldResponse:
     return await update_field(db, context, dataset_id, field_id, payload)
 
@@ -262,9 +277,7 @@ async def fields_update(
 async def quality_detail(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.quality.read", feature="data_quality"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(quality_capability)],
 ) -> QualitySummary:
     return await quality_summary(db, context, dataset_id)
 
@@ -279,9 +292,7 @@ async def quality_evaluations_create(
     request: Request,
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.quality.manage", feature="data_quality"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(quality_capability)],
 ) -> JobResponse:
     evaluation = await create_quality_evaluation(db, context, dataset_id)
     settings: Settings = request.app.state.settings
@@ -313,9 +324,7 @@ async def quality_evaluations_create(
 async def quality_evaluations_index(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.quality.read", feature="data_quality"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(quality_capability)],
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list[QualityEvaluationResponse]:
     return await list_quality_evaluations(db, context, dataset_id, limit=limit)
@@ -325,9 +334,7 @@ async def quality_evaluations_index(
 async def quality_rules_index(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.quality.read", feature="data_quality"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(quality_capability)],
 ) -> list[QualityRuleResponse]:
     return await list_quality_rules(db, context, dataset_id)
 
@@ -342,9 +349,7 @@ async def quality_rules_create(
     dataset_id: UUID,
     payload: QualityRuleCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.quality.manage", feature="data_quality"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(quality_capability)],
 ) -> QualityRuleResponse:
     return await create_quality_rule(db, context, dataset_id, payload)
 
@@ -359,9 +364,7 @@ async def quality_rules_update(
     rule_id: UUID,
     payload: QualityRuleCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.quality.manage", feature="data_quality"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(quality_capability)],
 ) -> QualityRuleResponse:
     return await update_quality_rule(db, context, dataset_id, rule_id, payload)
 
@@ -370,9 +373,7 @@ async def quality_rules_update(
 async def quality_results_index(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.quality.read", feature="data_quality"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(quality_capability)],
 ) -> list[QualityResultResponse]:
     return await list_quality_results(db, context, dataset_id)
 
@@ -384,9 +385,7 @@ async def quality_rules_delete(
     dataset_id: UUID,
     rule_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.quality.manage", feature="data_quality"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(quality_capability)],
 ) -> Response:
     await delete_quality_rule(db, context, dataset_id, rule_id)
     return Response(status_code=204)
@@ -396,9 +395,7 @@ async def quality_rules_delete(
 async def lineage_detail(
     dataset_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.lineage.read", feature="data_lineage"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(lineage_capability)],
     direction: Literal["upstream", "downstream", "both"] = "both",
     depth: Annotated[int, Query(ge=1)] = 3,
     max_nodes: Annotated[int, Query(ge=1)] = 100,
@@ -424,9 +421,7 @@ async def lineage_create(
     dataset_id: UUID,
     payload: LineageCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.lineage.manage", feature="data_lineage"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(lineage_capability)],
 ) -> LineageEdgeResponse:
     return await create_lineage(db, context, dataset_id, payload)
 
@@ -438,9 +433,7 @@ async def lineage_delete(
     dataset_id: UUID,
     edge_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(_policy("dataset.lineage.manage", feature="data_lineage"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(lineage_capability)],
 ) -> Response:
     await delete_lineage(db, context, dataset_id, edge_id)
     return Response(status_code=204)

@@ -85,7 +85,12 @@ const staleSelections = computed(() => {
       <div class="cols__toolbar">
         <div class="cols__search">
           <VipIcon name="search" :size="13" />
-          <input v-model="search" class="cols__search-input" placeholder="Search columns…" aria-label="Search columns" />
+          <input
+            v-model="search"
+            class="cols__search-input"
+            placeholder="Search columns…"
+            aria-label="Search columns"
+          />
         </div>
         <div class="cols__mode" role="group" aria-label="Selection mode">
           <button :class="{ 'is-active': mode === 'keep' }" @click="mode = 'keep'">Keep</button>
@@ -124,7 +129,11 @@ const staleSelections = computed(() => {
         {{ staleSelections.join(', ') }}
       </p>
       <p class="cols__hint">
-        {{ mode === 'keep' ? 'Checked columns continue to the next node.' : 'Checked columns are dropped; the rest continue.' }}
+        {{
+          mode === 'keep'
+            ? 'Checked columns continue to the next node.'
+            : 'Checked columns are dropped; the rest continue.'
+        }}
       </p>
     </template>
   </div>

@@ -145,7 +145,9 @@ const preview = computed(() => {
         <ul>
           <li v-for="p in preview" :key="p.from" :class="{ 'is-changed': p.changed }">
             <span class="rn__mono">{{ p.from }}</span>
-            <template v-if="p.changed"> <VipIcon name="chevronRight" :size="11" /> <span class="rn__mono">{{ p.to }}</span></template>
+            <template v-if="p.changed">
+              <VipIcon name="chevronRight" :size="11" /> <span class="rn__mono">{{ p.to }}</span></template
+            >
           </li>
         </ul>
       </div>

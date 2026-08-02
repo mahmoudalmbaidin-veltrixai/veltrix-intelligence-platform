@@ -18,6 +18,7 @@ import { MODELS, semanticService } from '@/shared/services/semanticModels'
 import type { Aggregation, NumberFormat, SemanticModel } from '@/shared/types/semantic'
 import { latency } from '@/shared/lib/mock'
 import { apiClient } from '@/shared/lib/apiClient'
+import type { ResourceEffectiveAccessDto } from '@/shared/lib/resourceAccess'
 import { defineService } from '@/shared/services/serviceFactory'
 
 export type MetricStatus = 'draft' | 'published'
@@ -315,6 +316,8 @@ export interface StudioModel {
   published_version: number | null
   updated_at: string
   version: number
+  /** Present on single-model reads: the caller's effective access (raw DTO). */
+  access?: ResourceEffectiveAccessDto | null
 }
 
 export interface StudioField {

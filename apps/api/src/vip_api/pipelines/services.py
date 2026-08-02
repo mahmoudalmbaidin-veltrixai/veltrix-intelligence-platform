@@ -9,13 +9,15 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.auth.models import utc_now
 from vip_api.core.errors import ApplicationError
+from vip_api.governance import resource_access_service
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
+from vip_api.governance.models import ResourceAccessEntry
 from vip_api.pipelines.models import (
     Pipeline,
     PipelineArtifact,
@@ -34,6 +36,7 @@ from vip_api.pipelines.schemas import (
     LogResponse,
     NodeInput,
     NodeRunResponse,
+    PipelineAccess,
     PipelineCreate,
     PipelineEditor,
     PipelineEditorSave,
@@ -60,7 +63,87 @@ def _slug(name: str) -> str:
     return value or "pipeline"
 
 
-async def _pipeline(db: AsyncSession, context: AuthorizationContext, pipeline_id: UUID) -> Pipeline:
+async def _authorize_pipeline(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    pipeline_id: UUID,
+    action_level: str,
+) -> None:
+    """Authoritative per-resource pipeline decision via the centralized evaluator.
+
+    Combines role-derived level, direct/group ACL grants, ownership, explicit
+    deny and expiration into a single decision so a resource ACL *elevates*
+    access without the broad workspace permission. An explicit deny yields a
+    ``403 RESOURCE_ACCESS_DENIED``; any other denial (no grant, expired,
+    insufficient level) yields a non-disclosing ``404``.
+    """
+    decision = await resource_access_service.check_access(
+        db,
+        resource_type="pipeline",
+        resource_id=pipeline_id,
+        action_level=action_level,
+        organization_id=context.organization_id,
+        workspace_id=context.workspace_id,
+        user_id=context.user_id,
+        role_permissions=context.permissions,
+    )
+    if decision.allowed:
+        return
+    if decision.reason == "EXPLICIT_DENY":
+        raise ApplicationError(
+            code="RESOURCE_ACCESS_DENIED",
+            message="Access to this resource is denied by an explicit permission rule.",
+            status_code=403,
+        )
+    raise ApplicationError(
+        code="NOT_FOUND", message="The requested resource was not found.", status_code=404
+    )
+
+
+async def pipeline_access(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    pipeline_id: UUID,
+    *,
+    is_platform_admin: bool = False,
+) -> PipelineAccess:
+    """Resolve the caller's effective pipeline access for client-side UI states.
+
+    Uses the same centralized evaluator that enforces every action, so the
+    returned capability flags exactly mirror what the backend will allow —
+    the frontend consumes this to render viewer/operator/developer/owner (and
+    denied) states, never as the security boundary itself.
+    """
+    result = await resource_access_service.effective_access(
+        db,
+        resource_type="pipeline",
+        resource_id=pipeline_id,
+        organization_id=context.organization_id,
+        workspace_id=context.workspace_id,
+        user_id=context.user_id,
+        is_platform_admin=is_platform_admin,
+        role_permissions=context.permissions,
+    )
+    allowed = set(result.allowed_levels)
+    return PipelineAccess(
+        level=result.level,
+        allowed_levels=result.allowed_levels,
+        can_view="viewer" in allowed,
+        can_run="operator" in allowed,
+        can_edit="developer" in allowed,
+        can_manage="owner" in allowed,
+        source=result.source,
+        reason=result.reason,
+    )
+
+
+async def _pipeline(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    pipeline_id: UUID,
+    *,
+    action_level: str = "viewer",
+) -> Pipeline:
     org, ws = _scope(context)
     item = await db.scalar(
         select(Pipeline).where(
@@ -74,6 +157,7 @@ async def _pipeline(db: AsyncSession, context: AuthorizationContext, pipeline_id
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    await _authorize_pipeline(db, context, item.id, action_level)
     return item
 
 
@@ -117,22 +201,66 @@ async def _summary(db: AsyncSession, item: Pipeline) -> PipelineSummary:
     )
 
 
+async def require_pipeline_access(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    pipeline_id: UUID,
+    action_level: str = "viewer",
+) -> Pipeline:
+    """Resource-aware access guard that *elevates* as well as restricts.
+
+    Unlike ``_pipeline``'s deny-only ``enforce_resource_guard``, this runs the
+    centralized evaluator so a user who holds a resource ACL grant (direct or via
+    group) can reach the pipeline even without the broad ``pipeline.read``
+    workspace permission. Role-derived level, ownership, explicit deny and
+    expiration are all honoured by the single evaluator. A denied decision is
+    reported as a non-disclosing 404.
+    """
+    return await _pipeline(db, context, pipeline_id, action_level=action_level)
+
+
 async def list_pipelines(
     db: AsyncSession, context: AuthorizationContext, limit: int = 100
 ) -> ListPage:
     org, ws = _scope(context)
-    rows = (
-        await db.scalars(
-            select(Pipeline)
-            .where(
-                Pipeline.organization_id == org,
-                Pipeline.workspace_id == ws,
-                Pipeline.archived_at.is_(None),
-            )
-            .order_by(Pipeline.updated_at.desc())
-            .limit(limit)
+    query = select(Pipeline).where(
+        Pipeline.organization_id == org,
+        Pipeline.workspace_id == ws,
+        Pipeline.archived_at.is_(None),
+    )
+    # Users with a broad workspace pipeline role see every pipeline (unchanged).
+    # Otherwise the collection is filtered to resources reachable through
+    # ownership or a non-expired ACL allow (direct or group), minus viewer-level
+    # denies — matching the centralized evaluator's visibility semantics.
+    if resource_access_service.role_level("pipeline", context.permissions) is None:
+        subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
+            db, org, context.user_id
         )
-    ).all()
+        now = datetime.now(UTC)
+        allowed_ids = select(ResourceAccessEntry.resource_id).where(
+            ResourceAccessEntry.resource_type == "pipeline",
+            ResourceAccessEntry.subject_id.in_(subjects),
+            ResourceAccessEntry.effect == "allow",
+            or_(
+                ResourceAccessEntry.expires_at.is_(None),
+                ResourceAccessEntry.expires_at > now,
+            ),
+        )
+        denied_ids = select(ResourceAccessEntry.resource_id).where(
+            ResourceAccessEntry.resource_type == "pipeline",
+            ResourceAccessEntry.subject_id.in_(subjects),
+            ResourceAccessEntry.effect == "deny",
+            ResourceAccessEntry.access_level == "viewer",
+            or_(
+                ResourceAccessEntry.expires_at.is_(None),
+                ResourceAccessEntry.expires_at > now,
+            ),
+        )
+        query = query.where(
+            or_(Pipeline.owner_user_id == context.user_id, Pipeline.id.in_(allowed_ids)),
+            Pipeline.id.notin_(denied_ids),
+        )
+    rows = (await db.scalars(query.order_by(Pipeline.updated_at.desc()).limit(limit))).all()
     return ListPage(items=[await _summary(db, item) for item in rows])
 
 
@@ -172,11 +300,21 @@ async def create_pipeline(
     )
     await db.commit()
     await db.refresh(item)
-    return PipelineEditor(pipeline=await _summary(db, item), canvas={}, nodes=[], edges=[])
+    return PipelineEditor(
+        pipeline=await _summary(db, item),
+        canvas={},
+        nodes=[],
+        edges=[],
+        access=await pipeline_access(db, context, item.id),
+    )
 
 
 async def get_editor(
-    db: AsyncSession, context: AuthorizationContext, pipeline_id: UUID
+    db: AsyncSession,
+    context: AuthorizationContext,
+    pipeline_id: UUID,
+    *,
+    is_platform_admin: bool = False,
 ) -> PipelineEditor:
     item = await _pipeline(db, context, pipeline_id)
     nodes = (
@@ -219,13 +357,14 @@ async def get_editor(
             )
             for e in edges
         ],
+        access=await pipeline_access(db, context, item.id, is_platform_admin=is_platform_admin),
     )
 
 
 async def save_editor(
     db: AsyncSession, context: AuthorizationContext, pipeline_id: UUID, payload: PipelineEditorSave
 ) -> PipelineEditor:
-    item = await _pipeline(db, context, pipeline_id)
+    item = await _pipeline(db, context, pipeline_id, action_level="developer")
     if item.row_version != payload.expected_version:
         raise ApplicationError(
             code="VERSION_CONFLICT",
@@ -299,6 +438,8 @@ async def save_editor(
 async def validate_pipeline(
     db: AsyncSession, context: AuthorizationContext, pipeline_id: UUID
 ) -> ValidationResponse:
+    # Validation is a Developer capability (it validates draft edits).
+    await _pipeline(db, context, pipeline_id, action_level="developer")
     editor = await get_editor(db, context, pipeline_id)
     return await validate_graph(db, context, editor.nodes, editor.edges)
 
@@ -324,7 +465,7 @@ async def publish_pipeline(
     expected_version: int,
     change_summary: str,
 ) -> VersionResponse:
-    item = await _pipeline(db, context, pipeline_id)
+    item = await _pipeline(db, context, pipeline_id, action_level="developer")
     if item.row_version != expected_version:
         raise ApplicationError(
             code="VERSION_CONFLICT",
@@ -404,7 +545,7 @@ async def restore_version(
     version_id: UUID,
     expected_version: int,
 ) -> PipelineEditor:
-    item = await _pipeline(db, context, pipeline_id)
+    item = await _pipeline(db, context, pipeline_id, action_level="developer")
     if item.row_version != expected_version:
         raise ApplicationError(
             code="VERSION_CONFLICT",
@@ -455,7 +596,7 @@ async def restore_version(
 async def archive_pipeline(
     db: AsyncSession, context: AuthorizationContext, pipeline_id: UUID, expected_version: int
 ) -> None:
-    item = await _pipeline(db, context, pipeline_id)
+    item = await _pipeline(db, context, pipeline_id, action_level="owner")
     if item.row_version != expected_version:
         raise ApplicationError(
             code="VERSION_CONFLICT",
@@ -487,7 +628,7 @@ async def create_run(
     pipeline_id: UUID,
     version_id: UUID | None = None,
 ) -> RunResponse:
-    item = await _pipeline(db, context, pipeline_id)
+    item = await _pipeline(db, context, pipeline_id, action_level="operator")
     selected = version_id or item.published_version_id
     if selected is None:
         raise ApplicationError(
@@ -547,7 +688,12 @@ async def create_run(
 
 
 async def _run(
-    db: AsyncSession, context: AuthorizationContext, pipeline_id: UUID, run_id: UUID
+    db: AsyncSession,
+    context: AuthorizationContext,
+    pipeline_id: UUID,
+    run_id: UUID,
+    *,
+    action_level: str = "viewer",
 ) -> PipelineRun:
     org, ws = _scope(context)
     run = await db.scalar(
@@ -562,6 +708,7 @@ async def _run(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    await _authorize_pipeline(db, context, pipeline_id, action_level)
     return run
 
 
@@ -622,7 +769,7 @@ async def run_detail(
 async def cancel_run(
     db: AsyncSession, context: AuthorizationContext, pipeline_id: UUID, run_id: UUID
 ) -> RunResponse:
-    run = await _run(db, context, pipeline_id, run_id)
+    run = await _run(db, context, pipeline_id, run_id, action_level="operator")
     if run.status not in {"queued", "running", "retrying"}:
         raise ApplicationError(
             code="RUN_NOT_CANCELLABLE",
@@ -650,7 +797,7 @@ async def cancel_run(
 async def retry_run(
     db: AsyncSession, context: AuthorizationContext, pipeline_id: UUID, run_id: UUID
 ) -> RunResponse:
-    run = await _run(db, context, pipeline_id, run_id)
+    run = await _run(db, context, pipeline_id, run_id, action_level="operator")
     if run.status != "failed":
         raise ApplicationError(
             code="RUN_NOT_RETRYABLE", message="Only failed runs can be retried.", status_code=409

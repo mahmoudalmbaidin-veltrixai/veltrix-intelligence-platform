@@ -12,6 +12,11 @@
  */
 import { latency, isoAgo } from '@/shared/lib/mock'
 import { apiClient } from '@/shared/lib/apiClient'
+import {
+  mapResourceAccess,
+  type ResourceEffectiveAccess,
+  type ResourceEffectiveAccessDto,
+} from '@/shared/lib/resourceAccess'
 import { defineService } from '@/shared/services/serviceFactory'
 
 export type DatasetStatus = 'active' | 'deprecated' | 'building'
@@ -36,6 +41,8 @@ export interface Dataset {
   schema?: string
   table?: string
   readOnly?: boolean
+  /** Present on single-dataset reads: the caller's effective access. */
+  access?: ResourceEffectiveAccess
 }
 
 export type QualityDimension = 'completeness' | 'validity' | 'uniqueness' | 'freshness' | 'consistency'
@@ -614,6 +621,7 @@ interface ApiDataset {
   quality_status: string
   classification: string
   version: number
+  access?: ResourceEffectiveAccessDto | null
 }
 
 interface ApiDatasetList {
@@ -724,6 +732,7 @@ function mapDataset(item: ApiDataset, qualityScore: number | null = null): Datas
     schema: item.source_schema,
     table: item.source_name,
     readOnly: item.is_read_only,
+    access: mapResourceAccess(item.access),
   }
 }
 

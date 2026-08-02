@@ -69,11 +69,28 @@ class PipelineSummary(StrictModel):
     updated_at: datetime
 
 
+class PipelineAccess(StrictModel):
+    """The caller's effective access to a pipeline, resolved by the centralized
+    authorization engine. Lets the client render viewer/operator/developer/owner
+    (and denied) UI states from the same decision the backend enforces —
+    frontend visibility is a convenience, never the security boundary."""
+
+    level: str | None
+    allowed_levels: list[str]
+    can_view: bool
+    can_run: bool
+    can_edit: bool
+    can_manage: bool
+    source: str
+    reason: str
+
+
 class PipelineEditor(StrictModel):
     pipeline: PipelineSummary
     canvas: dict[str, object]
     nodes: list[NodeInput]
     edges: list[EdgeInput]
+    access: PipelineAccess | None = None
 
 
 class ValidationIssue(StrictModel):

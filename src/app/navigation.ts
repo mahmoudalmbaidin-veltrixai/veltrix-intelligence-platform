@@ -74,7 +74,8 @@ export const NAV_GROUPS: NavGroup[] = [
         to: '/pipelines',
         icon: 'workflow',
         description: 'Build and orchestrate visual ETL data pipelines.',
-        permission: 'pipeline.read',
+        // Entitlement-only: users with resource-ACL grants (but no broad
+        // pipeline.read) can reach their shared pipelines via the filtered list.
         entitlement: 'pipeline_studio',
         keywords: ['etl', 'flow', 'transform', 'alteryx'],
       },
@@ -358,6 +359,33 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'users',
         description: 'Invite members and assign access roles.',
         permission: 'governance.read',
+        adminOnly: true,
+      },
+      {
+        label: 'Roles',
+        to: '/admin/roles',
+        icon: 'shield',
+        description: 'Create custom roles and assign them to users and groups.',
+        keywords: ['roles', 'rbac', 'permissions', 'custom role', 'assignments'],
+        permission: 'role.read',
+        adminOnly: true,
+      },
+      {
+        label: 'Groups & Teams',
+        to: '/admin/groups',
+        icon: 'users',
+        description: 'Create teams and manage their membership and resource access.',
+        keywords: ['teams', 'groups', 'membership'],
+        permission: 'group.read',
+        adminOnly: true,
+      },
+      {
+        label: 'Access Control',
+        to: '/admin/access',
+        icon: 'shield',
+        description: 'Share resources, inspect effective permissions and simulate access.',
+        keywords: ['permissions', 'sharing', 'acl', 'effective access', 'simulate'],
+        permission: 'resource.permissions.read',
         adminOnly: true,
       },
       {
