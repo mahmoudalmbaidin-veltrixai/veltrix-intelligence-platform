@@ -18,6 +18,7 @@ from vip_api.governance import resource_access_service
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.models import ResourceAccessEntry
+from vip_api.governance.services import consume_quota
 from vip_api.pipelines.models import (
     Pipeline,
     PipelineArtifact,
@@ -654,6 +655,9 @@ async def create_run(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested version was not found.", status_code=404
         )
+    # Quota is orthogonal to resource authorization: an ACL operator may run
+    # without broad pipeline.execute, but still consumes monthly run quota.
+    await consume_quota(db, context, "pipeline_runs.monthly")
     run = PipelineRun(
         organization_id=item.organization_id,
         workspace_id=item.workspace_id,
@@ -812,6 +816,7 @@ async def retry_run(
         raise ApplicationError(
             code="RUN_RETRY_LIMIT", message="The run retry limit has been reached.", status_code=409
         )
+    await consume_quota(db, context, "pipeline_runs.monthly")
     next_attempt = run.current_attempt + 1
     run.status = "retrying"
     run.progress = 0

@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { relativeTime, formatDateTime, formatNumber } from '@/shared/lib/format'
+import { resourceCan } from '@/shared/lib/resourceAccess'
+import { ApiError } from '@/shared/types/api'
+import { useUiStore } from '@/shared/stores/ui'
 import {
   datasetService,
   type Dataset,
+  type DatasetActivityItem,
   type DatasetField,
   type QualityRule,
   type QualityRuleStatus,
 } from './datasets.service'
+import { accessService, type ResourceEntry } from '@/modules/access/access.service'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
@@ -23,33 +28,68 @@ import ResourceShareButton from '@/modules/access/ResourceShareButton.vue'
 
 const route = useRoute()
 const router = useRouter()
+const ui = useUiStore()
 const id = computed(() => String(route.params.id))
 
-const { data: dataset, isLoading } = useQuery(
+const {
+  data: dataset,
+  isLoading,
+  refetch: refetchDataset,
+} = useQuery(
   () => `dataset:${id.value}`,
   () => datasetService.get(id.value),
 )
-const { data: rules } = useQuery('datasets:rules', () => datasetService.listQualityRules())
 const { data: schema } = useQuery(
   () => `dataset:${id.value}:fields`,
   () => datasetService.listFields(id.value),
 )
 const previewPage = ref(1)
-const { data: preview, isLoading: previewLoading } = useQuery(
+const effectiveAccessEarly = computed(() => dataset.value?.access)
+const canQueryEarly = computed(() => resourceCan(effectiveAccessEarly.value, 'query'))
+const {
+  data: preview,
+  isLoading: previewLoading,
+  error: previewError,
+} = useQuery(
   () => `dataset:${id.value}:preview:${previewPage.value}`,
   () => datasetService.preview(id.value, previewPage.value, 25),
+  { enabled: canQueryEarly },
 )
 const { data: profile, isLoading: profileLoading } = useQuery(
   () => `dataset:${id.value}:profile`,
   () => datasetService.profile(id.value),
+  { enabled: canQueryEarly },
+)
+const {
+  data: lineage,
+  isLoading: lineageLoading,
+  error: lineageError,
+} = useQuery(
+  () => `dataset:${id.value}:lineage`,
+  () => datasetService.getLineage(id.value),
+)
+const { data: rules } = useQuery(
+  () => `dataset:${id.value}:quality-rules`,
+  () => datasetService.listQualityRulesForDataset(id.value),
 )
 
-const datasetRules = computed<QualityRule[]>(() => (rules.value ?? []).filter((r) => r.dataset === dataset.value?.name))
+const accessEntries = ref<ResourceEntry[]>([])
+const accessLoading = ref(false)
+const accessError = ref<string | null>(null)
+const activityItems = ref<DatasetActivityItem[]>([])
+const activityLoading = ref(false)
+const activityError = ref<string | null>(null)
+const activityTotal = ref(0)
+const certBusy = ref(false)
+const certNote = ref('')
 
-// Resource-aware access from the backend (authoritative). Only owners / managers
-// (or holders of the manage permission) may share; the API enforces this too.
-const effectiveAccess = computed(() => dataset.value?.access)
+const datasetRules = computed<QualityRule[]>(() => rules.value ?? [])
+
+const effectiveAccess = effectiveAccessEarly
 const canManageAccess = computed(() => effectiveAccess.value?.canManageAccess ?? false)
+const canQuery = canQueryEarly
+const canCertify = computed(() => resourceCan(effectiveAccess.value, 'certify'))
+const canEdit = computed(() => resourceCan(effectiveAccess.value, 'edit'))
 
 const tabs = [
   { value: 'overview', label: 'Overview' },
@@ -63,6 +103,96 @@ const tabs = [
   { value: 'activity', label: 'Activity' },
 ]
 const activeTab = ref('overview')
+
+async function loadAccess() {
+  accessLoading.value = true
+  accessError.value = null
+  try {
+    accessEntries.value = await accessService.listResourceAccess('dataset', id.value)
+  } catch (error) {
+    accessError.value = error instanceof ApiError ? error.message : 'Unable to load access grants.'
+    accessEntries.value = []
+  } finally {
+    accessLoading.value = false
+  }
+}
+
+async function loadActivity() {
+  if (!datasetService.getActivity) {
+    activityError.value = 'Activity is unavailable.'
+    return
+  }
+  activityLoading.value = true
+  activityError.value = null
+  try {
+    const page = await datasetService.getActivity(id.value, { limit: 50, offset: 0 })
+    activityItems.value = page.items
+    activityTotal.value = page.total
+  } catch (error) {
+    activityError.value = error instanceof ApiError ? error.message : 'Unable to load activity.'
+    activityItems.value = []
+  } finally {
+    activityLoading.value = false
+  }
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'access') void loadAccess()
+  if (tab === 'activity') void loadActivity()
+})
+
+async function certifyDataset() {
+  if (!dataset.value?.version || !datasetService.certify || !canCertify.value) return
+  certBusy.value = true
+  try {
+    await datasetService.certify(id.value, dataset.value.version, certNote.value.trim() || undefined)
+    certNote.value = ''
+    await refetchDataset()
+    ui.pushToast({ kind: 'success', title: 'Certified', message: 'Dataset certification saved.' })
+  } catch (error) {
+    ui.pushToast({
+      kind: 'error',
+      title: 'Certification failed',
+      message: error instanceof ApiError ? error.message : 'Unable to certify this dataset.',
+    })
+  } finally {
+    certBusy.value = false
+  }
+}
+
+async function revokeCertification() {
+  if (!dataset.value?.version || !datasetService.revokeCertification || !canCertify.value) return
+  certBusy.value = true
+  try {
+    await datasetService.revokeCertification(id.value, dataset.value.version, certNote.value.trim() || undefined)
+    certNote.value = ''
+    await refetchDataset()
+    ui.pushToast({ kind: 'success', title: 'Revoked', message: 'Dataset certification revoked.' })
+  } catch (error) {
+    ui.pushToast({
+      kind: 'error',
+      title: 'Revoke failed',
+      message: error instanceof ApiError ? error.message : 'Unable to revoke certification.',
+    })
+  } finally {
+    certBusy.value = false
+  }
+}
+
+const lineageUpstream = computed(() => {
+  const graph = lineage.value
+  const current = id.value
+  if (!graph) return []
+  const upstreamIds = new Set(graph.edges.filter((e) => e.to === current).map((e) => e.from))
+  return graph.nodes.filter((n) => upstreamIds.has(n.id))
+})
+const lineageDownstream = computed(() => {
+  const graph = lineage.value
+  const current = id.value
+  if (!graph) return []
+  const downstreamIds = new Set(graph.edges.filter((e) => e.from === current).map((e) => e.to))
+  return graph.nodes.filter((n) => downstreamIds.has(n.id))
+})
 
 function qualityTone(score: number | null): 'success' | 'warning' | 'danger' {
   if (score == null) return 'warning'
@@ -78,7 +208,6 @@ const RULE_TONE: Record<QualityRuleStatus, 'success' | 'warning' | 'danger'> = {
   not_evaluated: 'warning',
 }
 
-/* ---- overview stat cards ---- */
 function overviewCards(d: Dataset): { label: string; value: string; icon: string }[] {
   return [
     { label: 'Owner', value: d.owner, icon: 'users' },
@@ -105,52 +234,12 @@ const previewColumns = computed<Column<Record<string, unknown>>[]>(() =>
   })),
 )
 
-/* ---- access (mock) ---- */
-interface AccessGrant {
-  principal: string
-  role: string
-  type: string
-}
-const access: AccessGrant[] = [
-  { principal: 'Revenue Ops', role: 'Owner', type: 'team' },
-  { principal: 'Analytics', role: 'Editor', type: 'workspace' },
-  { principal: 'Business Viewers', role: 'Viewer', type: 'group' },
-  { principal: 'analytics-service', role: 'Reader', type: 'service account' },
-]
-
-/* ---- versions (mock) ---- */
-interface Version {
-  id: string
-  label: string
-  when: string
-  author: string
-  note: string
-}
-const versions: Version[] = [
-  {
-    id: 'v12',
-    label: 'v12',
-    when: relativeTime(new Date(Date.now() - 35 * 60000).toISOString()),
-    author: 'Nightly Scheduler',
-    note: 'Incremental refresh',
-  },
-  { id: 'v11', label: 'v11', when: '1d ago', author: 'A. Rahman', note: 'Added channel column' },
-  { id: 'v10', label: 'v10', when: '9d ago', author: 'M. Almbaidin', note: 'Backfill 2024 orders' },
-]
-
-/* ---- activity (mock) ---- */
-interface ActivityItem {
-  id: string
-  actor: string
-  action: string
-  when: string
-  icon: string
-}
-const activity: ActivityItem[] = [
-  { id: 'a1', actor: 'Nightly Scheduler', action: 'refreshed the dataset', when: '35m', icon: 'run' },
-  { id: 'a2', actor: 'Data Quality', action: 'ran 4 quality checks', when: '35m', icon: 'gauge' },
-  { id: 'a3', actor: 'A. Rahman', action: 'certified the dataset', when: '1d', icon: 'shield' },
-  { id: 'a4', actor: 'M. Almbaidin', action: 'edited the schema', when: '9d', icon: 'table' },
+const accessColumns: Column<ResourceEntry>[] = [
+  { key: 'subject_label', label: 'Principal' },
+  { key: 'subject_type', label: 'Type' },
+  { key: 'access_level', label: 'Level' },
+  { key: 'effect', label: 'Effect' },
+  { key: 'expires_at', label: 'Expires' },
 ]
 </script>
 
@@ -207,6 +296,58 @@ const activity: ActivityItem[] = [
             <span class="dd__stat-label">{{ c.label }}</span>
           </VipCard>
         </div>
+        <VipCard class="dd__cert">
+          <h3 class="dd__card-title">Certification</h3>
+          <div class="dd__cert-facts">
+            <div>
+              <span>Status</span
+              ><strong>{{ dataset.certificationStatus ?? (dataset.certified ? 'certified' : 'uncertified') }}</strong>
+            </div>
+            <div>
+              <span>Certified by</span>
+              <strong>{{ dataset.certifiedByUserId ?? '—' }}</strong>
+            </div>
+            <div>
+              <span>Certified at</span>
+              <strong>{{ dataset.certifiedAt ? formatDateTime(dataset.certifiedAt) : '—' }}</strong>
+            </div>
+            <div>
+              <span>Note</span>
+              <strong>{{ dataset.certificationNote || '—' }}</strong>
+            </div>
+          </div>
+          <label v-if="canCertify" class="dd__cert-note">
+            Note
+            <input v-model="certNote" type="text" maxlength="2000" placeholder="Optional certification note" />
+          </label>
+          <div class="dd__cert-actions">
+            <VipButton
+              v-if="canCertify && !dataset.certified"
+              variant="primary"
+              size="sm"
+              icon="shield"
+              :loading="certBusy"
+              @click="certifyDataset"
+              >Certify</VipButton
+            >
+            <VipButton
+              v-else-if="canCertify && dataset.certified"
+              variant="danger"
+              size="sm"
+              icon="close"
+              :loading="certBusy"
+              @click="revokeCertification"
+              >Revoke certification</VipButton
+            >
+            <p v-else class="dd__muted">
+              {{
+                canEdit
+                  ? 'Edit access does not include certification. Certify capability is required.'
+                  : 'Certification requires the certify capability on this dataset.'
+              }}
+            </p>
+          </div>
+        </VipCard>
         <VipCard class="dd__tags-card">
           <h3 class="dd__card-title">Tags</h3>
           <div class="dd__tags">
@@ -217,35 +358,51 @@ const activity: ActivityItem[] = [
 
       <!-- DATA PREVIEW -->
       <VipCard v-else-if="activeTab === 'preview'" :padded="false">
-        <div class="dd__preview-head">
-          <span class="dd__mono">{{ dataset.name }} · page {{ previewPage }}</span>
-          <VipBadge v-if="preview?.maskedFields.length" tone="warning" variant="soft" size="sm">
-            sensitive values masked
-          </VipBadge>
-        </div>
-        <div v-if="previewLoading" class="dd__loading"><VipSpinner label="Loading live preview…" /></div>
-        <VipTable
-          v-else-if="preview?.rows.length"
-          :columns="previewColumns"
-          :rows="preview.rows"
-          :row-key="(row) => JSON.stringify(row)"
-          density="compact"
-        />
         <VipEmptyState
-          v-else
-          icon="table"
-          title="No preview rows"
-          description="The source returned no rows for this page."
+          v-if="!canQuery"
+          icon="warning"
+          tone="warning"
+          title="Preview not permitted"
+          description="Query access on this dataset is required to view preview rows. Frontend visibility is not the security boundary — the API enforces this independently."
         />
-        <div class="dd__pager">
-          <VipButton size="sm" :disabled="previewPage === 1" @click="previewPage--">Previous</VipButton>
-          <VipButton
-            size="sm"
-            :disabled="(preview?.returnedRows ?? 0) < (preview?.pageSize ?? 25)"
-            @click="previewPage++"
-            >Next</VipButton
-          >
-        </div>
+        <template v-else>
+          <div class="dd__preview-head">
+            <span class="dd__mono">{{ dataset.name }} · page {{ previewPage }}</span>
+            <VipBadge v-if="preview?.maskedFields.length" tone="warning" variant="soft" size="sm">
+              sensitive values masked
+            </VipBadge>
+          </div>
+          <div v-if="previewLoading" class="dd__loading"><VipSpinner label="Loading live preview…" /></div>
+          <VipEmptyState
+            v-else-if="previewError"
+            icon="warning"
+            tone="warning"
+            title="Preview failed"
+            :description="String(previewError)"
+          />
+          <VipTable
+            v-else-if="preview?.rows.length"
+            :columns="previewColumns"
+            :rows="preview.rows"
+            :row-key="(row) => JSON.stringify(row)"
+            density="compact"
+          />
+          <VipEmptyState
+            v-else
+            icon="table"
+            title="No preview rows"
+            description="The source returned no rows for this page."
+          />
+          <div class="dd__pager">
+            <VipButton size="sm" :disabled="previewPage === 1" @click="previewPage--">Previous</VipButton>
+            <VipButton
+              size="sm"
+              :disabled="(preview?.returnedRows ?? 0) < (preview?.pageSize ?? 25)"
+              @click="previewPage++"
+              >Next</VipButton
+            >
+          </div>
+        </template>
       </VipCard>
 
       <!-- SCHEMA -->
@@ -267,41 +424,50 @@ const activity: ActivityItem[] = [
 
       <!-- PROFILE -->
       <VipCard v-else-if="activeTab === 'profile'">
-        <h3 class="dd__card-title">Column profile</h3>
-        <p class="dd__muted">Live statistics over {{ profile?.sampleSize ?? 0 }} sampled rows.</p>
-        <div v-if="profileLoading" class="dd__loading"><VipSpinner label="Profiling dataset…" /></div>
-        <ul v-else-if="profile?.fields.length" class="dd__profile">
-          <li v-for="p in profile.fields" :key="p.name" class="dd__profile-row">
-            <span class="dd__profile-name">{{ p.name }}</span>
-            <div class="dd__profile-bars">
-              <div class="dd__bar-group">
-                <span class="dd__bar-label">nulls {{ p.nullCount }}</span>
-                <div class="dd__bar-track">
-                  <div
-                    class="dd__bar dd__bar--null"
-                    :style="{ width: `${profile.sampleSize ? (p.nullCount / profile.sampleSize) * 100 : 0}%` }"
-                  />
-                </div>
-              </div>
-              <div class="dd__bar-group">
-                <span class="dd__bar-label">distinct {{ p.distinctCount }}</span>
-                <div class="dd__bar-track">
-                  <div
-                    class="dd__bar dd__bar--distinct"
-                    :style="{ width: `${profile.sampleSize ? (p.distinctCount / profile.sampleSize) * 100 : 0}%` }"
-                  />
-                </div>
-              </div>
-            </div>
-            <span class="dd__profile-range">{{ p.minimum ?? '—' }} … {{ p.maximum ?? '—' }}</span>
-          </li>
-        </ul>
         <VipEmptyState
-          v-else
-          icon="gauge"
-          title="No profile available"
-          description="The source has no fields to profile."
+          v-if="!canQuery"
+          icon="warning"
+          tone="warning"
+          title="Profile not permitted"
+          description="Query access on this dataset is required to view column profiles."
         />
+        <template v-else>
+          <h3 class="dd__card-title">Column profile</h3>
+          <p class="dd__muted">Live statistics over {{ profile?.sampleSize ?? 0 }} sampled rows.</p>
+          <div v-if="profileLoading" class="dd__loading"><VipSpinner label="Profiling dataset…" /></div>
+          <ul v-else-if="profile?.fields.length" class="dd__profile">
+            <li v-for="p in profile.fields" :key="p.name" class="dd__profile-row">
+              <span class="dd__profile-name">{{ p.name }}</span>
+              <div class="dd__profile-bars">
+                <div class="dd__bar-group">
+                  <span class="dd__bar-label">nulls {{ p.nullCount }}</span>
+                  <div class="dd__bar-track">
+                    <div
+                      class="dd__bar dd__bar--null"
+                      :style="{ width: `${profile.sampleSize ? (p.nullCount / profile.sampleSize) * 100 : 0}%` }"
+                    />
+                  </div>
+                </div>
+                <div class="dd__bar-group">
+                  <span class="dd__bar-label">distinct {{ p.distinctCount }}</span>
+                  <div class="dd__bar-track">
+                    <div
+                      class="dd__bar dd__bar--distinct"
+                      :style="{ width: `${profile.sampleSize ? (p.distinctCount / profile.sampleSize) * 100 : 0}%` }"
+                    />
+                  </div>
+                </div>
+              </div>
+              <span class="dd__profile-range">{{ p.minimum ?? '—' }} … {{ p.maximum ?? '—' }}</span>
+            </li>
+          </ul>
+          <VipEmptyState
+            v-else
+            icon="gauge"
+            title="No profile available"
+            description="The source has no fields to profile."
+          />
+        </template>
       </VipCard>
 
       <!-- QUALITY -->
@@ -352,79 +518,115 @@ const activity: ActivityItem[] = [
       <!-- LINEAGE -->
       <VipCard v-else-if="activeTab === 'lineage'">
         <h3 class="dd__card-title">Lineage</h3>
-        <div class="dd__lineage">
-          <div class="dd__lineage-col">
-            <span class="dd__lineage-head">Upstream</span>
-            <div class="dd__lineage-node"><VipIcon name="plug" :size="14" />{{ dataset.source }}</div>
-            <div class="dd__lineage-node"><VipIcon name="workflow" :size="14" />Revenue Nightly ETL</div>
+        <div v-if="lineageLoading" class="dd__loading"><VipSpinner label="Loading lineage…" /></div>
+        <VipEmptyState
+          v-else-if="lineageError"
+          icon="warning"
+          tone="warning"
+          title="Unable to load lineage"
+          :description="String(lineageError)"
+        />
+        <template v-else>
+          <div class="dd__lineage">
+            <div class="dd__lineage-col">
+              <span class="dd__lineage-head">Upstream</span>
+              <div v-if="!lineageUpstream.length" class="dd__muted">No upstream resources</div>
+              <div v-for="n in lineageUpstream" :key="n.id" class="dd__lineage-node">
+                <VipIcon name="database" :size="14" />{{ n.name }}
+              </div>
+            </div>
+            <VipIcon name="chevronRight" :size="18" class="dd__lineage-arrow" />
+            <div class="dd__lineage-col">
+              <span class="dd__lineage-head">This dataset</span>
+              <div class="dd__lineage-node is-current"><VipIcon name="database" :size="14" />{{ dataset.name }}</div>
+            </div>
+            <VipIcon name="chevronRight" :size="18" class="dd__lineage-arrow" />
+            <div class="dd__lineage-col">
+              <span class="dd__lineage-head">Downstream</span>
+              <div v-if="!lineageDownstream.length" class="dd__muted">No downstream resources</div>
+              <div v-for="n in lineageDownstream" :key="n.id" class="dd__lineage-node">
+                <VipIcon name="database" :size="14" />{{ n.name }}
+              </div>
+            </div>
           </div>
-          <VipIcon name="chevronRight" :size="18" class="dd__lineage-arrow" />
-          <div class="dd__lineage-col">
-            <span class="dd__lineage-head">This dataset</span>
-            <div class="dd__lineage-node is-current"><VipIcon name="database" :size="14" />{{ dataset.name }}</div>
-          </div>
-          <VipIcon name="chevronRight" :size="18" class="dd__lineage-arrow" />
-          <div class="dd__lineage-col">
-            <span class="dd__lineage-head">Downstream</span>
-            <div class="dd__lineage-node"><VipIcon name="layers" :size="14" />Sales Analytics</div>
-            <div class="dd__lineage-node"><VipIcon name="chart" :size="14" />Executive Overview</div>
-          </div>
-        </div>
-        <VipButton variant="tertiary" icon="lineage" @click="router.push('/datasets/lineage')"
-          >Open full lineage graph</VipButton
-        >
+          <VipButton variant="tertiary" icon="lineage" @click="router.push('/datasets/lineage')"
+            >Open full lineage graph</VipButton
+          >
+        </template>
       </VipCard>
 
       <!-- ACCESS -->
       <VipCard v-else-if="activeTab === 'access'" :padded="false">
-        <VipTable
-          :columns="[
-            { key: 'principal', label: 'Principal' },
-            { key: 'type', label: 'Type' },
-            { key: 'role', label: 'Role', align: 'right' },
-          ]"
-          :rows="access"
-          :row-key="(r) => r.principal"
-          density="compact"
-        >
-          <template #cell-role="{ row }"
-            ><VipBadge tone="brand" variant="soft" size="sm">{{ row.role }}</VipBadge></template
+        <div v-if="accessLoading" class="dd__loading"><VipSpinner label="Loading access…" /></div>
+        <VipEmptyState
+          v-else-if="accessError"
+          icon="warning"
+          tone="warning"
+          title="Unable to load access"
+          :description="accessError"
+        />
+        <VipEmptyState
+          v-else-if="!accessEntries.length"
+          icon="users"
+          title="No direct access grants"
+          description="This dataset may still be reachable via ownership or workspace roles. Use Share to grant resource ACL access when authorized."
+        />
+        <VipTable v-else :columns="accessColumns" :rows="accessEntries" :row-key="(r) => r.id" density="compact">
+          <template #cell-access_level="{ row }"
+            ><VipBadge tone="brand" variant="soft" size="sm">{{ row.access_level }}</VipBadge></template
           >
+          <template #cell-effect="{ row }"
+            ><VipBadge :tone="row.effect === 'deny' ? 'danger' : 'success'" variant="soft" size="sm">{{
+              row.effect
+            }}</VipBadge></template
+          >
+          <template #cell-expires_at="{ row }">{{
+            row.expires_at ? formatDateTime(row.expires_at) : 'Never'
+          }}</template>
         </VipTable>
       </VipCard>
 
-      <!-- VERSIONS -->
+      <!-- VERSIONS — no history API exists -->
       <VipCard v-else-if="activeTab === 'versions'">
-        <h3 class="dd__card-title">Version history</h3>
-        <ul class="dd__versions">
-          <li v-for="v in versions" :key="v.id" class="dd__version">
-            <VipBadge tone="neutral" variant="outline" size="sm">{{ v.label }}</VipBadge>
-            <div class="dd__version-body">
-              <span class="dd__version-note">{{ v.note }}</span>
-              <span class="dd__version-meta">{{ v.author }} · {{ v.when }}</span>
-            </div>
-          </li>
-        </ul>
+        <VipEmptyState
+          icon="clock"
+          title="Version history unavailable"
+          description="Dataset Studio does not yet expose an immutable version-history API. The optimistic concurrency version on the dataset record is not a publish history."
+        >
+          <p class="dd__muted">Current concurrency version: {{ dataset.version ?? '—' }}</p>
+        </VipEmptyState>
       </VipCard>
 
       <!-- ACTIVITY -->
       <VipCard v-else>
         <h3 class="dd__card-title">Recent activity</h3>
-        <ul class="dd__feed">
-          <li v-for="a in activity" :key="a.id" class="dd__feed-item">
-            <span class="dd__feed-dot"><VipIcon :name="a.icon" :size="13" /></span>
+        <div v-if="activityLoading" class="dd__loading"><VipSpinner label="Loading activity…" /></div>
+        <VipEmptyState
+          v-else-if="activityError"
+          icon="warning"
+          tone="warning"
+          title="Unable to load activity"
+          :description="activityError"
+        />
+        <VipEmptyState
+          v-else-if="!activityItems.length"
+          icon="clock"
+          title="No activity yet"
+          description="Audit events for this dataset will appear here after create, update, certify, quality, and access actions."
+        />
+        <ul v-else class="dd__feed">
+          <li v-for="a in activityItems" :key="a.id" class="dd__feed-item">
+            <span class="dd__feed-dot"><VipIcon name="shield" :size="13" /></span>
             <div class="dd__feed-body">
               <span class="dd__feed-text"
-                ><strong>{{ a.actor }}</strong> {{ a.action }}</span
+                ><strong>{{ a.actorUserId ?? 'system' }}</strong> {{ a.eventType }}
+                <VipBadge tone="neutral" variant="soft" size="sm">{{ a.outcome }}</VipBadge></span
               >
-              <span class="dd__feed-time">{{ a.when }} ago</span>
+              <span class="dd__feed-time">{{ relativeTime(a.occurredAt) }} · {{ formatDateTime(a.occurredAt) }}</span>
             </div>
           </li>
         </ul>
-        <p class="dd__muted">
-          Dataset created {{ formatDateTime(dataset.freshness) }} · last refreshed
-          {{ relativeTime(dataset.freshness) }}.
-        </p>
+        <p v-if="activityTotal" class="dd__muted">{{ activityTotal }} event(s) total</p>
       </VipCard>
     </template>
   </div>
@@ -448,6 +650,42 @@ const activity: ActivityItem[] = [
 .dd__muted {
   font-size: var(--vip-fs-sm);
   color: var(--vip-text-muted);
+}
+.dd__cert {
+  margin-bottom: var(--vip-sp-5);
+}
+.dd__cert-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--vip-sp-4);
+  margin-bottom: var(--vip-sp-5);
+  font-size: var(--vip-fs-sm);
+}
+.dd__cert-facts span {
+  display: block;
+  color: var(--vip-text-muted);
+  margin-bottom: 2px;
+}
+.dd__cert-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-2);
+  font-size: var(--vip-fs-sm);
+  margin-bottom: var(--vip-sp-4);
+}
+.dd__cert-note input {
+  height: 34px;
+  border: 1px solid var(--vip-border);
+  border-radius: var(--vip-radius-sm);
+  padding: 0 var(--vip-sp-4);
+  background: var(--vip-surface-2);
+  color: var(--vip-text-primary);
+}
+.dd__cert-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  flex-wrap: wrap;
 }
 .dd__mono {
   font-family: var(--vip-font-mono);

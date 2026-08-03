@@ -30,6 +30,10 @@ export interface Dataset {
   tags: string[]
   status: DatasetStatus
   certified: boolean
+  certificationStatus?: string
+  certifiedByUserId?: string | null
+  certifiedAt?: string | null
+  certificationNote?: string | null
   source: string
   rowCount: number
   freshness: string
@@ -43,6 +47,25 @@ export interface Dataset {
   readOnly?: boolean
   /** Present on single-dataset reads: the caller's effective access. */
   access?: ResourceEffectiveAccess
+}
+
+export interface DatasetActivityItem {
+  id: string
+  occurredAt: string
+  actorUserId: string | null
+  eventType: string
+  action: string
+  outcome: string
+  resourceType: string | null
+  resourceId: string | null
+  metadata: Record<string, unknown>
+}
+
+export interface DatasetActivityPage {
+  items: DatasetActivityItem[]
+  limit: number
+  offset: number
+  total: number
 }
 
 export type QualityDimension = 'completeness' | 'validity' | 'uniqueness' | 'freshness' | 'consistency'
@@ -487,10 +510,16 @@ export interface DatasetService {
   profile(id: string): Promise<DatasetProfile>
   getLineage(id?: string): Promise<DatasetLineage>
   listQualityRules(): Promise<QualityRule[]>
+  /** Dataset-scoped rules — prefer this on detail pages to avoid workspace N+1 fan-out. */
+  listQualityRulesForDataset(datasetId: string): Promise<QualityRule[]>
   listIncidents(): Promise<QualityIncident[]>
   qualityHistory(datasetId: string): Promise<QualityEvaluation[]>
   createRule(payload: CreateRulePayload): Promise<QualityRule>
+  deleteQualityRule?(datasetId: string, ruleId: string): Promise<void>
   runQuality(datasetId: string): Promise<{ id: string; status: string }>
+  certify?(id: string, version: number, note?: string): Promise<Dataset>
+  revokeCertification?(id: string, version: number, note?: string): Promise<Dataset>
+  getActivity?(id: string, opts?: { limit?: number; offset?: number }): Promise<DatasetActivityPage>
   /** Soft-archive (POST /datasets/:id/archive). No restore/unarchive endpoint exists. */
   archive(id: string): Promise<void>
   /** Elevated delete (DELETE /datasets/:id) — backend soft-archives; no restore. */
@@ -563,6 +592,11 @@ const mockDatasetService: DatasetService = {
     return [...createdRules, ...RULES]
   },
 
+  async listQualityRulesForDataset(datasetId: string): Promise<QualityRule[]> {
+    await latency()
+    return [...createdRules, ...RULES].filter((rule) => rule.datasetId === datasetId)
+  },
+
   async listIncidents(): Promise<QualityIncident[]> {
     await latency()
     return INCIDENTS
@@ -615,6 +649,9 @@ interface ApiDataset {
   tags: string[]
   status: 'active' | 'inactive' | 'archived'
   certification_status: string
+  certified_by_user_id?: string | null
+  certified_at?: string | null
+  certification_note?: string | null
   qualified_name: string
   row_count_estimate: number | null
   last_discovered_at: string | null
@@ -721,6 +758,10 @@ function mapDataset(item: ApiDataset, qualityScore: number | null = null): Datas
     tags: item.tags,
     status: item.status === 'archived' ? 'deprecated' : item.status === 'inactive' ? 'building' : 'active',
     certified: item.certification_status === 'certified',
+    certificationStatus: item.certification_status,
+    certifiedByUserId: item.certified_by_user_id ?? null,
+    certifiedAt: item.certified_at ?? null,
+    certificationNote: item.certification_note ?? null,
     source: item.qualified_name,
     rowCount: item.row_count_estimate ?? 0,
     freshness: item.last_discovered_at ?? new Date(0).toISOString(),
@@ -749,30 +790,42 @@ async function liveDatasets(search?: string): Promise<Dataset[]> {
   return response.items.map((item, index) => mapDataset(item, summaries[index]?.score ?? null))
 }
 
+function mapQualityRule(rule: ApiQualityRule, dataset: Pick<Dataset, 'id' | 'name'>): QualityRule {
+  return {
+    id: rule.id,
+    name: rule.name,
+    dimension:
+      rule.rule_type === 'unique' ? 'uniqueness' : rule.rule_type === 'freshness' ? 'freshness' : 'completeness',
+    severity:
+      rule.severity === 'critical' || rule.severity === 'error'
+        ? 'high'
+        : rule.severity === 'warning'
+          ? 'medium'
+          : 'low',
+    status: ['passing', 'failing', 'warning', 'unknown'].includes(rule.status)
+      ? (rule.status as QualityRuleStatus)
+      : 'not_evaluated',
+    lastRun: rule.updated_at,
+    passRate: rule.status === 'passing' ? 100 : rule.status === 'not_evaluated' ? null : 0,
+    dataset: dataset.name,
+    datasetId: dataset.id,
+  }
+}
+
+async function liveRulesForDataset(datasetId: string): Promise<QualityRule[]> {
+  const [dataset, rules] = await Promise.all([
+    apiClient.get<ApiDataset>(`/datasets/${datasetId}`),
+    apiClient.get<ApiQualityRule[]>(`/datasets/${datasetId}/quality-rules`),
+  ])
+  return rules.map((rule) => mapQualityRule(rule, { id: dataset.id, name: dataset.display_name }))
+}
+
 async function liveRules(): Promise<QualityRule[]> {
   const datasets = await liveDatasets()
   const groups = await Promise.all(
     datasets.map(async (dataset) => {
       const rules = await apiClient.get<ApiQualityRule[]>(`/datasets/${dataset.id}/quality-rules`)
-      return rules.map((rule): QualityRule => ({
-        id: rule.id,
-        name: rule.name,
-        dimension:
-          rule.rule_type === 'unique' ? 'uniqueness' : rule.rule_type === 'freshness' ? 'freshness' : 'completeness',
-        severity:
-          rule.severity === 'critical' || rule.severity === 'error'
-            ? 'high'
-            : rule.severity === 'warning'
-              ? 'medium'
-              : 'low',
-        status: ['passing', 'failing', 'warning', 'unknown'].includes(rule.status)
-          ? (rule.status as QualityRuleStatus)
-          : 'not_evaluated',
-        lastRun: rule.updated_at,
-        passRate: rule.status === 'passing' ? 100 : rule.status === 'not_evaluated' ? null : 0,
-        dataset: dataset.name,
-        datasetId: dataset.id,
-      }))
+      return rules.map((rule) => mapQualityRule(rule, dataset))
     }),
   )
   return groups.flat()
@@ -930,8 +983,13 @@ const apiDatasetService: DatasetService = {
     }
   },
   getLineage: async (id) => {
-    const datasets = await liveDatasets()
-    const target = id ?? datasets[0]?.id
+    let target = id
+    if (!target) {
+      // Workspace-wide callers without an id still need a seed dataset; avoid
+      // this path on Dataset detail (always passes id).
+      const datasets = await liveDatasets()
+      target = datasets[0]?.id
+    }
     if (!target) return { nodes: [], edges: [] }
     const graph = await apiClient.get<ApiLineageGraph>(`/datasets/${target}/lineage`)
     return {
@@ -940,6 +998,7 @@ const apiDatasetService: DatasetService = {
     }
   },
   listQualityRules: liveRules,
+  listQualityRulesForDataset: liveRulesForDataset,
   listIncidents: liveIncidents,
   qualityHistory: async (datasetId) =>
     (await apiClient.get<ApiQualityEvaluation[]>(`/datasets/${datasetId}/quality-evaluations`)).map((item) => ({
@@ -978,6 +1037,57 @@ const apiDatasetService: DatasetService = {
   },
   runQuality: (datasetId) =>
     apiClient.post<{ id: string; status: string }>(`/datasets/${datasetId}/quality-evaluations`),
+  deleteQualityRule: (datasetId, ruleId) => apiClient.delete<void>(`/datasets/${datasetId}/quality-rules/${ruleId}`),
+  certify: async (id, version, note) => {
+    const [dataset, summary] = await Promise.all([
+      apiClient.post<ApiDataset>(`/datasets/${id}/certify`, { version, note: note ?? null }),
+      apiClient.get<ApiQualitySummary>(`/datasets/${id}/quality`).catch(() => ({ status: 'unknown', score: null })),
+    ])
+    return mapDataset(dataset, summary.score)
+  },
+  revokeCertification: async (id, version, note) => {
+    const [dataset, summary] = await Promise.all([
+      apiClient.post<ApiDataset>(`/datasets/${id}/certification/revoke`, { version, note: note ?? null }),
+      apiClient.get<ApiQualitySummary>(`/datasets/${id}/quality`).catch(() => ({ status: 'unknown', score: null })),
+    ])
+    return mapDataset(dataset, summary.score)
+  },
+  getActivity: async (id, opts = {}) => {
+    const page = await apiClient.get<{
+      items: Array<{
+        id: string
+        occurred_at: string
+        actor_user_id: string | null
+        event_type: string
+        action: string
+        outcome: string
+        resource_type: string | null
+        resource_id: string | null
+        metadata: Record<string, unknown>
+      }>
+      limit: number
+      offset: number
+      total: number
+    }>(`/datasets/${id}/activity`, {
+      query: { limit: opts.limit ?? 50, offset: opts.offset ?? 0 },
+    })
+    return {
+      items: page.items.map((item) => ({
+        id: item.id,
+        occurredAt: item.occurred_at,
+        actorUserId: item.actor_user_id,
+        eventType: item.event_type,
+        action: item.action,
+        outcome: item.outcome,
+        resourceType: item.resource_type,
+        resourceId: item.resource_id,
+        metadata: item.metadata ?? {},
+      })),
+      limit: page.limit,
+      offset: page.offset,
+      total: page.total,
+    }
+  },
   archive: (id) => apiClient.post<void>(`/datasets/${id}/archive`),
   remove: (id) => apiClient.delete<void>(`/datasets/${id}`),
 }

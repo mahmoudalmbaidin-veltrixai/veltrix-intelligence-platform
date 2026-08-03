@@ -91,9 +91,8 @@ class DatasetUpdate(BaseModel):
     tags: list[str] | None = Field(default=None, max_length=30)
     business_domain: str | None = Field(default=None, max_length=160)
     refresh_expectation: str | None = Field(default=None, max_length=160)
-    certification_status: (
-        Literal["uncertified", "draft", "reviewed", "certified", "deprecated"] | None
-    ) = None
+    # certification_status is intentionally absent: certify/revoke are dedicated
+    # certify-gated actions so edit alone cannot flip certification.
     documentation_url: HttpUrl | None = None
     owner_user_id: UUID | None = None
     steward_user_id: UUID | None = None
@@ -105,6 +104,16 @@ class DatasetUpdate(BaseModel):
         if value is None:
             return None
         return sorted({item.strip().lower() for item in value if item.strip()})
+
+
+class DatasetCertifyRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=2000)
+    version: int = Field(ge=1)
+
+
+class DatasetRevokeCertificationRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=2000)
+    version: int = Field(ge=1)
 
 
 class DatasetResponse(BaseModel):
@@ -130,6 +139,9 @@ class DatasetResponse(BaseModel):
     size_bytes_estimate: int | None
     tags: list[str]
     certification_status: str
+    certified_by_user_id: UUID | None = None
+    certified_at: datetime | None = None
+    certification_note: str | None = None
     last_discovered_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -138,6 +150,25 @@ class DatasetResponse(BaseModel):
     # Studio renders viewer/editor/certifier/manager states from the enforced
     # decision. Absent on list items (the list is already visibility-filtered).
     access: ResourceEffectiveAccess | None = None
+
+
+class DatasetActivityItem(BaseModel):
+    id: UUID
+    occurred_at: datetime
+    actor_user_id: UUID | None
+    event_type: str
+    action: str
+    outcome: str
+    resource_type: str | None
+    resource_id: UUID | None
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class DatasetActivityPage(BaseModel):
+    items: list[DatasetActivityItem]
+    limit: int
+    offset: int
+    total: int
 
 
 class DatasetListResponse(BaseModel):

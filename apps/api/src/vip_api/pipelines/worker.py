@@ -24,11 +24,7 @@ from vip_api.core.logging import configure_logging
 from vip_api.database.session import Database
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
-from vip_api.governance.services import (
-    GovernanceRequirement,
-    authorize,
-    resolve_authorization_context,
-)
+from vip_api.governance.services import resolve_authorization_context
 from vip_api.jobs.models import WorkerHeartbeat
 from vip_api.pipelines.execution import execute_snapshot
 from vip_api.pipelines.models import (
@@ -41,6 +37,7 @@ from vip_api.pipelines.models import (
     PipelineVersion,
 )
 from vip_api.pipelines.schemas import NodeInput
+from vip_api.pipelines.services import require_pipeline_access
 from vip_api.pipelines.storage import PipelineArtifactStorage
 from vip_api.tenancy.context import TenantContext
 from vip_api.tenancy.models import MembershipStatus, OrganizationMembership, WorkspaceMembership
@@ -120,9 +117,10 @@ async def _context(db: AsyncSession, run: PipelineRun) -> AuthorizationContext:
         correlation_id=run.correlation_id,
     )
     context = await resolve_authorization_context(db, tenant)
-    await authorize(
-        db, context, GovernanceRequirement("pipeline.execute", "pipeline_studio", "pipeline_studio")
-    )
+    # Re-authorize at claim time with the same resource evaluator used by the
+    # API (operator+). Broad pipeline.execute must not be required so ACL
+    # operators survive worker execution after their run was accepted.
+    await require_pipeline_access(db, context, run.pipeline_id, "operator")
     return context
 
 

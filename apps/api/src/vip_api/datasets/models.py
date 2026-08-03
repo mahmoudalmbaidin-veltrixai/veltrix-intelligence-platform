@@ -75,6 +75,11 @@ class Dataset(Base):
     certification_status: Mapped[str] = mapped_column(
         String(24), default="uncertified", nullable=False
     )
+    certified_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    certified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    certification_note: Mapped[str | None] = mapped_column(String(2000))
     documentation_url: Mapped[str | None] = mapped_column(String(1000))
     last_discovered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_metadata_refresh_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

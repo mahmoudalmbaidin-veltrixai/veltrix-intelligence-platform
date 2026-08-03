@@ -217,4 +217,22 @@ export interface PipelineRun {
   logs: RunLogEntry[]
   attempt: number
   rowsProcessed: number
+  /** Present when the backend provides a failure reason; never fabricated. */
+  errorMessage?: string
+}
+
+/** Artifact produced by a pipeline run (file-export / rejected rows). */
+export interface PipelineArtifact {
+  id: string
+  nodeKey: string
+  contentType: string
+  sizeBytes: number
+  sha256: string
+  expiresAt: string
+  createdAt: string
+}
+
+export interface ArtifactDownloadLink {
+  url: string
+  expiresInSeconds: number
 }

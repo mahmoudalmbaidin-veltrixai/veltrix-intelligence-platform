@@ -5,6 +5,7 @@ import { NODE_TYPES, PALETTE_GROUPS } from './nodeTypes'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipInput from '@/shared/ui/VipInput.vue'
 
+const props = withDefaults(defineProps<{ readonly?: boolean }>(), { readonly: false })
 const emit = defineEmits<{ add: [PipelineNodeKind] }>()
 const search = ref('')
 
@@ -19,13 +20,22 @@ const groups = computed(() => {
 })
 
 function onDragStart(e: DragEvent, kind: PipelineNodeKind) {
+  if (props.readonly) {
+    e.preventDefault()
+    return
+  }
   e.dataTransfer?.setData('application/vip-node', kind)
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy'
+}
+
+function add(kind: PipelineNodeKind) {
+  if (props.readonly) return
+  emit('add', kind)
 }
 </script>
 
 <template>
-  <aside class="palette">
+  <aside class="palette" :class="{ 'is-readonly': readonly }">
     <div class="palette__search">
       <VipInput v-model="search" icon="search" placeholder="Search nodes…" size="sm" />
     </div>
@@ -37,24 +47,31 @@ function onDragStart(e: DragEvent, kind: PipelineNodeKind) {
           :key="kind"
           class="palette__node"
           :class="`is-${NODE_TYPES[kind].category}`"
-          draggable="true"
-          :title="`${NODE_TYPES[kind].description} — press Enter to add`"
+          :draggable="!readonly"
+          :disabled="readonly"
+          :title="
+            readonly
+              ? `${NODE_TYPES[kind].label} — editing requires Developer access`
+              : `${NODE_TYPES[kind].description} — press Enter to add`
+          "
           :aria-label="`Add ${NODE_TYPES[kind].label} node`"
           @dragstart="onDragStart($event, kind)"
-          @dblclick="emit('add', kind)"
-          @keydown.enter.prevent="emit('add', kind)"
-          @keydown.space.prevent="emit('add', kind)"
+          @dblclick="add(kind)"
+          @keydown.enter.prevent="add(kind)"
+          @keydown.space.prevent="add(kind)"
         >
           <span class="palette__node-icon"><VipIcon :name="NODE_TYPES[kind].icon" :size="15" /></span>
           <span class="palette__node-text">
             <span class="palette__node-title">{{ NODE_TYPES[kind].label }}</span>
             <span class="palette__node-desc">{{ NODE_TYPES[kind].description }}</span>
           </span>
-          <VipIcon name="drag" :size="14" class="palette__node-grip" />
+          <VipIcon v-if="!readonly" name="drag" :size="14" class="palette__node-grip" />
         </button>
       </div>
     </div>
-    <div class="palette__hint">Drag onto canvas or double-click to add</div>
+    <div class="palette__hint">
+      {{ readonly ? 'Read-only — Developer access required to add nodes' : 'Drag onto canvas or double-click to add' }}
+    </div>
   </aside>
 </template>
 
@@ -64,6 +81,10 @@ function onDragStart(e: DragEvent, kind: PipelineNodeKind) {
   flex-direction: column;
   height: 100%;
   background: var(--vip-surface-1);
+}
+.palette.is-readonly .palette__node {
+  cursor: default;
+  opacity: 0.72;
 }
 .palette__search {
   padding: var(--vip-sp-5);

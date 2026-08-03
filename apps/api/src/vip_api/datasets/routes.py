@@ -18,6 +18,8 @@ from vip_api.datasets.ingestion import ingest_csv, ingest_csv_file
 from vip_api.datasets.preview import preview_dataset, profile_dataset
 from vip_api.datasets.schemas import (
     CsvIngestRequest,
+    DatasetActivityPage,
+    DatasetCertifyRequest,
     DatasetCreate,
     DatasetFieldResponse,
     DatasetFieldUpdate,
@@ -25,6 +27,7 @@ from vip_api.datasets.schemas import (
     DatasetPreviewResponse,
     DatasetProfileResponse,
     DatasetResponse,
+    DatasetRevokeCertificationRequest,
     DatasetUpdate,
     DiscoveryRequest,
     DiscoveryResult,
@@ -40,6 +43,7 @@ from vip_api.datasets.schemas import (
 )
 from vip_api.datasets.services import (
     archive_dataset,
+    certify_dataset,
     create_dataset,
     create_lineage,
     create_quality_evaluation,
@@ -49,6 +53,7 @@ from vip_api.datasets.services import (
     discover,
     get_dataset,
     lineage_graph,
+    list_dataset_activity,
     list_datasets,
     list_fields,
     list_quality_evaluations,
@@ -56,6 +61,7 @@ from vip_api.datasets.services import (
     list_quality_rules,
     quality_summary,
     require_dataset_access,
+    revoke_dataset_certification,
     update_dataset,
     update_field,
     update_quality_rule,
@@ -200,6 +206,49 @@ async def datasets_update(
     context: Annotated[AuthorizationContext, Depends(dataset_capability)],
 ) -> DatasetResponse:
     return await update_dataset(db, context, dataset_id, payload)
+
+
+@router.post(
+    "/{dataset_id}/certify",
+    response_model=DatasetResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def datasets_certify(
+    dataset_id: UUID,
+    payload: DatasetCertifyRequest,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
+) -> DatasetResponse:
+    return await certify_dataset(
+        db, context, dataset_id, version=payload.version, note=payload.note
+    )
+
+
+@router.post(
+    "/{dataset_id}/certification/revoke",
+    response_model=DatasetResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def datasets_revoke_certification(
+    dataset_id: UUID,
+    payload: DatasetRevokeCertificationRequest,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
+) -> DatasetResponse:
+    return await revoke_dataset_certification(
+        db, context, dataset_id, version=payload.version, note=payload.note
+    )
+
+
+@router.get("/{dataset_id}/activity", response_model=DatasetActivityPage)
+async def datasets_activity(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> DatasetActivityPage:
+    return await list_dataset_activity(db, context, dataset_id, limit=limit, offset=offset)
 
 
 @router.post("/{dataset_id}/archive", status_code=204, dependencies=[Depends(require_csrf)])

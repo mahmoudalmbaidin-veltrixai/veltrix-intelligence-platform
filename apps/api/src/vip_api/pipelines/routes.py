@@ -87,7 +87,7 @@ pipeline_capability = require_capability("pipeline_studio", "pipeline_studio")
 
 @router.get("/formula-language")
 async def formula_language(
-    _context: Annotated[AuthorizationContext, Depends(gate("pipeline.read"))],
+    _context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> dict[str, object]:
     return {
         "version": 1,
@@ -120,7 +120,7 @@ async def formula_language(
 )
 async def formula_validate(
     payload: FormulaValidationRequest,
-    _context: Annotated[AuthorizationContext, Depends(gate("pipeline.read"))],
+    _context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> FormulaValidationResponse:
     try:
         expression = parse_formula(
@@ -264,10 +264,11 @@ async def run_create(
     pipeline_id: UUID,
     payload: RunCreate,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(gate("pipeline.execute", quota="pipeline_runs.monthly"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> RunResponse:
+    # Authorization is resource-level (operator+) inside create_run; monthly run
+    # quota is enforced separately there so ACL operators are not blocked by
+    # broad pipeline.execute while still consuming pipeline_runs.monthly.
     return await create_run(db, context, pipeline_id, payload.pipeline_version_id)
 
 
@@ -314,10 +315,9 @@ async def run_retry(
     pipeline_id: UUID,
     run_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    context: Annotated[
-        AuthorizationContext, Depends(gate("pipeline.runs.retry", quota="pipeline_runs.monthly"))
-    ],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
 ) -> RunResponse:
+    # Same split as run_create: resource operator check + quota in retry_run.
     return await retry_run(db, context, pipeline_id, run_id)
 
 

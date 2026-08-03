@@ -61,8 +61,8 @@ Sequence strictly: **B9.0 critical stabilization (security + authoring/data bloc
 ### Partially ready
 | Module | What works | What's missing |
 |---|---|---|
-| Pipeline Studio | Create/save/autosave/nodes/edges/undo/redo/formula/validate/run/cancel/retry/logs | Re-publish broken; schema empty on load; read-only surfaces ungated; artifacts not surfaced; run-start/retry still broad-RBAC gated |
-| Dataset Studio | Overview/preview/schema/profile/quality (real) | Access/Versions/Activity/Lineage tabs are hardcoded mocks; certification enforced at `edit` not `certify` |
+| Pipeline Studio | Create/save/autosave/nodes/edges/undo/redo/formula/validate/run/cancel/retry/logs; B9.0 re-publish/schema; B9.1B ACL run/retry, read-only surfaces, artifacts UI | Remaining polish only; no known blockers in B9.1B scope |
+| Dataset Studio | Overview/preview/schema/profile/quality (real); B9.1B live Access/Lineage/Activity; certify/revoke; Versions unavailable-honest | Dataset immutable version history API still absent (documented unavailable) |
 | Dashboard delivery | On-demand export + "send test now" + email | **Recurring schedules never execute; cron unparsed** |
 | Auth recovery | Admin-driven reset | Self-service reset has no route; `must_change_password` not enforced; no MFA |
 | Admin UX / tenancy | Real org/ws/membership/role/group views | Tenant-lifecycle audit is logs-only (not persisted) |
@@ -116,15 +116,15 @@ Module: Auth · Evidence: `password_reset.py` fully implemented but **called by 
 Module: Backend API/security · Evidence: `CONNECTION_TEST_RATE_LIMIT_PER_MINUTE` defined (`config.py:115`) but **never wired**; `POST /connections/{id}/test` makes outbound calls with no throttle; login limiter fails open on Redis error (`auth/rate_limit.py:24-28`); no data-plane rate limiting. · User impact: SSRF-adjacent abuse/DoS amplification; brute-force window on Redis outage. · Action: wire the connection-test limiter; fail-closed (or degrade) login limiter; add per-account limiting; add baseline data-plane limits. · **Size: M** · **Milestone: B9.0** (connection-test) / B9.2 (general).
 
 ### Medium
-**M1 — Pipeline run-start/retry still broad-RBAC gated (permission-model inconsistency).** `pipelines/routes.py` — `run_create`/`run_retry` use `gate("pipeline.execute"|"pipeline.runs.retry")` while read/save/publish/cancel moved to `pipeline_capability` + ACL, so an ACL-elevated operator can cancel but cannot start/retry. Action: route run/retry through the resource evaluator at the `operator` level. Size: S. **B9.1**.
+**M1 — Pipeline run-start/retry still broad-RBAC gated (permission-model inconsistency). — RESOLVED in Phase B9.1B** (run/retry use `pipeline_capability` + operator resource evaluator; quota consumed in service; worker claim uses resource operator check. See `VIP_PHASE_B9_1B_PIPELINE_DATASET_REPORT.md`.)
 
-**M2 — Pipeline read-only surfaces ungated.** `PipelineCanvas.vue`, `NodeInspector.vue`, `NodePalette`, keyboard handlers (`PipelineStudioView.vue:263-309`) permit local mutation for viewers/operators (backend blocks persistence, so it's UX-misleading, not a hole). Action: pass `canEdit` into canvas/inspector/palette/keyboard. Size: S–M. **B9.1**.
+**M2 — Pipeline read-only surfaces ungated. — RESOLVED in Phase B9.1B** (`canEdit`/`canRun` wired into palette/canvas/inspector/keyboard/undo-redo/runs actions.)
 
-**M3 — Pipeline artifacts never surfaced.** `file-export` produces artifacts but there is no artifact list/download UI (`PipelineStudioView.vue:640-651`). Size: M. **B9.1**.
+**M3 — Pipeline artifacts never surfaced. — RESOLVED in Phase B9.1B** (Studio Results + Runs drawer list artifacts and signed downloads.)
 
-**M4 — Dataset four tabs are hardcoded mocks.** Access/Versions/Activity/Lineage in `DatasetDetailView.vue:108-154,353-376` render static data even in live mode (real lineage BFS exists at backend). Action: wire to resource-access/audit/lineage APIs. Size: M (L if Versions/Activity need new endpoints). **B9.1**.
+**M4 — Dataset four tabs are hardcoded mocks. — RESOLVED in Phase B9.1B** (Access/Lineage/Activity live-wired; Versions shows honest unavailable state; no fabricated live rows.)
 
-**M5 — Dataset certification enforced at `edit`, not `certify`.** `certification_status` transitions through `update_dataset` (`services.py:268`, edit-gated); no dedicated certify guard. Action: split into a `certify`-gated action. Size: S. **B9.1**.
+**M5 — Dataset certification enforced at `edit`, not `certify`. — RESOLVED in Phase B9.1B** (dedicated certify/revoke endpoints + migration metadata + audit; removed from `DatasetUpdate`.)
 
 **M6 — Export visual fidelity is a Python reimplementation.** `dashboard_delivery/rendering.py` (ReportLab/PIL), data-consistent but not pixel-parity with the Vue viewer. Action: document parity limits or move to headless-browser rendering. Size: M–L. **B9.1**.
 
@@ -215,11 +215,11 @@ Gaps: no tests for the three highest-impact pipeline defects (re-publish, load-t
 | B9-05 | Wire connection-test rate limiter; fail-closed login limiter | High | API/security | Redis | M | B9.0 |
 | B9-06 | Gate/hide all placeholder nav behind entitlement/flag (OFF) | Med | FE/nav | — | S | B9.0 (quick win) |
 | B9-07 | Delivery scheduler + real cron/time-of-day | High | Delivery | jobs | L | B9.1 |
-| B9-08 | Route pipeline run/retry through resource evaluator (operator) | Med | Pipelines | — | S | B9.1 |
-| B9-09 | Gate pipeline read-only surfaces (canvas/inspector/palette/keys) | Med | Pipelines | — | S–M | B9.1 |
-| B9-10 | Surface pipeline artifacts (list + signed download) | Med | Pipelines | files | M | B9.1 |
-| B9-11 | Wire 4 dataset mock tabs to real APIs | Med | Datasets | audit/version ep | M–L | B9.1 |
-| B9-12 | Enforce `certify` on dataset certification | Med | Datasets | — | S | B9.1 |
+| B9-08 | Route pipeline run/retry through resource evaluator (operator) | Med | Pipelines | — | S | **DONE B9.1B** |
+| B9-09 | Gate pipeline read-only surfaces (canvas/inspector/palette/keys) | Med | Pipelines | — | S–M | **DONE B9.1B** |
+| B9-10 | Surface pipeline artifacts (list + signed download) | Med | Pipelines | files | M | **DONE B9.1B** |
+| B9-11 | Wire 4 dataset mock tabs to real APIs | Med | Datasets | audit/version ep | M–L | **DONE B9.1B** |
+| B9-12 | Enforce `certify` on dataset certification | Med | Datasets | — | S | **DONE B9.1B** |
 | B9-13 | Fix AuditCenter path `/audit`→`/audit-events` | Med | FE/ops | — | S | B9.1 |
 | B9-14 | MySQL discovery adapter OR trim advertised capability | Med | Connections/Datasets | — | L/S | B9.1 |
 | B9-15 | Export fidelity: document limits or headless rendering | Med | Delivery | — | M–L | B9.1 |

@@ -7,11 +7,15 @@ import PipelineNode from './PipelineNode.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import { announce } from '@/shared/composables/useAnnouncer'
 
-const props = defineProps<{
-  editor: PipelineEditor
-  execStatuses?: Map<string, NodeExecStatus>
-  currentNodeId?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    editor: PipelineEditor
+    execStatuses?: Map<string, NodeExecStatus>
+    currentNodeId?: string
+    readonly?: boolean
+  }>(),
+  { readonly: false },
+)
 
 const NODE_W = 176
 const NODE_H = 62
@@ -123,6 +127,7 @@ function onNodePointerDown({ id, event }: { id: string; event: PointerEvent }) {
   const additive = event.shiftKey || event.metaKey || event.ctrlKey
   if (!props.editor.selection.value.has(id)) props.editor.selectNode(id, additive)
   else if (additive) props.editor.selectNode(id, true)
+  if (props.readonly) return
   mode = 'drag'
   graphMoved = false
   movedIds = [...props.editor.selection.value]
@@ -142,7 +147,7 @@ function onPortPointerDown({
   kind: 'in' | 'out'
   event: PointerEvent
 }) {
-  if (kind !== 'out') return
+  if (props.readonly || kind !== 'out') return
   const p = portPos(nodeId, port, 'out')
   const c = screenToCanvas(event.clientX, event.clientY)
   pending.value = { nodeId, port, sx: p.x, sy: p.y, mx: c.x, my: c.y }
@@ -152,7 +157,7 @@ function onPortPointerDown({
 }
 
 function onPortPointerUp({ nodeId, port, kind }: { nodeId: string; port: string; kind: 'in' | 'out' }) {
-  if (mode === 'connect' && pending.value && kind === 'in') {
+  if (!props.readonly && mode === 'connect' && pending.value && kind === 'in') {
     props.editor.connect(pending.value.nodeId, pending.value.port, nodeId, port)
   }
   pending.value = null
@@ -286,6 +291,7 @@ function fitToScreen() {
 /* ---- drop from palette ---- */
 function onDrop(event: DragEvent) {
   event.preventDefault()
+  if (props.readonly) return
   const kind = event.dataTransfer?.getData('application/vip-node') as PipelineNodeKind
   if (!kind || !NODE_TYPES[kind]) return
   const c = screenToCanvas(event.clientX, event.clientY)
