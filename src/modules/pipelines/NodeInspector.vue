@@ -16,7 +16,9 @@ import SourceConfigurationPanel from './SourceConfigurationPanel.vue'
 import NodeColumnSelect from './NodeColumnSelect.vue'
 import NodeRenameMap from './NodeRenameMap.vue'
 
-const props = defineProps<{ editor: PipelineEditor }>()
+const props = withDefaults(defineProps<{ editor: PipelineEditor; readonly?: boolean }>(), {
+  readonly: false,
+})
 
 const tab = ref<'config' | 'schema' | 'docs'>('config')
 const node = props.editor.selectedNode
@@ -39,7 +41,8 @@ function val(key: string): unknown {
   return node.value?.config[key]
 }
 function set(key: string, value: unknown) {
-  if (node.value) props.editor.updateNodeConfig(node.value.id, key, value)
+  if (props.readonly || !node.value) return
+  props.editor.updateNodeConfig(node.value.id, key, value)
 }
 
 /* key-value editor local rows */
@@ -68,7 +71,9 @@ function commitKv(key: string) {
 
 const titleModel = computed({
   get: () => node.value?.title ?? '',
-  set: (v: string) => node.value && props.editor.renameNode(node.value.id, v),
+  set: (v: string) => {
+    if (!props.readonly && node.value) props.editor.renameNode(node.value.id, v)
+  },
 })
 
 const columnsModel = (key: string) => ({
@@ -85,7 +90,7 @@ const columnsModel = (key: string) => ({
 </script>
 
 <template>
-  <aside class="insp">
+  <aside class="insp" :class="{ 'is-readonly': readonly }">
     <div v-if="!node" class="insp__empty">
       <VipEmptyState
         icon="settings"
@@ -98,8 +103,14 @@ const columnsModel = (key: string) => ({
       <header class="insp__head">
         <span class="insp__icon" :class="`is-${spec!.category}`"><VipIcon :name="spec!.icon" :size="16" /></span>
         <div class="insp__titles">
-          <input v-model="titleModel" class="insp__name" aria-label="Node name" />
-          <span class="insp__kind">{{ spec!.label }}</span>
+          <input
+            v-model="titleModel"
+            class="insp__name"
+            aria-label="Node name"
+            :readonly="readonly"
+            :title="readonly ? 'Editing requires Developer access' : undefined"
+          />
+          <span class="insp__kind">{{ spec!.label }}{{ readonly ? ' · read-only' : '' }}</span>
         </div>
       </header>
 
@@ -125,7 +136,8 @@ const columnsModel = (key: string) => ({
 
       <div class="insp__body">
         <!-- CONFIG -->
-        <div v-if="tab === 'config'" class="insp__fields">
+        <div v-if="tab === 'config'" class="insp__fields" :inert="readonly">
+          <p v-if="readonly" class="insp__readonly-note">Configuration is read-only for your access level.</p>
           <SourceConfigurationPanel v-if="node.kind === 'source-dataset'" :editor="editor" :node="node" />
           <NodeColumnSelect
             v-else-if="node.kind === 'select-columns'"
@@ -368,6 +380,11 @@ const columnsModel = (key: string) => ({
   flex: 1;
   overflow-y: auto;
   padding: var(--vip-sp-6);
+}
+.insp__readonly-note {
+  margin: 0 0 var(--vip-sp-4);
+  font-size: var(--vip-fs-sm);
+  color: var(--vip-text-muted);
 }
 .insp__fields {
   display: flex;

@@ -9,7 +9,13 @@ import { useResizable } from '@/shared/composables/useResizable'
 import { useIsCompact } from '@/shared/composables/useMediaQuery'
 import { announce } from '@/shared/composables/useAnnouncer'
 import { useUiStore } from '@/shared/stores/ui'
-import type { NodeExecStatus, Pipeline, PipelineNodeKind, ValidationReport } from '@/shared/types/pipeline'
+import type {
+  NodeExecStatus,
+  Pipeline,
+  PipelineArtifact,
+  PipelineNodeKind,
+  ValidationReport,
+} from '@/shared/types/pipeline'
 import { ApiError } from '@/shared/types/api'
 import { relativeTime, formatDuration } from '@/shared/lib/format'
 import NodePalette from './NodePalette.vue'
@@ -66,6 +72,7 @@ function closeOverlays() {
   inspectorOpen.value = false
 }
 function addPaletteNode(kind: PipelineNodeKind) {
+  if (!canEdit.value) return
   editor.value?.addNode(kind, 200, 160)
   if (compact.value) paletteOpen.value = false
 }
@@ -86,8 +93,56 @@ const dirty = computed(() => editor.value?.dirty.value ?? false)
 // re-drafted pipeline (status !== 'published') or unsaved edits on top of a
 // published version. A clean, already-published pipeline has nothing to publish.
 const canPublish = computed(() => canEdit.value && (editor.value?.pipeline.status !== 'published' || dirty.value))
-const canUndo = computed(() => editor.value?.canUndo.value ?? false)
-const canRedo = computed(() => editor.value?.canRedo.value ?? false)
+const canUndo = computed(() => canEdit.value && (editor.value?.canUndo.value ?? false))
+const canRedo = computed(() => canEdit.value && (editor.value?.canRedo.value ?? false))
+
+/* ---- run artifacts (Results tab) ---- */
+const artifacts = ref<PipelineArtifact[]>([])
+const artifactsLoading = ref(false)
+const artifactsError = ref<string | null>(null)
+const downloadingArtifactId = ref<string | null>(null)
+
+async function loadArtifacts() {
+  const run = runner.run.value
+  const pipelineId = editor.value?.pipeline.id
+  artifacts.value = []
+  artifactsError.value = null
+  if (!run || !pipelineId || pipelineId === 'new') return
+  artifactsLoading.value = true
+  try {
+    artifacts.value = await pipelineService.listArtifacts(pipelineId, run.id)
+  } catch (error) {
+    artifactsError.value = error instanceof ApiError ? error.message : 'Unable to load artifacts for this run.'
+  } finally {
+    artifactsLoading.value = false
+  }
+}
+
+async function downloadArtifact(artifact: PipelineArtifact) {
+  const pipelineId = editor.value?.pipeline.id
+  const run = runner.run.value
+  if (!pipelineId || !run) return
+  downloadingArtifactId.value = artifact.id
+  try {
+    const link = await pipelineService.createArtifactDownloadUrl(pipelineId, run.id, artifact.id)
+    window.open(link.url, '_blank', 'noopener')
+  } catch (error) {
+    ui.pushToast({
+      kind: 'error',
+      title: 'Download failed',
+      message: error instanceof ApiError ? error.message : 'The artifact could not be downloaded (expired or missing).',
+    })
+  } finally {
+    downloadingArtifactId.value = null
+  }
+}
+
+watch(
+  () => runner.run.value?.id,
+  () => {
+    void loadArtifacts()
+  },
+)
 
 // Reveal the inspector when a single node is selected (compact) and announce
 // the selection to screen readers.
@@ -271,10 +326,24 @@ function onKeydown(e: KeyboardEvent) {
   const mod = e.metaKey || e.ctrlKey
   if (mod && e.key.toLowerCase() === 's') {
     e.preventDefault()
-    save()
+    if (canEdit.value) save()
     return
   }
   if (typing) return
+  // Escape / select-all remain available in read-only; mutations require canEdit.
+  if (e.key === 'Escape') {
+    canvasRef.value?.cancelKeyboardConnect()
+    paletteOpen.value = false
+    inspectorOpen.value = false
+    editor.value.clearSelection()
+    return
+  }
+  if (mod && e.key.toLowerCase() === 'a') {
+    e.preventDefault()
+    editor.value.selectMany(editor.value.pipeline.nodes.map((n) => n.id))
+    return
+  }
+  if (!canEdit.value) return
   const edge = editor.value.selectedEdge.value
   if ((e.key === 'Delete' || e.key === 'Backspace') && editor.value.selection.value.size) {
     e.preventDefault()
@@ -294,9 +363,6 @@ function onKeydown(e: KeyboardEvent) {
   } else if (mod && e.key.toLowerCase() === 'd') {
     e.preventDefault()
     editor.value.duplicateNodes([...editor.value.selection.value])
-  } else if (mod && e.key.toLowerCase() === 'a') {
-    e.preventDefault()
-    editor.value.selectMany(editor.value.pipeline.nodes.map((n) => n.id))
   } else if (e.key.startsWith('Arrow') && editor.value.selection.value.size) {
     // Keyboard move of the selected node(s) (QA VIP-FE-C003).
     e.preventDefault()
@@ -305,11 +371,6 @@ function onKeydown(e: KeyboardEvent) {
     const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0
     editor.value.moveNodes([...editor.value.selection.value], dx, dy)
     editor.value.commit()
-  } else if (e.key === 'Escape') {
-    canvasRef.value?.cancelKeyboardConnect()
-    paletteOpen.value = false
-    inspectorOpen.value = false
-    editor.value.clearSelection()
   }
 }
 
@@ -510,7 +571,7 @@ onBeforeUnmount(() => {
           :class="{ 'is-overlay': compact, 'is-open': paletteOpen }"
           :style="compact ? {} : { width: `${leftPanel.size.value}px` }"
         >
-          <NodePalette @add="addPaletteNode" />
+          <NodePalette :readonly="!canEdit" @add="addPaletteNode" />
         </div>
         <div v-if="!compact" class="pstudio__resizer" @pointerdown="leftPanel.startResize" />
 
@@ -519,6 +580,7 @@ onBeforeUnmount(() => {
           <PipelineCanvas
             ref="canvasRef"
             :editor="editor"
+            :readonly="!canEdit"
             :exec-statuses="execStatuses"
             :current-node-id="runner.run.value?.currentNodeId"
           />
@@ -536,7 +598,7 @@ onBeforeUnmount(() => {
           :class="{ 'is-overlay': compact, 'is-open': inspectorOpen }"
           :style="compact ? {} : { width: `${rightPanel.size.value}px` }"
         >
-          <NodeInspector :editor="editor" />
+          <NodeInspector :editor="editor" :readonly="!canEdit" />
         </div>
       </div>
 
@@ -619,14 +681,18 @@ onBeforeUnmount(() => {
                 <span>Duration: {{ formatDuration(runner.run.value.durationMs) }}</span>
                 <span>Attempt: {{ runner.run.value.attempt }}</span>
                 <VipButton
-                  v-if="runner.run.value.status === 'failed'"
+                  v-if="runner.run.value.status === 'failed' && canRun"
                   variant="secondary"
                   size="xs"
                   icon="refresh"
+                  title="Retry requires operator access"
                   @click="retry"
                   >Retry</VipButton
                 >
               </div>
+              <p v-if="runner.run.value.errorMessage" class="pstudio__run-error">
+                {{ runner.run.value.errorMessage }}
+              </p>
               <div class="pstudio__log-lines">
                 <div v-for="(l, i) in runner.run.value.logs" :key="i" class="pstudio__log" :class="`is-${l.level}`">
                   <span class="pstudio__log-ts">{{ new Date(l.ts).toLocaleTimeString() }}</span>
@@ -638,15 +704,52 @@ onBeforeUnmount(() => {
 
           <!-- results -->
           <div v-else class="pstudio__results">
-            <div v-if="runner.run.value?.status === 'succeeded'" class="pstudio__node-results">
-              <div v-for="s in runner.run.value.nodeStates" :key="s.nodeId" class="pstudio__node-result">
-                <VipIcon name="success" :size="13" class="is-ok" />
-                <span class="pstudio__nr-name">{{ editor.pipeline.nodes.find((n) => n.id === s.nodeId)?.title }}</span>
-                <span class="pstudio__nr-rows">{{ s.rows?.toLocaleString() ?? '—' }} rows</span>
-                <span class="pstudio__nr-dur">{{ formatDuration(s.durationMs) }}</span>
-              </div>
+            <div v-if="!runner.run.value" class="pstudio__logs-empty">
+              Run the pipeline to see node results and artifacts.
             </div>
-            <div v-else class="pstudio__logs-empty">Results appear after a successful run.</div>
+            <template v-else>
+              <div v-if="runner.run.value.nodeStates.length" class="pstudio__node-results">
+                <div v-for="s in runner.run.value.nodeStates" :key="s.nodeId" class="pstudio__node-result">
+                  <VipIcon
+                    :name="s.status === 'succeeded' ? 'success' : s.status === 'failed' ? 'error' : 'clock'"
+                    :size="13"
+                    :class="s.status === 'succeeded' ? 'is-ok' : ''"
+                  />
+                  <span class="pstudio__nr-name">{{
+                    editor?.pipeline.nodes.find((n) => n.id === s.nodeId)?.title
+                  }}</span>
+                  <span class="pstudio__nr-rows">{{
+                    s.rows != null ? `${s.rows.toLocaleString()} rows` : 'Rows unavailable'
+                  }}</span>
+                  <span class="pstudio__nr-dur">{{ formatDuration(s.durationMs) }}</span>
+                </div>
+              </div>
+              <div class="pstudio__artifacts">
+                <h4 class="pstudio__artifacts-title">Artifacts</h4>
+                <div v-if="artifactsLoading" class="pstudio__logs-empty">Loading artifacts…</div>
+                <div v-else-if="artifactsError" class="pstudio__logs-empty">{{ artifactsError }}</div>
+                <div v-else-if="!artifacts.length" class="pstudio__logs-empty">No artifacts for this run.</div>
+                <ul v-else class="pstudio__artifact-list">
+                  <li v-for="art in artifacts" :key="art.id" class="pstudio__artifact">
+                    <div class="pstudio__artifact-meta">
+                      <span class="pstudio__artifact-name">{{ art.nodeKey }}</span>
+                      <span class="pstudio__artifact-type">{{ art.contentType }}</span>
+                      <span>{{ (art.sizeBytes / 1024).toFixed(1) }} KB</span>
+                      <span>Created {{ new Date(art.createdAt).toLocaleString() }}</span>
+                      <span>Expires {{ new Date(art.expiresAt).toLocaleString() }}</span>
+                    </div>
+                    <VipButton
+                      variant="secondary"
+                      size="xs"
+                      icon="download"
+                      :loading="downloadingArtifactId === art.id"
+                      @click="downloadArtifact(art)"
+                      >Download</VipButton
+                    >
+                  </li>
+                </ul>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -880,6 +983,49 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 
+.pstudio__run-error {
+  margin: var(--vip-sp-3) 0;
+  color: var(--vip-danger);
+  font-size: var(--vip-fs-sm);
+}
+.pstudio__artifacts {
+  margin-top: var(--vip-sp-5);
+}
+.pstudio__artifacts-title {
+  margin: 0 0 var(--vip-sp-3);
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-semibold);
+}
+.pstudio__artifact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vip-sp-3);
+}
+.pstudio__artifact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vip-sp-4);
+  padding: var(--vip-sp-3) 0;
+  border-bottom: 1px solid var(--vip-border-subtle);
+}
+.pstudio__artifact-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vip-sp-3);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.pstudio__artifact-name {
+  color: var(--vip-text-primary);
+  font-weight: var(--vip-fw-medium);
+}
+.pstudio__artifact-type {
+  font-family: var(--vip-font-mono);
+}
 .pstudio__logs-empty {
   color: var(--vip-text-muted);
   font-size: var(--vip-fs-sm);

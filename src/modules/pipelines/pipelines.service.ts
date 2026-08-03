@@ -1,9 +1,11 @@
 /** Live B7 pipeline REST adapter. No production-path seeds or local persistence. */
 import { apiClient } from '@/shared/lib/apiClient'
 import type {
+  ArtifactDownloadLink,
   Pipeline,
   PipelineAccess,
   PipelineAccessLevel,
+  PipelineArtifact,
   PipelineListItem,
   PipelineNode,
   PipelineRun,
@@ -123,6 +125,16 @@ interface RunDto {
     node_key: string | null
     message: string
   }>
+}
+
+interface ArtifactDto {
+  id: string
+  node_key: string
+  content_type: string
+  size_bytes: number
+  sha256: string
+  expires_at: string
+  created_at: string
 }
 
 const nodeId = (node: NodeDto) => node.key
@@ -258,6 +270,19 @@ function mapRun(dto: RunDto): PipelineRun {
     logs,
     attempt: dto.current_attempt,
     rowsProcessed: dto.rows_processed,
+    errorMessage: dto.safe_error_message ?? undefined,
+  }
+}
+
+function mapArtifact(dto: ArtifactDto): PipelineArtifact {
+  return {
+    id: dto.id,
+    nodeKey: dto.node_key,
+    contentType: dto.content_type,
+    sizeBytes: dto.size_bytes,
+    sha256: dto.sha256,
+    expiresAt: dto.expires_at,
+    createdAt: dto.created_at,
   }
 }
 
@@ -335,6 +360,20 @@ export const pipelineService = {
   },
   async retryRun(pipelineId: string, runId: string): Promise<PipelineRun> {
     return mapRun(await apiClient.post<RunDto>(`/api/v1/pipelines/${pipelineId}/runs/${runId}/retry`))
+  },
+  async listArtifacts(pipelineId: string, runId: string): Promise<PipelineArtifact[]> {
+    const rows = await apiClient.get<ArtifactDto[]>(`/api/v1/pipelines/${pipelineId}/runs/${runId}/artifacts`)
+    return rows.map(mapArtifact)
+  },
+  async createArtifactDownloadUrl(
+    pipelineId: string,
+    runId: string,
+    artifactId: string,
+  ): Promise<ArtifactDownloadLink> {
+    const link = await apiClient.post<{ url: string; expires_in_seconds: number }>(
+      `/api/v1/pipelines/${pipelineId}/runs/${runId}/artifacts/${artifactId}/download-url`,
+    )
+    return { url: link.url, expiresInSeconds: link.expires_in_seconds }
   },
   // Backend implements DELETE as a soft-archive (sets archived_at); requires the
   // current version for optimistic concurrency. There is no separate pipeline
