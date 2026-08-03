@@ -2,7 +2,6 @@
 import { ref, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/shared/stores/auth'
-import { useUiStore } from '@/shared/stores/ui'
 import { LocalStore } from '@/shared/lib/mock'
 import VipInput from '@/shared/ui/VipInput.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
@@ -13,7 +12,6 @@ import VipLogo from '@/shared/ui/VipLogo.vue'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
-const ui = useUiStore()
 const expired = computed(() => route.query.expired === '1')
 
 // Remember-me persists ONLY the email address — never the password.
@@ -102,16 +100,6 @@ async function submit() {
     triggerShake()
   }
 }
-
-function forgotPassword() {
-  ui.pushToast({
-    kind: 'info',
-    title: 'Password reset',
-    message: email.value.trim()
-      ? `If ${email.value.trim()} matches an account, a reset link will be sent.`
-      : 'Enter your work email, then request a reset link.',
-  })
-}
 </script>
 
 <template>
@@ -180,9 +168,7 @@ function forgotPassword() {
             <input v-model="remember" type="checkbox" class="login__check" :disabled="submitting" />
             <span>Remember me</span>
           </label>
-          <button type="button" class="login__forgot" :disabled="submitting" @click="forgotPassword">
-            Forgot password?
-          </button>
+          <RouterLink class="login__forgot" to="/forgot-password">Forgot password?</RouterLink>
         </div>
 
         <VipButton type="submit" variant="primary" size="lg" block :loading="submitting" :disabled="submitting">

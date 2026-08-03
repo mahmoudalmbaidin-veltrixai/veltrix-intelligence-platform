@@ -13,6 +13,8 @@ export interface AuthenticatedUser {
   displayName: string
   status: UserStatus
   isPlatformAdmin: boolean
+  /** When true the user must complete a forced password change before continuing. */
+  mustChangePassword: boolean
 }
 
 export interface Session {
@@ -34,4 +36,10 @@ export interface AuthService {
   currentUser(): Promise<Session | null>
   /** Exchange a refresh token / re-validate the session. */
   refresh(): Promise<Session | null>
+  /** Request a password-reset link (non-disclosing; resolves regardless of match). */
+  requestPasswordReset(identifier: string): Promise<void>
+  /** Complete a password reset with a single-use token. */
+  confirmPasswordReset(token: string, newPassword: string): Promise<void>
+  /** Change the signed-in user's password (revokes all sessions server-side). */
+  changePassword(currentPassword: string, newPassword: string): Promise<void>
 }

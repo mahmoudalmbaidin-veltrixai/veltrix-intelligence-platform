@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     PASSWORD_MIN_LENGTH: int = Field(default=12, ge=8, le=128)
     PASSWORD_MAX_LENGTH: int = Field(default=256, ge=64, le=1024)
     PASSWORD_RESET_TOKEN_TTL_MINUTES: int = Field(default=30, ge=5, le=1440)
+    PASSWORD_RESET_RATE_LIMIT_PER_MINUTE: int = Field(default=5, ge=1, le=1000)
     FRONTEND_URL: str = "http://localhost:3009"
     CSRF_TRUSTED_ORIGINS: CsvList = Field(default_factory=lambda: ["http://localhost:3009"])
 

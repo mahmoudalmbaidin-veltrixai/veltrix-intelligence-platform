@@ -56,6 +56,7 @@ export const authenticationResponseSchema = z.object({
     display_name: z.string().min(1),
     status: z.enum(['pending', 'active', 'locked', 'disabled', 'suspended', 'deleted']),
     is_platform_admin: z.boolean().optional().default(false),
+    must_change_password: z.boolean().optional().default(false),
   }),
   session: z.object({ expires_at: isoDate }),
 })

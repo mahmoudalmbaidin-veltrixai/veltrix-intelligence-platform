@@ -15,6 +15,24 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/modules/auth/LoginView.vue'),
     meta: { title: 'Sign in', layout: 'blank', publicOnly: true },
   },
+  {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    component: () => import('@/modules/auth/ForgotPasswordView.vue'),
+    meta: { title: 'Forgot password', layout: 'blank', publicOnly: true },
+  },
+  {
+    path: '/reset-password',
+    name: 'reset-password',
+    component: () => import('@/modules/auth/ResetPasswordView.vue'),
+    meta: { title: 'Reset password', layout: 'blank', publicOnly: true },
+  },
+  {
+    path: '/force-password-change',
+    name: 'force-password-change',
+    component: () => import('@/modules/auth/ForcePasswordChangeView.vue'),
+    meta: { title: 'Change your password', layout: 'blank', requiresAuth: true },
+  },
 
   // Core
   {
@@ -628,6 +646,18 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     auth.setIntended(to.fullPath)
     return { name: 'login' }
+  }
+
+  // Forced password change: a flagged, authenticated user is confined to the
+  // change-password screen. The backend independently blocks every business
+  // route (PASSWORD_CHANGE_REQUIRED), so this runs before any tenancy or
+  // authorization bootstrap to avoid a guaranteed 403. Direct navigation to any
+  // other route (including a deep link) is redirected here.
+  if (auth.isAuthenticated && auth.mustChangePassword && to.name !== 'force-password-change') {
+    return { name: 'force-password-change' }
+  }
+  if (auth.isAuthenticated && !auth.mustChangePassword && to.name === 'force-password-change') {
+    return { name: 'home' }
   }
 
   // Platform super-admin gate: non-disclosing (mirror the backend 404) and
