@@ -9,8 +9,46 @@ import type {
   PipelineRun,
   RunLogEntry,
   RunNodeState,
+  SchemaColumn,
   ValidationReport,
 } from '@/shared/types/pipeline'
+import type { DataType } from '@/shared/types/semantic'
+
+/** Map a source database/physical type string onto the editor's DataType. */
+function toDataType(value: string): DataType {
+  const type = value.toLowerCase()
+  if (type.includes('timestamp')) return 'datetime'
+  if (type === 'date') return 'date'
+  if (type.includes('bool')) return 'boolean'
+  if (type.includes('int')) return 'integer'
+  if (/(numeric|decimal|float|double|real)/.test(type)) return 'number'
+  return 'string'
+}
+
+/**
+ * Rebuild a source node's output schema from its persisted `schema_snapshot`
+ * (a bounded `[{name,type,nullable}]` list written when the source was
+ * configured). Restoring this on load is what lets the downstream Select,
+ * Rename, and Formula editors show upstream columns without the user having to
+ * perturb the graph. Returns undefined when no valid snapshot is present so the
+ * caller can surface a clear "schema unavailable" state instead of inventing
+ * columns.
+ */
+function sourceSchemaFromConfig(config: Record<string, unknown>): SchemaColumn[] | undefined {
+  const snapshot = config.schema_snapshot
+  if (!Array.isArray(snapshot) || snapshot.length === 0) return undefined
+  const columns: SchemaColumn[] = []
+  for (const entry of snapshot) {
+    if (entry && typeof entry === 'object' && typeof (entry as { name?: unknown }).name === 'string') {
+      const field = entry as { name: string; type?: unknown }
+      columns.push({
+        name: field.name,
+        dataType: toDataType(typeof field.type === 'string' ? field.type : 'string'),
+      })
+    }
+  }
+  return columns.length > 0 ? columns : undefined
+}
 
 interface SummaryDto {
   id: string
@@ -111,14 +149,23 @@ function mapEditor(dto: EditorDto): Pipeline {
     rowVersion: dto.pipeline.row_version,
     owner: 'You',
     tags: dto.pipeline.tags,
-    nodes: dto.nodes.map((node) => ({
-      id: nodeId(node),
-      kind: node.type,
-      title: node.title,
-      x: node.x,
-      y: node.y,
-      config: node.config,
-    })),
+    nodes: dto.nodes.map((node) => {
+      const mapped: PipelineNode = {
+        id: nodeId(node),
+        kind: node.type,
+        title: node.title,
+        x: node.x,
+        y: node.y,
+        config: node.config,
+      }
+      // Restore the persisted upstream schema for source nodes so the loaded
+      // graph can propagate columns to downstream editors immediately.
+      if (node.type === 'source-dataset') {
+        const restored = sourceSchemaFromConfig(node.config)
+        if (restored) mapped.outputSchema = restored
+      }
+      return mapped
+    }),
     edges: dto.edges.map((edge) => ({
       id: edge.key,
       sourceNode: edge.source,

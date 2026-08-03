@@ -44,6 +44,16 @@ async def get_tenant_context(
     cached = getattr(request.state, "tenant_context", None)
     if isinstance(cached, TenantContext):
         return cached
+    # Forced password change is enforced here — the single chokepoint every
+    # tenant-scoped (business) route passes through. Session-only endpoints
+    # (me/logout/change-password/password-reset) do not resolve a tenant context,
+    # so a flagged user can still reach the change-password flow but nothing else.
+    if auth.user.must_change_password:
+        raise ApplicationError(
+            code="PASSWORD_CHANGE_REQUIRED",
+            message="A password change is required before continuing.",
+            status_code=403,
+        )
     settings: Settings = request.app.state.settings
     organization_id = _required_header(request, settings.TENANCY_ORGANIZATION_HEADER)
     organization_result = await OrganizationRepository(db).get_authorized(

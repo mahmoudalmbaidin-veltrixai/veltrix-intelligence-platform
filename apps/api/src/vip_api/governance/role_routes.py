@@ -223,15 +223,24 @@ async def assign_role(
     role_id: UUID,
     payload: RoleAssignRequest,
     context: Annotated[AuthorizationContext, Depends(require_permission("role.assign"))],
+    auth: Annotated[AuthenticatedContext, Depends(get_current_session)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> RoleAssignmentResponse:
     if payload.subject_type == "user":
         await role_assignment_service.assign_user_role(
-            db, context, role_id=role_id, user_id=payload.subject_id
+            db,
+            context,
+            role_id=role_id,
+            user_id=payload.subject_id,
+            is_platform_admin=auth.user.is_platform_admin,
         )
     else:
         await role_assignment_service.assign_group_role(
-            db, context, role_id=role_id, group_id=payload.subject_id
+            db,
+            context,
+            role_id=role_id,
+            group_id=payload.subject_id,
+            is_platform_admin=auth.user.is_platform_admin,
         )
     items = await role_assignment_service.list_role_assignments(db, context, role_id)
     match = next(
@@ -255,10 +264,16 @@ async def bulk_assign(
     role_id: UUID,
     payload: BulkRoleAssignRequest,
     context: Annotated[AuthorizationContext, Depends(require_permission("role.assign"))],
+    auth: Annotated[AuthenticatedContext, Depends(get_current_session)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> list[BulkResultItem]:
     results = await role_assignment_service.bulk_assign_role(
-        db, context, role_id=role_id, user_ids=payload.user_ids, group_ids=payload.group_ids
+        db,
+        context,
+        role_id=role_id,
+        user_ids=payload.user_ids,
+        group_ids=payload.group_ids,
+        is_platform_admin=auth.user.is_platform_admin,
     )
     return [BulkResultItem(subject_id=r.subject_id, ok=r.ok, detail=r.detail) for r in results]
 

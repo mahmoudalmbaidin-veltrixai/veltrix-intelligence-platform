@@ -97,7 +97,10 @@ def test_login_me_refresh_logout_flow(auth_client: TestClient) -> None:
     assert login_response.status_code == 200
     body = login_response.json()
     assert body["user"]["email"] == EMAIL
-    assert "password" not in login_response.text
+    # The submitted password and any raw session token must never be echoed. (The
+    # safe `must_change_password` boolean is a legitimate field, so assert on the
+    # actual secret value rather than the substring "password".)
+    assert PASSWORD not in login_response.text
     assert "token" not in login_response.text
     cookies = login_response.headers.get_list("set-cookie")
     assert any("vip_access_session=" in value and "HttpOnly" in value for value in cookies)
@@ -381,8 +384,9 @@ def test_session_revocation_cleanup_and_password_reset(settings: Settings) -> No
 
                 reset_session, _ = await create_session(db, user, settings)
                 await db.commit()
-                raw_token = await request_password_reset(db, EMAIL, settings)
-                assert raw_token is not None
+                raw_result = await request_password_reset(db, EMAIL, settings)
+                assert raw_result is not None
+                raw_token = raw_result[0]
                 stored = await db.scalar(
                     select(PasswordResetToken).where(PasswordResetToken.user_id == user_id)
                 )
@@ -400,8 +404,9 @@ def test_session_revocation_cleanup_and_password_reset(settings: Settings) -> No
                     )
                 assert await request_password_reset(db, "missing@veltrix.local", settings) is None
 
-                expiring_token = await request_password_reset(db, EMAIL, settings)
-                assert expiring_token is not None
+                expiring_result = await request_password_reset(db, EMAIL, settings)
+                assert expiring_result is not None
+                expiring_token = expiring_result[0]
                 expiring = await db.scalar(
                     select(PasswordResetToken).where(
                         PasswordResetToken.token_hash

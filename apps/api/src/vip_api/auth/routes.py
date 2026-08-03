@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from hashlib import sha256
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -11,10 +12,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from vip_api.auth.authentication import authenticate_login
 from vip_api.auth.cookies import clear_auth_cookies, set_auth_cookies
 from vip_api.auth.csrf import validate_csrf
-from vip_api.auth.dependencies import AuthenticatedContext, get_current_session
+from vip_api.auth.dependencies import AuthenticatedContext, get_current_session, require_csrf
+from vip_api.auth.email import send_password_reset_email
 from vip_api.auth.models import AuthSession, User, utc_now
 from vip_api.auth.password import PasswordService
-from vip_api.auth.rate_limit import login_rate_limited
+from vip_api.auth.password_reset import (
+    change_password as change_password_service,
+)
+from vip_api.auth.password_reset import (
+    consume_password_reset,
+    request_password_reset,
+)
+from vip_api.auth.rate_limit import login_rate_limited, password_reset_rate_limited
 from vip_api.auth.sessions import (
     authentication_error,
     create_session,
@@ -29,12 +38,17 @@ from vip_api.auth.sessions import (
 from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
 from vip_api.database.session import get_db_session
+from vip_api.governance.audit import record_audit
 from vip_api.redis.client import RedisClient
 from vip_api.schemas.auth import (
     AuthenticatedUser,
     AuthenticationResponse,
+    ChangePasswordRequest,
+    GenericAcceptedResponse,
     LoginRequest,
     LogoutResponse,
+    PasswordResetConfirm,
+    PasswordResetRequest,
     SessionInfo,
 )
 from vip_api.schemas.error import ErrorResponse
@@ -219,3 +233,125 @@ async def logout(
         )
     clear_auth_cookies(response, settings)
     return LogoutResponse()
+
+
+@router.post(
+    "/password-reset/request",
+    response_model=GenericAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Request a password-reset link",
+    description=(
+        "Accepts a username or email and always returns the same accepted response so account "
+        "existence is never disclosed. When a match exists an email with a single-use, "
+        "time-limited reset link is delivered via the configured provider."
+    ),
+)
+async def password_reset_request(
+    payload: PasswordResetRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    redis_client: Annotated[RedisClient, Depends(get_redis)],
+) -> GenericAcceptedResponse:
+    client_ip = request.client.host if request.client else "unknown"
+    scope = f"{client_ip}:{payload.identifier.strip().lower()}"
+    if await password_reset_rate_limited(redis_client, scope, settings):
+        raise ApplicationError(
+            code="TOO_MANY_REQUESTS",
+            message="Too many requests. Please try again later.",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+    ip_hash = sha256(client_ip.encode()).hexdigest()
+    result = await request_password_reset(
+        db, payload.identifier, settings, requested_ip_hash=ip_hash
+    )
+    if result is not None:
+        token, user = result
+        await record_audit(
+            db,
+            "auth.password_reset.requested",
+            actor_user_id=user.id,
+            organization_id=None,
+            resource_type="user",
+            resource_id=user.id,
+            commit=True,
+        )
+        if user.email:
+            reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
+            await send_password_reset_email(settings, user.email, reset_url)
+    return GenericAcceptedResponse()
+
+
+@router.post(
+    "/password-reset/confirm",
+    response_model=GenericAcceptedResponse,
+    summary="Complete a password reset",
+    description=(
+        "Consumes a single-use reset token and sets a new password. The token is validated by "
+        "hash, purpose, and expiry; all of the account's sessions are revoked on success."
+    ),
+    responses={400: {"model": ErrorResponse, "description": "Invalid or expired reset token"}},
+)
+async def password_reset_confirm(
+    payload: PasswordResetConfirm,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    password_service: Annotated[PasswordService, Depends(get_password_service)],
+) -> GenericAcceptedResponse:
+    user = await consume_password_reset(db, payload.token, payload.new_password, password_service)
+    await record_audit(
+        db,
+        "auth.password_reset.completed",
+        actor_user_id=user.id,
+        organization_id=None,
+        resource_type="user",
+        resource_id=user.id,
+        commit=True,
+    )
+    logger.info(
+        "Password reset completed",
+        extra={"security_event": "password_reset_completed", "outcome": "success"},
+    )
+    return GenericAcceptedResponse()
+
+
+@router.post(
+    "/change-password",
+    response_model=GenericAcceptedResponse,
+    dependencies=[Depends(require_csrf)],
+    summary="Change the signed-in user's password",
+    description=(
+        "Verifies the current password, applies the new one, clears any forced-change flag, and "
+        "revokes every session so the new credential must be used to sign back in."
+    ),
+    responses={
+        400: {"model": ErrorResponse, "description": "Current password incorrect or policy failed"},
+        403: {"model": ErrorResponse, "description": "CSRF validation failed"},
+    },
+)
+async def change_password_route(
+    payload: ChangePasswordRequest,
+    context: Annotated[AuthenticatedContext, Depends(get_current_session)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    password_service: Annotated[PasswordService, Depends(get_password_service)],
+) -> GenericAcceptedResponse:
+    user = await change_password_service(
+        db,
+        context.user.id,
+        payload.current_password,
+        payload.new_password,
+        password_service,
+    )
+    await record_audit(
+        db,
+        "auth.password_changed",
+        actor_user_id=user.id,
+        organization_id=None,
+        resource_type="user",
+        resource_id=user.id,
+        commit=True,
+    )
+    logger.info(
+        "Password changed",
+        extra={"security_event": "password_changed", "outcome": "success"},
+    )
+    return GenericAcceptedResponse()

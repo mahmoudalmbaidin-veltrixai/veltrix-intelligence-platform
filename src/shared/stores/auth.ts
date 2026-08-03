@@ -18,6 +18,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => status.value === 'authenticated')
   const isBooting = computed(() => !initialized.value || status.value === 'loading')
+  // Drives the forced password-change flow; the backend independently blocks all
+  // business routes for a flagged user, so this only governs client routing.
+  const mustChangePassword = computed(() => session.value?.user.mustChangePassword === true)
 
   async function applySession(value: Session | null): Promise<void> {
     session.value = value
@@ -100,6 +103,7 @@ export const useAuthStore = defineStore('auth', () => {
     expiredTick,
     isAuthenticated,
     isBooting,
+    mustChangePassword,
     bootstrap,
     login,
     logout,

@@ -419,6 +419,12 @@ async def save_editor(
         payload.canvas,
     )
     item.slug = item.slug or _slug(item.name)
+    # A saved draft diverges from any previously published version, so the
+    # pipeline returns to the ``draft`` state — this is what re-enables Publish for
+    # a subsequent immutable version. The last published version stays viewable
+    # and runnable via ``published_version_id`` (unchanged here), and existing runs
+    # keep their original ``pipeline_version_id`` linkage.
+    item.status = "draft"
     item.row_version += 1
     item.updated_at = utc_now()
     await record_audit(

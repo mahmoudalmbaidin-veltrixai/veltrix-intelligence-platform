@@ -14,6 +14,7 @@ function parseSession(value: unknown): Session {
       displayName: dto.user.display_name,
       status: dto.user.status,
       isPlatformAdmin: dto.user.is_platform_admin,
+      mustChangePassword: dto.user.must_change_password,
     },
   }
 }
@@ -53,5 +54,25 @@ export const apiAuthService: AuthService = {
       if (error instanceof ApiError && error.kind === 'unauthorized') return null
       throw error
     }
+  },
+  async requestPasswordReset(identifier: string) {
+    await apiClient.post<unknown>(
+      '/auth/password-reset/request',
+      { identifier },
+      { skipAuthRefresh: true, notifyOnUnauthorized: false },
+    )
+  },
+  async confirmPasswordReset(token: string, newPassword: string) {
+    await apiClient.post<unknown>(
+      '/auth/password-reset/confirm',
+      { token, new_password: newPassword },
+      { skipAuthRefresh: true, notifyOnUnauthorized: false },
+    )
+  },
+  async changePassword(currentPassword: string, newPassword: string) {
+    await apiClient.post<unknown>('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    })
   },
 }
