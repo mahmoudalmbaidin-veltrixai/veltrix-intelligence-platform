@@ -13,7 +13,7 @@ import VipDrawer from '@/shared/ui/VipDrawer.vue'
 import VipAlert from '@/shared/ui/VipAlert.vue'
 import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 
-const { data, error, isLoading } = useQuery('governance:audit', (signal) =>
+const { data, error, isLoading, refetch } = useQuery('governance:audit', (signal) =>
   auditService.list().then((r) => {
     signal.throwIfAborted()
     return r
@@ -95,6 +95,11 @@ function pretty(value: Record<string, unknown> | undefined): string {
 
     <VipAlert v-if="error" tone="danger" title="Audit events unavailable">
       The persisted audit trail could not be loaded.
+      <template #actions>
+        <VipButton variant="secondary" size="sm" icon="refresh" :loading="isLoading" @click="refetch">
+          Retry
+        </VipButton>
+      </template>
     </VipAlert>
 
     <VipCard :padded="false">
