@@ -37,7 +37,7 @@ colorama==0.4.6
     # via
     #   click
     #   pytest
-cryptography==48.0.1
+cryptography==50.0.0
     # via vip-api (pyproject.toml)
 fastapi==0.139.2
     # via vip-api (pyproject.toml)
