@@ -194,7 +194,12 @@ async def _complete_delivery(
     run.sent_at = datetime.now(UTC)
     run.completed_at = run.sent_at
     schedule.last_run_at = run.sent_at
-    schedule.status = "sent"
+    # Preserve a recurring schedule's "scheduled" state (the scheduler has already
+    # advanced next_run_at to the upcoming slot); only a spent one-time schedule
+    # settles to "sent".
+    schedule.status = (
+        "scheduled" if schedule.enabled and schedule.next_run_at is not None else "sent"
+    )
     await record_audit(
         db,
         "dashboard.delivery.sent",

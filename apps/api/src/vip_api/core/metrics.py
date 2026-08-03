@@ -25,6 +25,13 @@ class MetricsRegistry:
         self._sse_missed_event_recoveries = 0
         self._sse_dropped_events = 0
         self._sse_stream_errors = 0
+        self._delivery_scheduled: Counter[str] = Counter()
+
+    def record_delivery_scheduled(self, outcome: str) -> None:
+        """Count recurring-delivery scheduler outcomes (dispatched/errors)."""
+        safe = outcome if outcome in {"dispatched", "access_revoked", "export_error"} else "other"
+        with self._lock:
+            self._delivery_scheduled[safe] += 1
 
     def request_started(self) -> None:
         with self._lock:
@@ -113,8 +120,14 @@ class MetricsRegistry:
                     f"vip_sse_dropped_events_total {self._sse_dropped_events}",
                     "# TYPE vip_sse_stream_errors_total counter",
                     f"vip_sse_stream_errors_total {self._sse_stream_errors}",
+                    "# HELP vip_dashboard_delivery_scheduled_total Delivery dispatch outcomes.",
+                    "# TYPE vip_dashboard_delivery_scheduled_total counter",
                 ]
             )
+            for outcome, value in sorted(self._delivery_scheduled.items()):
+                lines.append(
+                    f'vip_dashboard_delivery_scheduled_total{{outcome="{outcome}"}} {value}'
+                )
         return "\n".join(lines) + "\n"
 
 

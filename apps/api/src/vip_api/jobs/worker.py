@@ -130,6 +130,7 @@ class GenericJobWorker:
         self.worker_id = f"{socket.gethostname()}:{os.getpid()}"
         self.stop = asyncio.Event()
         self.active: set[asyncio.Task[None]] = set()
+        self._next_delivery_tick = 0.0
 
     async def run(self) -> None:
         self._install_signals()
@@ -146,6 +147,7 @@ class GenericJobWorker:
                     task = asyncio.create_task(self._execute(job_id))
                     self.active.add(task)
                 await self._heartbeat("running")
+                await self._maybe_dispatch_deliveries()
                 with suppress(TimeoutError):
                     await asyncio.wait_for(
                         self.stop.wait(), timeout=self.settings.JOB_WORKER_POLL_SECONDS
@@ -156,6 +158,28 @@ class GenericJobWorker:
             await self._heartbeat("stopped")
             await self.redis.close()
             await self.database.dispose()
+
+    async def _maybe_dispatch_deliveries(self) -> None:
+        """Run the recurring dashboard-delivery scheduler tick on its own cadence.
+
+        Executed inline in the worker loop (no second process/queue). Concurrent
+        workers are safe: the scheduler claims due schedules with SKIP LOCKED and
+        advances next_run_at atomically. Failures never break the job loop.
+        """
+        if not self.settings.DASHBOARD_DELIVERY_SCHEDULER_ENABLED:
+            return
+        loop_time = asyncio.get_running_loop().time()
+        if loop_time < self._next_delivery_tick:
+            return
+        self._next_delivery_tick = (
+            loop_time + self.settings.DASHBOARD_DELIVERY_SCHEDULER_POLL_SECONDS
+        )
+        from vip_api.dashboard_delivery.scheduler import dispatch_due_deliveries
+
+        try:
+            await dispatch_due_deliveries(self.database, self.settings, self.queue)
+        except Exception:
+            logger.exception("Dashboard delivery scheduler tick failed")
 
     async def _next_job(self) -> UUID | None:
         for name in self.settings.JOB_WORKER_QUEUES:
