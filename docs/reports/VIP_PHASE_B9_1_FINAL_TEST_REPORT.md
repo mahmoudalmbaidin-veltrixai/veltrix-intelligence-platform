@@ -87,6 +87,33 @@ The audit URL contract (`apiClient.services-url.spec.ts`) now asserts
 `/audit-events` resolves to a single `/api/v1/audit-events` under both host-only
 and version-prefixed base forms.
 
+## 6a. Supply-chain gate (pip-audit) — cryptography CVE fix
+
+The initial PR CI run failed **only** at `pip-audit -r requirements.lock`
+(`backend-static-and-unit`); backend-integration, backend-container, frontend
+static/unit, and browser all passed. The audit flagged three freshly-disclosed
+2026 CVEs in the pinned `cryptography==48.0.1`:
+
+```
+cryptography 48.0.1  CVE-2026-69248  fix 49.0.0
+cryptography 48.0.1  CVE-2026-69247  fix 50.0.0
+cryptography 48.0.1  CVE-2026-69249  fix 49.0.0
+```
+
+These CVEs were published **after** the lock was pinned; the constraint
+`cryptography>=48.0.1,<49` in `pyproject.toml` actively excluded the fix, so the
+base branch fails identically on any re-run — this is a pre-existing, repo-wide
+supply-chain issue, **not** introduced by the B9.1C code.
+
+**Fix (isolated commit):** `pyproject.toml` → `cryptography>=50.0.0,<51`;
+`requirements.lock` → `cryptography==50.0.0` (covers all three CVEs).
+
+Re-validated with cryptography 50.0.0 installed:
+- `pip-audit -r requirements.lock` → **No known vulnerabilities found**
+- ruff ✓ · ruff format ✓ · mypy ✓
+- connection-security unit tests ✓ (encryption/decryption unaffected)
+- 240 unit ✓ · **58 integration ×2 both green** ✓
+
 ## 7. Summary
 
 | Suite | Count | Status |

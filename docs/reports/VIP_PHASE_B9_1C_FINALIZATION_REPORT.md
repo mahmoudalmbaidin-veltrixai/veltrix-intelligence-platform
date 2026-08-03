@@ -126,6 +126,14 @@ src/shared/lib/apiClient.services-url.spec.ts   (audit URL contract)
 
 Dependency `aiomysql>=0.2,<1` was already present in `apps/api/pyproject.toml`.
 
+**Supply-chain fix (isolated commit):** the initial PR CI failed only at
+`pip-audit`, which flagged three freshly-disclosed 2026 CVEs in the pinned
+`cryptography==48.0.1` (a pre-existing repo-wide issue, not introduced by this
+slice — the base branch fails identically). Bumped `cryptography>=50.0.0,<51`
+(`pyproject.toml`) + `cryptography==50.0.0` (`requirements.lock`); pip-audit is
+now clean and all backend gates + integration ×2 re-pass with 50.0.0. See the
+test report §6a.
+
 ---
 
 ## 6. Deferred / remaining work (why B9.1C is PARTIAL)
