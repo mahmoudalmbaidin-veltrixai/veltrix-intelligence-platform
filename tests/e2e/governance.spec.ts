@@ -158,8 +158,10 @@ test('viewer and restricted personas are fail-closed in UI and direct API calls'
   expect(restricted.direct.status).toBe(404)
   // Unauthorized creation is denied by the broad create gate (no `pipeline.create`).
   expect(restricted.create.status).toBe(403)
-  // Unauthorized execution is denied by the execute gate (no `pipeline.execute`).
-  expect(restricted.run.status).toBe(403)
+  // Unauthorized execution is resource-evaluator denied: no operator ACL →
+  // non-disclosing 404 (same contract as direct GET). Broad pipeline.execute is
+  // no longer the run gate.
+  expect(restricted.run.status).toBe(404)
 
   // Best-effort cleanup so repeated local runs don't accumulate fixtures (the CI
   // database is ephemeral). Not asserted — the checks above already used a fresh id.
