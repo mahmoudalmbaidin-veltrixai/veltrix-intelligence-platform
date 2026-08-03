@@ -19,8 +19,13 @@ from vip_api.core.errors import ApplicationError
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.models import Group, GroupRoleAssignment, Role, UserRoleAssignment
-from vip_api.governance.role_service import get_role
+from vip_api.governance.policies import SYSTEM_ROLES
+from vip_api.governance.role_service import _permission_keys, get_role
 from vip_api.tenancy.models import MembershipStatus, OrganizationMembership
+
+# Priority of each built-in system role, used to bound the administrative rank an
+# actor may confer through a system-role assignment.
+_SYSTEM_ROLE_PRIORITY: dict[str, int] = {item.key: item.priority for item in SYSTEM_ROLES}
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +58,91 @@ def _assignment_scope(role: Role, context: AuthorizationContext) -> tuple[str, U
             )
         return "workspace", context.workspace_id
     return "organization", None
+
+
+def _actor_ceiling_priority(context: AuthorizationContext) -> int:
+    """The actor's effective administrative rank from their membership roles.
+
+    A system role may only be conferred if its priority does not exceed this
+    ceiling, so a low-privilege member who somehow holds ``role.assign`` cannot
+    grant an administrative system role above their own standing.
+    """
+    org = _SYSTEM_ROLE_PRIORITY.get(context.organization_role_key, 0)
+    workspace = _SYSTEM_ROLE_PRIORITY.get(context.workspace_role_key or "", 0)
+    return max(org, workspace)
+
+
+async def _authorize_assignment(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    role: Role,
+    *,
+    subject_type: str,
+    subject_id: UUID,
+    scope: str,
+    workspace_id: UUID | None,
+    is_platform_admin: bool,
+    commit: bool,
+) -> None:
+    """Fail-closed guard for conferring a role.
+
+    Enforces (server-side, never trusting the client): the role is active and
+    assignable; the actor cannot confer permissions they do not themselves hold
+    (privilege ceiling); and the actor cannot confer a system role ranked above
+    their own authority. Platform super-admins bypass the ceiling/assignable
+    checks (they already hold every permission) but never the archived guard.
+    Denials are audited and use non-disclosing messages. Cross-tenant and
+    cross-workspace attempts are already blocked upstream: ``get_role`` scopes the
+    role to the actor's organization (or a global system role) and the subject
+    loaders require active membership in the actor's organization, while the
+    assignment is bound to the actor's own ``workspace_id`` context.
+    """
+
+    async def _deny(code: str, message: str, status_code: int) -> ApplicationError:
+        await record_audit(
+            db,
+            "role.assignment.denied",
+            actor_user_id=context.user_id,
+            organization_id=context.organization_id,
+            workspace_id=workspace_id,
+            outcome="denied",
+            reason_code=code,
+            resource_type="role",
+            resource_id=role.id,
+            metadata={"subject_type": subject_type, "subject_id": str(subject_id), "scope": scope},
+            commit=commit,
+        )
+        return ApplicationError(code=code, message=message, status_code=status_code)
+
+    # Archived/inactive roles are never assignable — even by a platform admin.
+    if role.archived_at is not None or role.status != "active":
+        raise await _deny("ROLE_ARCHIVED", "This role is archived and cannot be assigned.", 409)
+
+    if is_platform_admin:
+        return
+
+    # Protected/non-assignable roles (e.g. Organization Owner) require platform
+    # authorization; a tenant administrator cannot confer them.
+    if not role.is_assignable:
+        raise await _deny("ROLE_NOT_ASSIGNABLE", "This role cannot be assigned.", 403)
+
+    # Privilege ceiling: the actor may not confer any permission they do not hold.
+    role_permissions = set(await _permission_keys(db, role.id))
+    if role_permissions - set(context.permissions):
+        raise await _deny(
+            "ROLE_ESCALATION_DENIED",
+            "You cannot assign a role that exceeds your own authority.",
+            403,
+        )
+
+    # Administrative-rank ceiling for system roles (custom roles are bounded by
+    # the permission ceiling above; their nominal priority is not comparable).
+    if role.is_system and role.priority > _actor_ceiling_priority(context):
+        raise await _deny(
+            "ROLE_ESCALATION_DENIED",
+            "You cannot assign a role that exceeds your own authority.",
+            403,
+        )
 
 
 async def _require_org_user(db: AsyncSession, context: AuthorizationContext, user_id: UUID) -> User:
@@ -99,11 +189,23 @@ async def assign_user_role(
     *,
     role_id: UUID,
     user_id: UUID,
+    is_platform_admin: bool = False,
     commit: bool = True,
 ) -> UserRoleAssignment:
     role = await get_role(db, context, role_id)
     scope, workspace_id = _assignment_scope(role, context)
     await _require_org_user(db, context, user_id)
+    await _authorize_assignment(
+        db,
+        context,
+        role,
+        subject_type="user",
+        subject_id=user_id,
+        scope=scope,
+        workspace_id=workspace_id,
+        is_platform_admin=is_platform_admin,
+        commit=commit,
+    )
     existing = await db.scalar(
         select(UserRoleAssignment).where(
             UserRoleAssignment.organization_id == context.organization_id,
@@ -148,11 +250,23 @@ async def assign_group_role(
     *,
     role_id: UUID,
     group_id: UUID,
+    is_platform_admin: bool = False,
     commit: bool = True,
 ) -> GroupRoleAssignment:
     role = await get_role(db, context, role_id)
     scope, workspace_id = _assignment_scope(role, context)
     await _require_org_group(db, context, group_id)
+    await _authorize_assignment(
+        db,
+        context,
+        role,
+        subject_type="group",
+        subject_id=group_id,
+        scope=scope,
+        workspace_id=workspace_id,
+        is_platform_admin=is_platform_admin,
+        commit=commit,
+    )
     existing = await db.scalar(
         select(GroupRoleAssignment).where(
             GroupRoleAssignment.organization_id == context.organization_id,
@@ -329,6 +443,7 @@ async def bulk_assign_role(
     role_id: UUID,
     user_ids: list[UUID],
     group_ids: list[UUID],
+    is_platform_admin: bool = False,
 ) -> list[BulkResult]:
     """Assign one role to many users/groups, returning per-item outcomes.
 
@@ -341,13 +456,27 @@ async def bulk_assign_role(
     results: list[BulkResult] = []
     for user_id in user_ids:
         try:
-            await assign_user_role(db, context, role_id=role_id, user_id=user_id, commit=False)
+            await assign_user_role(
+                db,
+                context,
+                role_id=role_id,
+                user_id=user_id,
+                is_platform_admin=is_platform_admin,
+                commit=False,
+            )
             results.append(BulkResult(user_id, True, "assigned"))
         except ApplicationError as exc:
             results.append(BulkResult(user_id, False, exc.code))
     for group_id in group_ids:
         try:
-            await assign_group_role(db, context, role_id=role_id, group_id=group_id, commit=False)
+            await assign_group_role(
+                db,
+                context,
+                role_id=role_id,
+                group_id=group_id,
+                is_platform_admin=is_platform_admin,
+                commit=False,
+            )
             results.append(BulkResult(group_id, True, "assigned"))
         except ApplicationError as exc:
             results.append(BulkResult(group_id, False, exc.code))
