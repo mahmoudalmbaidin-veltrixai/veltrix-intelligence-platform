@@ -284,3 +284,46 @@ Gaps: no tests for the three highest-impact pipeline defects (re-publish, load-t
 | Live module smoke (admin) | home/roles/groups/connections/pipelines/datasets/semantic-models/dashboards/jobs/notifications → 200 |
 
 *Left running at `http://localhost:8000` and `http://localhost:3009` per instructions.*
+
+---
+
+## Addendum — B9.1C slice (2026-08-04)
+
+Slice `phase-b9/connection-semantic-finalization`. Verdict:
+**B9.1C PARTIALLY COMPLETE — MORE WORK REQUIRED.**
+
+### Resolved this slice
+- **B9-14 (MySQL honesty):** `MySQLDiscoveryAdapter` implemented and
+  **live-verified** against the real `mysql` container — `vip_demo.customers`
+  discovered with correct type normalization; bad-credential path returns typed
+  `DISCOVERY_FAILED` (502) without echoing the secret. MySQL is now honestly
+  classified: **discovery + dataset registration supported; analytics
+  (preview/profile/query) PostgreSQL-only by design.** The "do not advertise
+  MySQL discovery" caution is lifted; the "do not advertise MySQL analytics"
+  caution stands.
+- **Semantic re-publish:** the `SEMANTIC_MODEL_IMMUTABLE` block was the same
+  defect fixed in the pipeline domain (B9-02 class). Now supports repeatable
+  publishing with sequential immutable versions, re-draft on edit, and
+  `SEMANTIC_MODEL_NOT_DRAFT` guard — integration-tested (publish v1→v2→v3, deny
+  path).
+- **B9-* audit path:** `/audit` → `/audit-events` canonicalized in the last dead
+  code path + URL contract spec; the live Audit Center already used the canonical
+  route.
+
+### Still open (carried forward)
+- **B9-06 / placeholder gating:** AI Studio, Developer Portal, Automation,
+  Billing are OFF by default via entitlements, but **Reports and Insights remain
+  route-reachable** in live mode. Route-level gating is deferred because
+  `route-smoke.spec.ts` navigates those routes directly and would fail CI without
+  a coordinated e2e update. The "do not enable placeholder nav in production"
+  caution **stands** for Reports/Insights.
+- **Core UX consistency pass (B9.3 preview):** not started in this slice.
+- **Semantic CRUD audit:** dimension/measure/metric/KPI mutations are not yet
+  audit-logged (model create/update/publish are).
+- **Live Chromium persona matrix** (Viewer/Query/Editor/Manager/Denied) not
+  re-run for this slice.
+
+### Gates (this slice)
+Backend: ruff ✓ · format ✓ · mypy ✓ · 240 unit ✓ · alembic upgrade+check clean ✓
+· 58 integration ×2 both green ✓. Frontend: typecheck ✓ · lint ✓ · format ✓ ·
+279 unit ✓ · build ✓. Rollback tag `6254d60d…` unchanged.
