@@ -510,6 +510,8 @@ export interface DatasetService {
   profile(id: string): Promise<DatasetProfile>
   getLineage(id?: string): Promise<DatasetLineage>
   listQualityRules(): Promise<QualityRule[]>
+  /** Dataset-scoped rules — prefer this on detail pages to avoid workspace N+1 fan-out. */
+  listQualityRulesForDataset(datasetId: string): Promise<QualityRule[]>
   listIncidents(): Promise<QualityIncident[]>
   qualityHistory(datasetId: string): Promise<QualityEvaluation[]>
   createRule(payload: CreateRulePayload): Promise<QualityRule>
@@ -588,6 +590,11 @@ const mockDatasetService: DatasetService = {
   async listQualityRules(): Promise<QualityRule[]> {
     await latency()
     return [...createdRules, ...RULES]
+  },
+
+  async listQualityRulesForDataset(datasetId: string): Promise<QualityRule[]> {
+    await latency()
+    return [...createdRules, ...RULES].filter((rule) => rule.datasetId === datasetId)
   },
 
   async listIncidents(): Promise<QualityIncident[]> {
@@ -783,30 +790,42 @@ async function liveDatasets(search?: string): Promise<Dataset[]> {
   return response.items.map((item, index) => mapDataset(item, summaries[index]?.score ?? null))
 }
 
+function mapQualityRule(rule: ApiQualityRule, dataset: Pick<Dataset, 'id' | 'name'>): QualityRule {
+  return {
+    id: rule.id,
+    name: rule.name,
+    dimension:
+      rule.rule_type === 'unique' ? 'uniqueness' : rule.rule_type === 'freshness' ? 'freshness' : 'completeness',
+    severity:
+      rule.severity === 'critical' || rule.severity === 'error'
+        ? 'high'
+        : rule.severity === 'warning'
+          ? 'medium'
+          : 'low',
+    status: ['passing', 'failing', 'warning', 'unknown'].includes(rule.status)
+      ? (rule.status as QualityRuleStatus)
+      : 'not_evaluated',
+    lastRun: rule.updated_at,
+    passRate: rule.status === 'passing' ? 100 : rule.status === 'not_evaluated' ? null : 0,
+    dataset: dataset.name,
+    datasetId: dataset.id,
+  }
+}
+
+async function liveRulesForDataset(datasetId: string): Promise<QualityRule[]> {
+  const [dataset, rules] = await Promise.all([
+    apiClient.get<ApiDataset>(`/datasets/${datasetId}`),
+    apiClient.get<ApiQualityRule[]>(`/datasets/${datasetId}/quality-rules`),
+  ])
+  return rules.map((rule) => mapQualityRule(rule, { id: dataset.id, name: dataset.display_name }))
+}
+
 async function liveRules(): Promise<QualityRule[]> {
   const datasets = await liveDatasets()
   const groups = await Promise.all(
     datasets.map(async (dataset) => {
       const rules = await apiClient.get<ApiQualityRule[]>(`/datasets/${dataset.id}/quality-rules`)
-      return rules.map((rule): QualityRule => ({
-        id: rule.id,
-        name: rule.name,
-        dimension:
-          rule.rule_type === 'unique' ? 'uniqueness' : rule.rule_type === 'freshness' ? 'freshness' : 'completeness',
-        severity:
-          rule.severity === 'critical' || rule.severity === 'error'
-            ? 'high'
-            : rule.severity === 'warning'
-              ? 'medium'
-              : 'low',
-        status: ['passing', 'failing', 'warning', 'unknown'].includes(rule.status)
-          ? (rule.status as QualityRuleStatus)
-          : 'not_evaluated',
-        lastRun: rule.updated_at,
-        passRate: rule.status === 'passing' ? 100 : rule.status === 'not_evaluated' ? null : 0,
-        dataset: dataset.name,
-        datasetId: dataset.id,
-      }))
+      return rules.map((rule) => mapQualityRule(rule, dataset))
     }),
   )
   return groups.flat()
@@ -964,8 +983,13 @@ const apiDatasetService: DatasetService = {
     }
   },
   getLineage: async (id) => {
-    const datasets = await liveDatasets()
-    const target = id ?? datasets[0]?.id
+    let target = id
+    if (!target) {
+      // Workspace-wide callers without an id still need a seed dataset; avoid
+      // this path on Dataset detail (always passes id).
+      const datasets = await liveDatasets()
+      target = datasets[0]?.id
+    }
     if (!target) return { nodes: [], edges: [] }
     const graph = await apiClient.get<ApiLineageGraph>(`/datasets/${target}/lineage`)
     return {
@@ -974,6 +998,7 @@ const apiDatasetService: DatasetService = {
     }
   },
   listQualityRules: liveRules,
+  listQualityRulesForDataset: liveRulesForDataset,
   listIncidents: liveIncidents,
   qualityHistory: async (datasetId) =>
     (await apiClient.get<ApiQualityEvaluation[]>(`/datasets/${datasetId}/quality-evaluations`)).map((item) => ({

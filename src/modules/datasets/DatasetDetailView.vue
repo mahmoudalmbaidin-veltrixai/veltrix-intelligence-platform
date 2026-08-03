@@ -39,12 +39,13 @@ const {
   () => `dataset:${id.value}`,
   () => datasetService.get(id.value),
 )
-const { data: rules } = useQuery('datasets:rules', () => datasetService.listQualityRules())
 const { data: schema } = useQuery(
   () => `dataset:${id.value}:fields`,
   () => datasetService.listFields(id.value),
 )
 const previewPage = ref(1)
+const effectiveAccessEarly = computed(() => dataset.value?.access)
+const canQueryEarly = computed(() => resourceCan(effectiveAccessEarly.value, 'query'))
 const {
   data: preview,
   isLoading: previewLoading,
@@ -52,10 +53,12 @@ const {
 } = useQuery(
   () => `dataset:${id.value}:preview:${previewPage.value}`,
   () => datasetService.preview(id.value, previewPage.value, 25),
+  { enabled: canQueryEarly },
 )
 const { data: profile, isLoading: profileLoading } = useQuery(
   () => `dataset:${id.value}:profile`,
   () => datasetService.profile(id.value),
+  { enabled: canQueryEarly },
 )
 const {
   data: lineage,
@@ -64,6 +67,10 @@ const {
 } = useQuery(
   () => `dataset:${id.value}:lineage`,
   () => datasetService.getLineage(id.value),
+)
+const { data: rules } = useQuery(
+  () => `dataset:${id.value}:quality-rules`,
+  () => datasetService.listQualityRulesForDataset(id.value),
 )
 
 const accessEntries = ref<ResourceEntry[]>([])
@@ -76,13 +83,11 @@ const activityTotal = ref(0)
 const certBusy = ref(false)
 const certNote = ref('')
 
-const datasetRules = computed<QualityRule[]>(() =>
-  (rules.value ?? []).filter((r) => r.datasetId === dataset.value?.id || r.dataset === dataset.value?.name),
-)
+const datasetRules = computed<QualityRule[]>(() => rules.value ?? [])
 
-const effectiveAccess = computed(() => dataset.value?.access)
+const effectiveAccess = effectiveAccessEarly
 const canManageAccess = computed(() => effectiveAccess.value?.canManageAccess ?? false)
-const canQuery = computed(() => resourceCan(effectiveAccess.value, 'query'))
+const canQuery = canQueryEarly
 const canCertify = computed(() => resourceCan(effectiveAccess.value, 'certify'))
 const canEdit = computed(() => resourceCan(effectiveAccess.value, 'edit'))
 
@@ -419,41 +424,50 @@ const accessColumns: Column<ResourceEntry>[] = [
 
       <!-- PROFILE -->
       <VipCard v-else-if="activeTab === 'profile'">
-        <h3 class="dd__card-title">Column profile</h3>
-        <p class="dd__muted">Live statistics over {{ profile?.sampleSize ?? 0 }} sampled rows.</p>
-        <div v-if="profileLoading" class="dd__loading"><VipSpinner label="Profiling dataset…" /></div>
-        <ul v-else-if="profile?.fields.length" class="dd__profile">
-          <li v-for="p in profile.fields" :key="p.name" class="dd__profile-row">
-            <span class="dd__profile-name">{{ p.name }}</span>
-            <div class="dd__profile-bars">
-              <div class="dd__bar-group">
-                <span class="dd__bar-label">nulls {{ p.nullCount }}</span>
-                <div class="dd__bar-track">
-                  <div
-                    class="dd__bar dd__bar--null"
-                    :style="{ width: `${profile.sampleSize ? (p.nullCount / profile.sampleSize) * 100 : 0}%` }"
-                  />
-                </div>
-              </div>
-              <div class="dd__bar-group">
-                <span class="dd__bar-label">distinct {{ p.distinctCount }}</span>
-                <div class="dd__bar-track">
-                  <div
-                    class="dd__bar dd__bar--distinct"
-                    :style="{ width: `${profile.sampleSize ? (p.distinctCount / profile.sampleSize) * 100 : 0}%` }"
-                  />
-                </div>
-              </div>
-            </div>
-            <span class="dd__profile-range">{{ p.minimum ?? '—' }} … {{ p.maximum ?? '—' }}</span>
-          </li>
-        </ul>
         <VipEmptyState
-          v-else
-          icon="gauge"
-          title="No profile available"
-          description="The source has no fields to profile."
+          v-if="!canQuery"
+          icon="warning"
+          tone="warning"
+          title="Profile not permitted"
+          description="Query access on this dataset is required to view column profiles."
         />
+        <template v-else>
+          <h3 class="dd__card-title">Column profile</h3>
+          <p class="dd__muted">Live statistics over {{ profile?.sampleSize ?? 0 }} sampled rows.</p>
+          <div v-if="profileLoading" class="dd__loading"><VipSpinner label="Profiling dataset…" /></div>
+          <ul v-else-if="profile?.fields.length" class="dd__profile">
+            <li v-for="p in profile.fields" :key="p.name" class="dd__profile-row">
+              <span class="dd__profile-name">{{ p.name }}</span>
+              <div class="dd__profile-bars">
+                <div class="dd__bar-group">
+                  <span class="dd__bar-label">nulls {{ p.nullCount }}</span>
+                  <div class="dd__bar-track">
+                    <div
+                      class="dd__bar dd__bar--null"
+                      :style="{ width: `${profile.sampleSize ? (p.nullCount / profile.sampleSize) * 100 : 0}%` }"
+                    />
+                  </div>
+                </div>
+                <div class="dd__bar-group">
+                  <span class="dd__bar-label">distinct {{ p.distinctCount }}</span>
+                  <div class="dd__bar-track">
+                    <div
+                      class="dd__bar dd__bar--distinct"
+                      :style="{ width: `${profile.sampleSize ? (p.distinctCount / profile.sampleSize) * 100 : 0}%` }"
+                    />
+                  </div>
+                </div>
+              </div>
+              <span class="dd__profile-range">{{ p.minimum ?? '—' }} … {{ p.maximum ?? '—' }}</span>
+            </li>
+          </ul>
+          <VipEmptyState
+            v-else
+            icon="gauge"
+            title="No profile available"
+            description="The source has no fields to profile."
+          />
+        </template>
       </VipCard>
 
       <!-- QUALITY -->
