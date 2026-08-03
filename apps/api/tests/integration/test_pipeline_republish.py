@@ -23,6 +23,7 @@ from vip_api.database.session import Database
 from vip_api.datasets.models import Dataset, DatasetField
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.models import Role
+from vip_api.governance.seed import provision_organization_governance
 from vip_api.pipelines.models import PipelineVersion
 from vip_api.pipelines.schemas import EdgeInput, NodeInput, PipelineCreate, PipelineEditorSave
 from vip_api.pipelines.services import (
@@ -135,6 +136,7 @@ async def _seed(db: AsyncSession, suffix: str) -> tuple[UUID, UUID, UUID, UUID]:
             status=MembershipStatus.ACTIVE,
         )
     )
+    await provision_organization_governance(db, org.id)
     ctype = ConnectionType(
         key=f"pg-{suffix}",
         name="Postgres",
