@@ -317,7 +317,13 @@ const routes: RouteRecordRaw[] = [
     path: '/insights',
     name: 'insights',
     component: () => import('@/modules/insights/InsightsView.vue'),
-    meta: { title: 'Insights', layout: 'app', requiresAuth: true, permission: 'dashboard.read' },
+    meta: {
+      title: 'Insights',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'dashboard.read',
+      entitlement: 'insights',
+    },
   },
   {
     path: '/explore',
@@ -331,25 +337,51 @@ const routes: RouteRecordRaw[] = [
     path: '/reports',
     name: 'reports',
     component: () => import('@/modules/reports/ReportListView.vue'),
-    meta: { title: 'Reports', layout: 'app', requiresAuth: true, permission: 'report.read' },
+    meta: {
+      title: 'Reports',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'report.read',
+      entitlement: 'report_studio',
+    },
   },
   {
     path: '/reports/new',
     name: 'report-new',
     component: () => import('@/modules/reports/ReportBuilderView.vue'),
-    meta: { title: 'New Report', layout: 'studio', requiresAuth: true, permission: 'report.create', fullBleed: true },
+    meta: {
+      title: 'New Report',
+      layout: 'studio',
+      requiresAuth: true,
+      permission: 'report.create',
+      entitlement: 'report_studio',
+      fullBleed: true,
+    },
   },
   {
     path: '/reports/deliveries',
     name: 'deliveries',
     component: () => import('@/modules/reports/DeliveriesView.vue'),
-    meta: { title: 'Scheduled Deliveries', layout: 'app', requiresAuth: true, permission: 'report.read' },
+    meta: {
+      title: 'Scheduled Deliveries',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'report.read',
+      entitlement: 'report_studio',
+    },
   },
   {
     path: '/reports/:id',
     name: 'report-builder',
     component: () => import('@/modules/reports/ReportBuilderView.vue'),
-    meta: { title: 'Report', layout: 'studio', requiresAuth: true, permission: 'report.read', fullBleed: true },
+    meta: {
+      title: 'Report',
+      layout: 'studio',
+      requiresAuth: true,
+      permission: 'report.read',
+      entitlement: 'report_studio',
+      fullBleed: true,
+    },
   },
 
   // AI
@@ -506,7 +538,13 @@ const routes: RouteRecordRaw[] = [
     path: '/marketplace/:id',
     name: 'marketplace-detail',
     component: () => import('@/modules/marketplace/ExtensionDetailView.vue'),
-    meta: { title: 'Extension', layout: 'app', requiresAuth: true, permission: 'workspace.read' },
+    meta: {
+      title: 'Extension',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'workspace.read',
+      entitlement: 'marketplace',
+    },
   },
   {
     path: '/developer',
@@ -585,7 +623,13 @@ const routes: RouteRecordRaw[] = [
     path: '/billing',
     name: 'billing',
     component: () => import('@/modules/billing/BillingView.vue'),
-    meta: { title: 'Billing', layout: 'app', requiresAuth: true, permission: 'billing.read' },
+    meta: {
+      title: 'Billing',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'billing.read',
+      entitlement: 'billing',
+    },
   },
 
   // Settings

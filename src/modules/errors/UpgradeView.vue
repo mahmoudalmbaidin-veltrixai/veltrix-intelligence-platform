@@ -1,10 +1,28 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipLogo from '@/shared/ui/VipLogo.vue'
 const route = useRoute()
 const router = useRouter()
+
+// Friendly labels for the capability keys the router guard passes through as
+// `?feature=`. Falls back to a generic phrase for any unmapped key.
+const FEATURE_LABELS: Record<string, string> = {
+  report_studio: 'Reports',
+  insights: 'Insights',
+  marketplace: 'Marketplace',
+  billing: 'Billing',
+  ai_studio: 'AI Studio',
+  developer_api: 'Developer Portal',
+  automation: 'Automation Studio',
+}
+const featureLabel = computed(() => {
+  const key = route.query.feature
+  if (typeof key === 'string' && FEATURE_LABELS[key]) return FEATURE_LABELS[key]
+  return 'This module'
+})
 </script>
 
 <template>
@@ -13,14 +31,13 @@ const router = useRouter()
       ><VipLogo variant="full" size="md" decorative
     /></RouterLink>
     <div class="err__icon"><VipIcon name="sparkles" :size="28" /></div>
-    <h1 class="err__title">Upgrade required</h1>
+    <h1 class="err__title">Not available on this workspace</h1>
     <p class="err__desc">
-      <strong>{{ route.query.feature ?? 'This feature' }}</strong> isn’t included in your current plan. Upgrade your
-      organization plan to unlock it.
+      <strong>{{ featureLabel }}</strong> isn’t enabled for your organization. This module is disabled here — it isn’t a
+      permission error. An administrator can enable it once it’s available for your plan.
     </p>
     <div class="err__actions">
-      <VipButton variant="primary" icon="card" @click="router.push('/billing')">View plans</VipButton>
-      <VipButton variant="tertiary" @click="router.push('/home')">Not now</VipButton>
+      <VipButton variant="primary" icon="arrow-left" @click="router.push('/home')">Back to home</VipButton>
     </div>
   </div>
 </template>

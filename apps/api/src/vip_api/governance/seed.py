@@ -115,9 +115,11 @@ DEFAULT_ORGANIZATION_ENTITLEMENTS = frozenset(
         "dashboard_delivery",
         "pipeline_studio",
         "dataset_studio",
-        "report_studio",
+        # report_studio / marketplace intentionally omitted: those modules are
+        # placeholders with no production backend, so they stay gated OFF in live
+        # mode (their routes resolve to the upgrade wall). Re-add here when the
+        # module ships a real backend. See governance/policies.py FEATURE_DEFINITIONS.
         "advanced_audit",
-        "marketplace",
         "connection_studio",
         "semantic_layer",
         "business_glossary",

@@ -21,11 +21,7 @@ const routes = [
   '/dashboards/published',
   '/dashboards/deliveries',
   '/dashboards/new',
-  '/insights',
   '/explore',
-  '/reports',
-  '/reports/new',
-  '/reports/deliveries',
   '/automation',
   '/automation/new',
   '/automation/runs',
@@ -35,8 +31,6 @@ const routes = [
   '/operations/activity',
   '/audit',
   '/usage',
-  '/marketplace',
-  '/marketplace/ext_snowflake',
   '/developer',
   '/admin/platform',
   '/admin/organization',
@@ -44,7 +38,6 @@ const routes = [
   '/admin/members',
   '/admin/feature-flags',
   '/admin/governance',
-  '/billing',
   '/settings/personal',
   '/settings/workspace',
   '/settings/organization',
@@ -57,11 +50,40 @@ const routes = [
 
 const featureGatedRoutes = ['/ai/assistant', '/ai/studio', '/ai/knowledge', '/ai/agents', '/ai/agent-runs'] as const
 
+// Placeholder modules with no production backend: gated OFF in live mode by an
+// entitlement that DEFAULT_ORGANIZATION_ENTITLEMENTS does not grant, so their
+// routes resolve to the upgrade wall and never present an empty/fake surface as
+// complete. (See governance/policies.py + seed.py and src/app/router/index.ts.)
+const entitlementGatedRoutes = [
+  '/reports',
+  '/reports/new',
+  '/reports/deliveries',
+  '/insights',
+  '/marketplace',
+  '/marketplace/ext_snowflake',
+  '/billing',
+] as const
+
 test('disabled AI preview routes remain inaccessible in production navigation', async ({ authenticatedPage: page }) => {
   for (const route of featureGatedRoutes) {
     await page.goto(route)
     await expect.poll(() => new URL(page.url()).pathname).not.toBe(route)
     await expect(page).toHaveURL(/\/(?:upgrade\?.*|)$/)
+  }
+})
+
+test('placeholder modules are gated to the upgrade wall in live mode', async ({ authenticatedPage: page }) => {
+  for (const route of entitlementGatedRoutes) {
+    await page.goto(route)
+    // The router guard redirects an un-entitled placeholder module to /upgrade
+    // (never renders the module surface), with the requested route preserved in
+    // the `from` query param.
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/upgrade')
+    await expect(page).toHaveURL(/\/upgrade\?/)
+    // The upgrade wall renders a real, non-blank surface (not a blank/placeholder).
+    const main = page.locator('#vip-main')
+    await expect(main).toBeVisible()
+    await expect(main).not.toBeEmpty()
   }
 })
 
