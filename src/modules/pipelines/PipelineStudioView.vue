@@ -82,6 +82,10 @@ const accessLevel = computed(() => perms.level.value)
 
 // Unwrapped accessors for template use (composable exposes refs).
 const dirty = computed(() => editor.value?.dirty.value ?? false)
+// Publishing is available whenever there are unpublished changes: a never- or
+// re-drafted pipeline (status !== 'published') or unsaved edits on top of a
+// published version. A clean, already-published pipeline has nothing to publish.
+const canPublish = computed(() => canEdit.value && (editor.value?.pipeline.status !== 'published' || dirty.value))
 const canUndo = computed(() => editor.value?.canUndo.value ?? false)
 const canRedo = computed(() => editor.value?.canRedo.value ?? false)
 
@@ -464,12 +468,7 @@ onBeforeUnmount(() => {
         <VipButton v-else variant="danger" size="sm" icon="close" :disabled="!canRun" @click="runner.cancel()"
           >Cancel</VipButton
         >
-        <VipButton
-          variant="secondary"
-          size="sm"
-          icon="upload"
-          :disabled="!canEdit || editor?.pipeline.status === 'published'"
-          @click="publish"
+        <VipButton variant="secondary" size="sm" icon="upload" :disabled="!canPublish" @click="publish"
           >Publish</VipButton
         >
         <ResourceShareButton

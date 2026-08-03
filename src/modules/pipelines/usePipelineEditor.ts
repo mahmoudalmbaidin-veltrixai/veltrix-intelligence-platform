@@ -33,6 +33,11 @@ export function usePipelineEditor(initial: Pipeline) {
   const redoStack = ref<string[]>([])
   const clipboard = ref<PipelineNode[]>([])
   const dirty = ref(false)
+  // Propagate schemas once on load so downstream Select/Rename/Formula editors
+  // receive upstream columns immediately (source nodes carry their restored
+  // outputSchema). This runs before the saved snapshot is captured, so restoring
+  // schema state never marks the freshly-loaded pipeline dirty.
+  propagateSchemas()
   const lastSavedSnapshot = ref(snapshot())
 
   function snapshot(): string {
