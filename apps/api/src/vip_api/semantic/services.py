@@ -256,7 +256,7 @@ async def update_model(
 
 
 async def validate_model(
-    db: AsyncSession, context: AuthorizationContext, model_id: UUID
+    db: AsyncSession, context: AuthorizationContext, model_id: UUID, *, audit: bool = True
 ) -> SemanticValidationResponse:
     item = await _model(db, context, model_id)
     dimensions = list(
@@ -295,6 +295,26 @@ async def validate_model(
                     resource=metric.key,
                 )
             )
+    # Audit direct validation requests (route calls); publish() calls with
+    # audit=False so a publish records a single semantic_model.published event.
+    if audit:
+        await record_audit(
+            db,
+            "semantic_model.validated",
+            actor_user_id=context.user_id,
+            organization_id=item.organization_id,
+            workspace_id=item.workspace_id,
+            resource_type="semantic_model",
+            resource_id=item.id,
+            outcome="success" if not errors else "failure",
+            metadata={
+                "valid": not errors,
+                "error_codes": [issue.code for issue in errors],
+                "dimension_count": len(dimensions),
+                "metric_count": len(metrics),
+            },
+            commit=True,
+        )
     return SemanticValidationResponse(valid=not errors, errors=errors, warnings=[])
 
 
@@ -312,7 +332,7 @@ async def publish_model(
             message="There are no unpublished changes to publish.",
             status_code=409,
         )
-    result = await validate_model(db, context, model_id)
+    result = await validate_model(db, context, model_id, audit=False)
     if not result.valid:
         raise ApplicationError(
             code="SEMANTIC_MODEL_INVALID",
@@ -445,6 +465,80 @@ async def list_dimensions(
     ]
 
 
+# Declarative modeling fields captured in audit before/after payloads. Never
+# includes secrets or raw SQL — only the semantic definition surface.
+_AUDIT_SNAPSHOT_FIELDS = (
+    "key",
+    "name",
+    "description",
+    "dimension_type",
+    "data_type",
+    "aggregation",
+    "metric_type",
+    "is_hidden",
+    "is_time_dimension",
+    "time_granularities",
+    "unit",
+    "dataset_id",
+    "field_id",
+    "base_measure_id",
+    "numerator_metric_id",
+    "denominator_metric_id",
+    "metric_id",
+    "target_value",
+    "warning_threshold",
+    "critical_threshold",
+    "comparison_operator",
+    "target_period",
+)
+
+
+def _entity_snapshot(item: object) -> dict[str, object]:
+    """Non-sensitive attribute snapshot for audit before/after payloads."""
+    snapshot: dict[str, object] = {}
+    for field_name in _AUDIT_SNAPSHOT_FIELDS:
+        if hasattr(item, field_name):
+            value = getattr(item, field_name)
+            snapshot[field_name] = str(value) if isinstance(value, UUID) else value
+    return snapshot
+
+
+async def _audit_child(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    model: SemanticModel,
+    event_type: str,
+    entity: str,
+    entity_id: UUID,
+    *,
+    before: dict[str, object] | None = None,
+    after: dict[str, object] | None = None,
+) -> None:
+    """Record a semantic child-entity change against the parent model so the
+    model's audit history reflects every dimension/measure/metric/KPI change,
+    with actor, tenant, workspace, resource, before/after and correlation id."""
+    metadata: dict[str, object] = {
+        "model_id": str(model.id),
+        "model_key": model.key,
+        "entity": entity,
+        "entity_id": str(entity_id),
+    }
+    if before is not None:
+        metadata["before"] = before
+    if after is not None:
+        metadata["after"] = after
+    await record_audit(
+        db,
+        event_type,
+        actor_user_id=context.user_id,
+        organization_id=model.organization_id,
+        workspace_id=model.workspace_id,
+        resource_type="semantic_model",
+        resource_id=model.id,
+        metadata=metadata,
+    )
+
+
 async def create_dimension(
     db: AsyncSession, context: AuthorizationContext, model_id: UUID, payload: DimensionCreate
 ) -> DimensionResponse:
@@ -473,6 +567,16 @@ async def create_dimension(
         is_hidden=payload.is_hidden,
     )
     db.add(item)
+    await db.flush()
+    await _audit_child(
+        db,
+        context,
+        model,
+        "semantic_dimension.created",
+        "dimension",
+        item.id,
+        after=_entity_snapshot(item),
+    )
     await db.commit()
     return DimensionResponse.model_validate(item)
 
@@ -501,9 +605,20 @@ async def update_dimension(
             message="A time dimension requires a date or datetime field.",
             status_code=422,
         )
+    before = _entity_snapshot(item)
     for key, value in payload.model_dump().items():
         setattr(item, key, value)
     item.data_type = field.normalized_data_type
+    await _audit_child(
+        db,
+        context,
+        model,
+        "semantic_dimension.updated",
+        "dimension",
+        item.id,
+        before=before,
+        after=_entity_snapshot(item),
+    )
     await db.commit()
     return DimensionResponse.model_validate(item)
 
@@ -521,7 +636,11 @@ async def delete_dimension(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    before = _entity_snapshot(item)
     await db.delete(item)
+    await _audit_child(
+        db, context, model, "semantic_dimension.deleted", "dimension", dimension_id, before=before
+    )
     await db.commit()
 
 
@@ -575,6 +694,16 @@ async def create_measure(
         is_hidden=payload.is_hidden,
     )
     db.add(item)
+    await db.flush()
+    await _audit_child(
+        db,
+        context,
+        model,
+        "semantic_measure.created",
+        "measure",
+        item.id,
+        after=_entity_snapshot(item),
+    )
     await db.commit()
     return MeasureResponse.model_validate(item)
 
@@ -607,6 +736,7 @@ async def update_measure(
             message="This aggregation requires a numeric field.",
             status_code=422,
         )
+    before = _entity_snapshot(item)
     for key, value in payload.model_dump().items():
         setattr(item, key, value)
     item.data_type = (
@@ -615,6 +745,16 @@ async def update_measure(
         else field.normalized_data_type
         if field
         else "integer"
+    )
+    await _audit_child(
+        db,
+        context,
+        model,
+        "semantic_measure.updated",
+        "measure",
+        item.id,
+        before=before,
+        after=_entity_snapshot(item),
     )
     await db.commit()
     return MeasureResponse.model_validate(item)
@@ -633,7 +773,11 @@ async def delete_measure(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    before = _entity_snapshot(item)
     await db.delete(item)
+    await _audit_child(
+        db, context, model, "semantic_measure.deleted", "measure", measure_id, before=before
+    )
     await db.commit()
 
 
@@ -695,6 +839,16 @@ async def create_metric(
         unit=payload.unit,
     )
     db.add(item)
+    await db.flush()
+    await _audit_child(
+        db,
+        context,
+        model,
+        "semantic_metric.created",
+        "metric",
+        item.id,
+        after=_entity_snapshot(item),
+    )
     await db.commit()
     return MetricResponse.model_validate(item)
 
@@ -743,8 +897,19 @@ async def update_metric(
                 message="A metric dependency is unavailable.",
                 status_code=422,
             )
+    before = _entity_snapshot(item)
     for key, value in payload.model_dump().items():
         setattr(item, key, value)
+    await _audit_child(
+        db,
+        context,
+        model,
+        "semantic_metric.updated",
+        "metric",
+        item.id,
+        before=before,
+        after=_entity_snapshot(item),
+    )
     await db.commit()
     return MetricResponse.model_validate(item)
 
@@ -762,7 +927,11 @@ async def delete_metric(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    before = _entity_snapshot(item)
     await db.delete(item)
+    await _audit_child(
+        db, context, model, "semantic_metric.deleted", "metric", metric_id, before=before
+    )
     await db.commit()
 
 
@@ -813,6 +982,16 @@ async def create_kpi(
         target_period=payload.target_period,
     )
     db.add(item)
+    await db.flush()
+    await _audit_child(
+        db,
+        context,
+        model,
+        "semantic_kpi.created",
+        "kpi",
+        item.id,
+        after=_entity_snapshot(item),
+    )
     await db.commit()
     return KpiResponse.model_validate(item)
 
@@ -845,8 +1024,19 @@ async def update_kpi(
         raise ApplicationError(
             code="INVALID_METRIC", message="The selected metric is unavailable.", status_code=422
         )
+    before = _entity_snapshot(item)
     for key, value in payload.model_dump().items():
         setattr(item, key, value)
+    await _audit_child(
+        db,
+        context,
+        model,
+        "semantic_kpi.updated",
+        "kpi",
+        item.id,
+        before=before,
+        after=_entity_snapshot(item),
+    )
     await db.commit()
     return KpiResponse.model_validate(item)
 
@@ -864,7 +1054,9 @@ async def delete_kpi(
         raise ApplicationError(
             code="NOT_FOUND", message="The requested resource was not found.", status_code=404
         )
+    before = _entity_snapshot(item)
     await db.delete(item)
+    await _audit_child(db, context, model, "semantic_kpi.deleted", "kpi", kpi_id, before=before)
     await db.commit()
 
 
