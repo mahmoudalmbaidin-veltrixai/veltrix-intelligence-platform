@@ -191,6 +191,8 @@ async def list_audit_events(
     event_type: str | None = None,
     outcome: str | None = None,
     actor_user_id: UUID | None = None,
+    resource_type: str | None = None,
+    resource_id: UUID | None = None,
     occurred_from: datetime | None = None,
     occurred_to: datetime | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
@@ -205,6 +207,10 @@ async def list_audit_events(
         statement = statement.where(AuditEvent.outcome == outcome)
     if actor_user_id is not None:
         statement = statement.where(AuditEvent.actor_user_id == actor_user_id)
+    if resource_type is not None:
+        statement = statement.where(AuditEvent.resource_type == resource_type)
+    if resource_id is not None:
+        statement = statement.where(AuditEvent.resource_id == resource_id)
     if occurred_from is not None:
         statement = statement.where(AuditEvent.occurred_at >= occurred_from)
     if occurred_to is not None:

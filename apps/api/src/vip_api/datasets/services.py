@@ -23,6 +23,8 @@ from vip_api.datasets.models import (
 )
 from vip_api.datasets.repositories import DatasetRepository
 from vip_api.datasets.schemas import (
+    DatasetActivityItem,
+    DatasetActivityPage,
     DatasetCreate,
     DatasetFieldResponse,
     DatasetFieldUpdate,
@@ -44,6 +46,7 @@ from vip_api.governance import resource_access_service
 from vip_api.governance.access_view import ResourceEffectiveAccess
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
+from vip_api.governance.models import AuditEvent
 from vip_api.governance.services import consume_quota
 
 
@@ -285,6 +288,159 @@ async def update_dataset(
     )
     await db.commit()
     return DatasetResponse.model_validate(item)
+
+
+async def certify_dataset(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    dataset_id: UUID,
+    *,
+    version: int,
+    note: str | None = None,
+) -> DatasetResponse:
+    """Mark a dataset certified. Requires the certify capability (not merely edit)."""
+    org, ws = _scope(context)
+    item = await DatasetRepository(db, org, ws).get(dataset_id)
+    if item is None:
+        raise ApplicationError(
+            code="NOT_FOUND", message="The requested resource was not found.", status_code=404
+        )
+    if item.version != version:
+        raise ApplicationError(
+            code="VERSION_CONFLICT",
+            message="The resource was changed by another request.",
+            status_code=409,
+        )
+    await _guard(db, context, dataset_id, "certify")
+    if item.certification_status == "certified":
+        raise ApplicationError(
+            code="ALREADY_CERTIFIED",
+            message="This dataset is already certified.",
+            status_code=409,
+        )
+    item.certification_status = "certified"
+    item.certified_by_user_id = context.user_id
+    item.certified_at = datetime.now(UTC)
+    item.certification_note = (note or "").strip() or None
+    item.version += 1
+    item.updated_by_user_id = context.user_id
+    await record_audit(
+        db,
+        "dataset.certified",
+        actor_user_id=context.user_id,
+        organization_id=org,
+        workspace_id=ws,
+        resource_type="dataset",
+        resource_id=item.id,
+        metadata={"note": item.certification_note, "version": item.version},
+    )
+    await db.commit()
+    return DatasetResponse.model_validate(item)
+
+
+async def revoke_dataset_certification(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    dataset_id: UUID,
+    *,
+    version: int,
+    note: str | None = None,
+) -> DatasetResponse:
+    """Revoke certification. Requires the certify capability (not merely edit)."""
+    org, ws = _scope(context)
+    item = await DatasetRepository(db, org, ws).get(dataset_id)
+    if item is None:
+        raise ApplicationError(
+            code="NOT_FOUND", message="The requested resource was not found.", status_code=404
+        )
+    if item.version != version:
+        raise ApplicationError(
+            code="VERSION_CONFLICT",
+            message="The resource was changed by another request.",
+            status_code=409,
+        )
+    await _guard(db, context, dataset_id, "certify")
+    if item.certification_status != "certified":
+        raise ApplicationError(
+            code="NOT_CERTIFIED",
+            message="This dataset is not certified.",
+            status_code=409,
+        )
+    prior_note = item.certification_note
+    item.certification_status = "uncertified"
+    item.certified_by_user_id = None
+    item.certified_at = None
+    item.certification_note = (note or "").strip() or None
+    item.version += 1
+    item.updated_by_user_id = context.user_id
+    await record_audit(
+        db,
+        "dataset.certification.revoked",
+        actor_user_id=context.user_id,
+        organization_id=org,
+        workspace_id=ws,
+        resource_type="dataset",
+        resource_id=item.id,
+        metadata={
+            "note": item.certification_note,
+            "prior_note": prior_note,
+            "version": item.version,
+        },
+    )
+    await db.commit()
+    return DatasetResponse.model_validate(item)
+
+
+async def list_dataset_activity(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    dataset_id: UUID,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> DatasetActivityPage:
+    """Return audit events for a dataset. Gated by dataset query access (not audit.read)."""
+    org, ws = _scope(context)
+    if await DatasetRepository(db, org, ws).get(dataset_id) is None:
+        raise ApplicationError(
+            code="NOT_FOUND", message="The requested resource was not found.", status_code=404
+        )
+    await _guard(db, context, dataset_id, "query")
+    filters = (
+        AuditEvent.organization_id == org,
+        AuditEvent.workspace_id == ws,
+        AuditEvent.resource_type == "dataset",
+        AuditEvent.resource_id == dataset_id,
+    )
+    total = await db.scalar(select(func.count()).select_from(AuditEvent).where(*filters)) or 0
+    rows = (
+        await db.scalars(
+            select(AuditEvent)
+            .where(*filters)
+            .order_by(AuditEvent.occurred_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).all()
+    return DatasetActivityPage(
+        items=[
+            DatasetActivityItem(
+                id=row.id,
+                occurred_at=row.occurred_at,
+                actor_user_id=row.actor_user_id,
+                event_type=row.event_type,
+                action=row.action,
+                outcome=row.outcome,
+                resource_type=row.resource_type,
+                resource_id=row.resource_id,
+                metadata=row.event_metadata or {},
+            )
+            for row in rows
+        ],
+        limit=limit,
+        offset=offset,
+        total=int(total),
+    )
 
 
 async def archive_dataset(
