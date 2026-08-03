@@ -84,7 +84,11 @@ const tabs = computed(() => [
   { value: 'settings', label: 'Settings' },
   { value: 'history', label: 'Versions' },
 ])
-const isEditable = computed(() => canEdit.value && definition.value?.model.status === 'draft')
+// Editing a published model is allowed: the first edit opens the next draft
+// version server-side (the published version stays immutable), then Publish mints
+// that next sequential version. The view refetches after every edit so status and
+// version reflect the re-draft.
+const isEditable = computed(() => canEdit.value)
 
 const settings = reactive({ name: '', description: '', timezone: 'UTC', currency: 'USD', version: 1 })
 const savedSettings = ref('')

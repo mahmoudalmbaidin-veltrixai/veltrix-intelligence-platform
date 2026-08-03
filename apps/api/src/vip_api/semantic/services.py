@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.core.errors import ApplicationError
@@ -95,12 +95,13 @@ async def _model(
         resource_id=item.id,
         action_level=action_level or ("edit" if editable else "view"),
     )
-    if editable and item.status != "draft":
-        raise ApplicationError(
-            code="SEMANTIC_MODEL_IMMUTABLE",
-            message="Only draft semantic models can be edited.",
-            status_code=409,
-        )
+    if editable and item.status == "published":
+        # Editing a published model reopens it as a draft. The previously published
+        # version stays immutable (its frozen snapshot), and the next publish mints
+        # the next sequential published version (computed at publish time), mirroring
+        # the pipeline re-publish state machine. Archived models are already filtered
+        # out above, so only draft/published reach here.
+        item.status = "draft"
     return item
 
 
@@ -301,7 +302,16 @@ async def publish_model(
     db: AsyncSession, context: AuthorizationContext, model_id: UUID
 ) -> SemanticModelResponse:
     org, ws = _scope(context)
-    item = await _model(db, context, model_id, editable=True, action_level="manage")
+    # Publish must not re-draft: authorize manage without the editable re-draft,
+    # and require an unpublished draft so a clean published model is not
+    # republished into a duplicate version.
+    item = await _model(db, context, model_id, action_level="manage")
+    if item.status != "draft":
+        raise ApplicationError(
+            code="SEMANTIC_MODEL_NOT_DRAFT",
+            message="There are no unpublished changes to publish.",
+            status_code=409,
+        )
     result = await validate_model(db, context, model_id)
     if not result.valid:
         raise ApplicationError(
@@ -313,8 +323,18 @@ async def publish_model(
                 for issue in result.errors
             ],
         )
+    # Sequential, immutable published versions: the next published number is one
+    # past the highest existing published version for this model (independent of
+    # the draft edit counter), so re-publishing after edits never collides and
+    # never skips — mirroring the pipeline re-publish numbering.
+    highest = await db.scalar(
+        select(func.max(SemanticModelVersion.version_number)).where(
+            SemanticModelVersion.semantic_model_id == item.id
+        )
+    )
+    next_version = int(highest or 0) + 1
     item.status = "published"
-    item.published_version = item.version_number
+    item.published_version = next_version
     item.version += 1
     snapshot = {
         "model": SemanticModelResponse.model_validate(item).model_dump(mode="json"),
@@ -334,7 +354,7 @@ async def publish_model(
             organization_id=org,
             workspace_id=ws,
             semantic_model_id=item.id,
-            version_number=item.version_number,
+            version_number=next_version,
             definition=snapshot,
             published_by_user_id=context.user_id,
         )
