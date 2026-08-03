@@ -20,7 +20,7 @@ import '@/modules/operations/operations.service'
  *   datasets.service.ts     → GET /datasets
  *   semantic.service.ts     → GET /semantic-models
  *   home.service.ts         → GET /home/summary
- *   operations.service.ts   → GET /audit
+ *   operations.service.ts   → GET /audit-events
  */
 const HOST = 'http://localhost:8000'
 const VERSIONED = 'http://localhost:8000/api/v1'
@@ -35,7 +35,7 @@ const MODULE_ENDPOINTS: Array<{ module: string; path: string; expected: string }
   { module: 'dataset-list', path: '/datasets', expected: '/api/v1/datasets' },
   { module: 'semantic-models', path: '/semantic-models', expected: '/api/v1/semantic-models' },
   { module: 'home-summary', path: '/home/summary', expected: '/api/v1/home/summary' },
-  { module: 'audit', path: '/audit', expected: '/api/v1/audit' },
+  { module: 'audit', path: '/audit-events', expected: '/api/v1/audit-events' },
 ]
 
 describe('service adapter URL resolution (single /api/v1)', () => {
@@ -55,7 +55,7 @@ describe('service adapter URL resolution (single /api/v1)', () => {
 
   it('audit keeps its query string under both base forms', () => {
     const q = { search: 'x', result: 'denied' }
-    expect(resolveApiUrl(HOST, '/audit', q)).toBe(`${HOST}/api/v1/audit?search=x&result=denied`)
-    expect(resolveApiUrl(VERSIONED, '/audit', q)).toBe(`${HOST}/api/v1/audit?search=x&result=denied`)
+    expect(resolveApiUrl(HOST, '/audit-events', q)).toBe(`${HOST}/api/v1/audit-events?search=x&result=denied`)
+    expect(resolveApiUrl(VERSIONED, '/audit-events', q)).toBe(`${HOST}/api/v1/audit-events?search=x&result=denied`)
   })
 })

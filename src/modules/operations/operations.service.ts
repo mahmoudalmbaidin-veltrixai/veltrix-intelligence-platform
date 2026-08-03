@@ -8,7 +8,7 @@
  *   Live backend:
  *     GET /api/v1/notifications                 -> Notification[]
  *     GET /api/v1/activity                       -> ActivityEvent[]
- *     GET /api/v1/audit?actor=&result=&from=&to= -> AuditEvent[]
+ *     GET /api/v1/audit-events?actor=&result=&from=&to= -> AuditEvent[]
  *     GET /api/v1/usage                          -> UsageMetric[]
  *   Swap `operationsService` for a live adapter; the contract is identical.
  *
@@ -522,7 +522,9 @@ const apiOperationsService: OperationsService = {
   listNotifications: () => apiClient.get<Notification[]>('/notifications'),
   listActivity: () => apiClient.get<ActivityEvent[]>('/activity'),
   listAudit: (params) =>
-    apiClient.get<AuditEvent[]>('/audit', {
+    // Canonical audit route is /audit-events (the Audit Center uses it via
+    // governance/auditService). This adapter is retained for API completeness.
+    apiClient.get<AuditEvent[]>('/audit-events', {
       query: {
         search: params?.search,
         actor: params?.actor,
