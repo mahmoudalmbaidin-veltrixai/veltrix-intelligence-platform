@@ -114,15 +114,73 @@ Re-validated with cryptography 50.0.0 installed:
 - connection-security unit tests ✓ (encryption/decryption unaffected)
 - 240 unit ✓ · **58 integration ×2 both green** ✓
 
+## 6b. Round 2 — gating, semantic audit, UX, live persona matrix
+
+**Backend — semantic modeling audit trail** (`test_semantic_audit.py`, integration):
+- `test_semantic_modeling_changes_are_audited` — the ten event types
+  (dimension/measure/metric/KPI create/update/delete + `semantic_model.validated`)
+  all persist against the parent model with actor/org/workspace/resource/entity,
+  a correlation id, and before/after snapshots; asserts no secret or raw SQL is
+  captured.
+- `test_invalid_validation_is_audited_as_failure` — a model with no
+  dimensions/metrics audits `semantic_model.validated` with `outcome=failure`.
+
+**Backend — governance policy** (`test_governance_policies.py`) re-passes with the
+new `insights`/`billing` capability keys and the trimmed default entitlements.
+
+**Live Chromium — semantic persona matrix** (`tests/e2e/semantic-personas.spec.ts`,
+chrome-desktop, against the seeded governance personas + a real semantic model):
+```
+ok  semantic personas render from backend-resolved effective access
+ok  audit access and placeholder gating are persona-scoped
+2 passed
+```
+- Manager/Owner holds the `manage` capability level and `can_manage_access`.
+- Editor tops at `edit` (never `manage`); Viewer is read-only; the restricted
+  persona is fail-closed (403/404 on detail + archive).
+- Audit Center reachable with real events for a manager; the placeholder
+  entitlements (`report_studio`/`insights`/`marketplace`/`billing`) are absent
+  from `/authorization/context`, their nav is hidden, and audit read is denied
+  for the restricted persona.
+
+**Live Chromium — placeholder gating + smoke** (`tests/e2e/route-smoke.spec.ts`):
+```
+ok  disabled AI preview routes remain inaccessible in production navigation
+ok  placeholder modules never render their surface in live mode
+ok  all router destinations render an intentional nonblank surface ...
+3 passed
+```
+
+**Accessibility + governance** (`accessibility.spec.ts`, `governance.spec.ts`,
+chrome-desktop + chrome-high-dpi): `39 passed` — zero critical/serious axe
+violations across protected routes (including `/developer` → the reframed upgrade
+wall), and the persona nav/API fail-closed matrix intact.
+
+The exhaustive semantic capability ladder (ACL elevation, group grants, expiry,
+cross-tenant denial, and `execute_query` authorization for Studio/Explore/
+dashboard paths) remains proven by
+`tests/integration/test_resource_authorization_domains.py`.
+
+> Note: the local live runs re-seed the demo personas with a known password and
+> revoke the two placeholder entitlements (`report_studio`, `marketplace`) that
+> older org rows still carried, so the running DB matches the new defaults. CI
+> seeds a fresh database from the new code, so this state is the default there.
+
 ## 7. Summary
 
 | Suite | Count | Status |
 |-------|-------|--------|
 | Backend static (ruff/format/mypy) | 3 gates | ✅ |
 | Backend unit | 240 | ✅ |
-| Backend integration (×2) | 58 ×2 | ✅ |
+| Backend integration (×2) | 60 ×2 | ✅ |
+| Frontend typecheck/lint/format | 3 gates | ✅ |
 | Frontend unit | 279 | ✅ |
 | Frontend build | — | ✅ |
 | Live MySQL discovery | happy + error | ✅ |
+| Live Chromium — persona matrix + gating | 5 | ✅ |
+| Accessibility + governance (axe) | 39 | ✅ |
+
+(Backend unit 240 includes the 24-case MySQL discovery unit test; integration 60
+= 58 + the 2 new semantic-audit tests. Confirmed by the gate run in §2–§4.)
 
 All gates green. No flaky results across the two integration runs.

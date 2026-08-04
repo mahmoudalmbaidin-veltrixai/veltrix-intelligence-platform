@@ -78,6 +78,50 @@ from the canonical `/api/v1/audit-events` endpoint.
 
 **Overall B9.1C acceptance:** ☐ Approved ☐ Changes requested
 
-_Deferred items (placeholder gating, UX consistency pass, semantic CRUD audit,
-live Chromium persona matrix) are acknowledged as remaining work, not part of
-this acceptance._
+---
+
+## UAT-4 — Placeholder-module gating (live mode)
+
+1. As an org admin, confirm the sidebar shows **no** Reports, Insights,
+   Marketplace, or Billing entries (nor AI Studio / Developer / Automation).
+2. Navigate directly to `/reports`, `/insights`, `/marketplace`, `/billing`.
+   - **Expect:** each redirects to a wall — the **"not available on this
+     workspace"** upgrade page when the module is merely disabled, or the
+     Forbidden page if you also lack the permission. The empty/fake module
+     surface is never shown.
+3. Confirm the upgrade wall names the specific module and states it's disabled
+   (not a permission error), distinguishing disabled from unauthorized.
+
+**Pass criteria:** placeholder modules are unreachable in live mode, with no dead
+nav, no empty pages presented as complete, and no fake API keys/billing surfaced.
+
+---
+
+## UAT-5 — Semantic modeling audit trail
+
+1. In Semantic Studio, open a model and add/edit/delete a dimension, a measure, a
+   metric and a KPI; run Validate; Publish.
+2. Open **Audit Center** and filter by the model.
+   - **Expect:** a distinct event for each change
+     (`semantic_dimension.created`, `…measure.updated`, `…kpi.deleted`,
+     `semantic_model.validated`, `semantic_model.published`, …), each showing the
+     actor, timestamp, correlation ID, and a before/after snapshot in the detail
+     drawer.
+   - **Expect:** no secrets or raw SQL appear in any snapshot (the drawer states
+     sensitive fields are redacted).
+
+**Pass criteria:** every modeling mutation and validation is captured as a
+tenant-scoped, before/after audit event with no sensitive data.
+
+---
+
+## Reviewer sign-off (round 2)
+
+| UAT | Result (Pass/Fail) | Notes |
+|-----|--------------------|-------|
+| UAT-4 Placeholder gating | | |
+| UAT-5 Semantic audit trail | | |
+
+All B9.1C objectives (Connection/MySQL, Semantic re-publish + audit, Audit route,
+placeholder gating, core UX, live persona matrix) are now in scope for acceptance;
+no items are deferred.

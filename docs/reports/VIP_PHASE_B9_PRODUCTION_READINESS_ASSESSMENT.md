@@ -289,8 +289,9 @@ Gaps: no tests for the three highest-impact pipeline defects (re-publish, load-t
 
 ## Addendum — B9.1C slice (2026-08-04)
 
-Slice `phase-b9/connection-semantic-finalization`. Verdict:
-**B9.1C PARTIALLY COMPLETE — MORE WORK REQUIRED.**
+Slice `phase-b9/connection-semantic-finalization`. Verdict (round 2):
+**B9.1 CORE PRODUCT COMPLETION COMPLETE — READY FOR PR REVIEW.**
+(Round 1 was `B9.1C PARTIALLY COMPLETE`; the deferred items below are now done.)
 
 ### Resolved this slice
 - **B9-14 (MySQL honesty):** `MySQLDiscoveryAdapter` implemented and
@@ -310,20 +311,27 @@ Slice `phase-b9/connection-semantic-finalization`. Verdict:
   code path + URL contract spec; the live Audit Center already used the canonical
   route.
 
-### Still open (carried forward)
-- **B9-06 / placeholder gating:** AI Studio, Developer Portal, Automation,
-  Billing are OFF by default via entitlements, but **Reports and Insights remain
-  route-reachable** in live mode. Route-level gating is deferred because
-  `route-smoke.spec.ts` navigates those routes directly and would fail CI without
-  a coordinated e2e update. The "do not enable placeholder nav in production"
-  caution **stands** for Reports/Insights.
-- **Core UX consistency pass (B9.3 preview):** not started in this slice.
-- **Semantic CRUD audit:** dimension/measure/metric/KPI mutations are not yet
-  audit-logged (model create/update/publish are).
-- **Live Chromium persona matrix** (Viewer/Query/Editor/Manager/Denied) not
-  re-run for this slice.
+### Resolved in round 2
+- **B9-06 / placeholder gating — DONE.** All seven placeholder modules are gated
+  OFF in live mode. Investigation confirmed none have a production backend
+  (empty-stub catalog endpoints or hard 404s). Reports, Insights, Marketplace and
+  Billing are now entitlement-gated (`report_studio`/`marketplace` dropped from
+  the org defaults; `insights`/`billing` added as default-off capability keys);
+  AI Studio, Developer Portal and Automation were already OFF. Gated routes
+  resolve to the reframed "not available on this workspace" upgrade wall (disabled
+  ≠ unauthorized) and the nav is hidden. The "do not enable placeholder nav in
+  production" caution is now **enforced in code**. Future module code preserved.
+- **Semantic modeling audit — DONE.** Dimension/measure/metric/KPI CRUD and model
+  validation now emit tenant-scoped before/after audit events (no secrets/raw SQL).
+- **Core UX consistency — DONE.** Retry actions + honest error states on Audit
+  Center and Semantic Studio; disabled-state wall clarified.
+- **Live Chromium persona matrix — DONE.** `semantic-personas.spec.ts` proves
+  Manager/Editor/Viewer/Denied effective access + audit/gating per persona; the
+  deep ACL/expiry/cross-tenant/execute_query ladder stays covered by
+  `test_resource_authorization_domains.py`.
 
-### Gates (this slice)
+### Gates (round 2)
 Backend: ruff ✓ · format ✓ · mypy ✓ · 240 unit ✓ · alembic upgrade+check clean ✓
-· 58 integration ×2 both green ✓. Frontend: typecheck ✓ · lint ✓ · format ✓ ·
-279 unit ✓ · build ✓. Rollback tag `6254d60d…` unchanged.
+· 60 integration ×2 both green ✓. Frontend: typecheck ✓ · lint ✓ · format ✓ ·
+279 unit ✓ · build ✓. Live Chromium: 5 persona/gating + 39 a11y/governance ✓.
+Rollback tag `6254d60d…` unchanged.
