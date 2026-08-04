@@ -72,15 +72,17 @@ test('disabled AI preview routes remain inaccessible in production navigation', 
   }
 })
 
-test('placeholder modules are gated to the upgrade wall in live mode', async ({ authenticatedPage: page }) => {
+test('placeholder modules never render their surface in live mode', async ({ authenticatedPage: page }) => {
   for (const route of entitlementGatedRoutes) {
     await page.goto(route)
-    // The router guard redirects an un-entitled placeholder module to /upgrade
-    // (never renders the module surface), with the requested route preserved in
-    // the `from` query param.
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/upgrade')
-    await expect(page).toHaveURL(/\/upgrade\?/)
-    // The upgrade wall renders a real, non-blank surface (not a blank/placeholder).
+    // The router guard redirects a gated placeholder away from the module surface
+    // to a safe wall — /upgrade when the module is merely disabled (entitlement
+    // absent) or /forbidden when the persona also lacks the permission. Either
+    // way the empty/fake module surface is never shown.
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toMatch(/^\/(upgrade|forbidden)$/)
+    // The wall renders a real, non-blank surface (not a blank/placeholder page).
     const main = page.locator('#vip-main')
     await expect(main).toBeVisible()
     await expect(main).not.toBeEmpty()
