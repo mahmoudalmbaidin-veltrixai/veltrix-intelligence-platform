@@ -9,6 +9,7 @@ covered elsewhere (test_semantic_republish + governance/query suites).
 
 from __future__ import annotations
 
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -166,8 +167,10 @@ async def test_semantic_modeling_changes_are_audited(settings: Settings) -> None
             assert meta["entity"] == "dimension"
             assert meta["entity_id"] == str(dim.id)
             # Before/after reflect the rename and contain no secret/raw SQL.
-            assert meta["before"]["name"] == "Region"
-            assert meta["after"]["name"] == "Region (edited)"
+            before = cast("dict[str, object]", meta["before"])
+            after = cast("dict[str, object]", meta["after"])
+            assert before["name"] == "Region"
+            assert after["name"] == "Region (edited)"
             blob = str(meta).lower()
             assert "select " not in blob and "password" not in blob and "secret" not in blob
 
@@ -208,7 +211,8 @@ async def test_invalid_validation_is_audited_as_failure(settings: Settings) -> N
             events = await _events(db, org_id)
             validated = [e for e in events if e.event_type == "semantic_model.validated"]
             assert validated and validated[-1].outcome == "failure"
-            assert "DIMENSION_REQUIRED" in validated[-1].event_metadata["error_codes"]
+            error_codes = cast("list[str]", validated[-1].event_metadata["error_codes"])
+            assert "DIMENSION_REQUIRED" in error_codes
     finally:
         await _cleanup(database, org_ids, user_ids)
 
