@@ -164,6 +164,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'sparkles',
         description: 'AI-detected trends, anomalies and highlights.',
         permission: 'dashboard.read',
+        entitlement: 'insights',
         keywords: ['ai', 'trend', 'anomaly', 'analyze'],
       },
       {
@@ -180,6 +181,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'report',
         description: 'Paginated, print-ready operational reports.',
         permission: 'report.read',
+        entitlement: 'report_studio',
       },
       {
         label: 'Scheduled Deliveries',
@@ -394,6 +396,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'card',
         description: 'Plans, invoices and payment methods.',
         permission: 'billing.read',
+        entitlement: 'billing',
         adminOnly: true,
       },
       {
@@ -459,6 +462,12 @@ export const QUICK_CREATE: NavItem[] = [
   { label: 'New Connection', to: '/connections/new', icon: 'plug', permission: 'connection.create' },
   { label: 'New Pipeline', to: '/pipelines/new', icon: 'workflow', permission: 'pipeline.create' },
   { label: 'New Dashboard', to: '/dashboards/new', icon: 'chart', permission: 'dashboard.create' },
-  { label: 'New Report', to: '/reports/new', icon: 'report', permission: 'report.create' },
+  {
+    label: 'New Report',
+    to: '/reports/new',
+    icon: 'report',
+    permission: 'report.create',
+    entitlement: 'report_studio',
+  },
   { label: 'New Automation', to: '/automation/new', icon: 'workflow', permission: 'automation.write' },
 ]

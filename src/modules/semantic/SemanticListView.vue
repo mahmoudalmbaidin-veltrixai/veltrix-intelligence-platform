@@ -14,6 +14,7 @@ import VipBadge from '@/shared/ui/VipBadge.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipSkeleton from '@/shared/ui/VipSkeleton.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
+import VipAlert from '@/shared/ui/VipAlert.vue'
 import VipDialog from '@/shared/ui/VipDialog.vue'
 import VipInput from '@/shared/ui/VipInput.vue'
 import VipSelect from '@/shared/ui/VipSelect.vue'
@@ -24,7 +25,7 @@ const ui = useUiStore()
 const platform = usePlatformStore()
 const canWrite = computed(() => platform.can('semantic_model.create'))
 
-const { data, isLoading, refetch } = useQuery(
+const { data, isLoading, error, refetch } = useQuery(
   () => 'semantic:models',
   () => semanticStudioService.listModels(),
 )
@@ -160,6 +161,15 @@ function counts(dimensions: number, measures: number): string {
         <VipSkeleton width="60%" height="12px" style="margin-top: 8px" />
       </VipCard>
     </div>
+
+    <VipAlert v-else-if="error" tone="danger" title="Semantic models unavailable">
+      The semantic models could not be loaded. This is a load error, not an empty workspace.
+      <template #actions>
+        <VipButton variant="secondary" size="sm" icon="refresh" :loading="isLoading" @click="refetch">
+          Retry
+        </VipButton>
+      </template>
+    </VipAlert>
 
     <VipEmptyState
       v-else-if="!data || data.length === 0"

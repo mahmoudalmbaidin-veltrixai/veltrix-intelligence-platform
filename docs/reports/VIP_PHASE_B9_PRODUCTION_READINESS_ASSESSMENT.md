@@ -284,3 +284,54 @@ Gaps: no tests for the three highest-impact pipeline defects (re-publish, load-t
 | Live module smoke (admin) | home/roles/groups/connections/pipelines/datasets/semantic-models/dashboards/jobs/notifications → 200 |
 
 *Left running at `http://localhost:8000` and `http://localhost:3009` per instructions.*
+
+---
+
+## Addendum — B9.1C slice (2026-08-04)
+
+Slice `phase-b9/connection-semantic-finalization`. Verdict (round 2):
+**B9.1 CORE PRODUCT COMPLETION COMPLETE — READY FOR PR REVIEW.**
+(Round 1 was `B9.1C PARTIALLY COMPLETE`; the deferred items below are now done.)
+
+### Resolved this slice
+- **B9-14 (MySQL honesty):** `MySQLDiscoveryAdapter` implemented and
+  **live-verified** against the real `mysql` container — `vip_demo.customers`
+  discovered with correct type normalization; bad-credential path returns typed
+  `DISCOVERY_FAILED` (502) without echoing the secret. MySQL is now honestly
+  classified: **discovery + dataset registration supported; analytics
+  (preview/profile/query) PostgreSQL-only by design.** The "do not advertise
+  MySQL discovery" caution is lifted; the "do not advertise MySQL analytics"
+  caution stands.
+- **Semantic re-publish:** the `SEMANTIC_MODEL_IMMUTABLE` block was the same
+  defect fixed in the pipeline domain (B9-02 class). Now supports repeatable
+  publishing with sequential immutable versions, re-draft on edit, and
+  `SEMANTIC_MODEL_NOT_DRAFT` guard — integration-tested (publish v1→v2→v3, deny
+  path).
+- **B9-* audit path:** `/audit` → `/audit-events` canonicalized in the last dead
+  code path + URL contract spec; the live Audit Center already used the canonical
+  route.
+
+### Resolved in round 2
+- **B9-06 / placeholder gating — DONE.** All seven placeholder modules are gated
+  OFF in live mode. Investigation confirmed none have a production backend
+  (empty-stub catalog endpoints or hard 404s). Reports, Insights, Marketplace and
+  Billing are now entitlement-gated (`report_studio`/`marketplace` dropped from
+  the org defaults; `insights`/`billing` added as default-off capability keys);
+  AI Studio, Developer Portal and Automation were already OFF. Gated routes
+  resolve to the reframed "not available on this workspace" upgrade wall (disabled
+  ≠ unauthorized) and the nav is hidden. The "do not enable placeholder nav in
+  production" caution is now **enforced in code**. Future module code preserved.
+- **Semantic modeling audit — DONE.** Dimension/measure/metric/KPI CRUD and model
+  validation now emit tenant-scoped before/after audit events (no secrets/raw SQL).
+- **Core UX consistency — DONE.** Retry actions + honest error states on Audit
+  Center and Semantic Studio; disabled-state wall clarified.
+- **Live Chromium persona matrix — DONE.** `semantic-personas.spec.ts` proves
+  Manager/Editor/Viewer/Denied effective access + audit/gating per persona; the
+  deep ACL/expiry/cross-tenant/execute_query ladder stays covered by
+  `test_resource_authorization_domains.py`.
+
+### Gates (round 2)
+Backend: ruff ✓ · format ✓ · mypy ✓ · 240 unit ✓ · alembic upgrade+check clean ✓
+· 60 integration ×2 both green ✓. Frontend: typecheck ✓ · lint ✓ · format ✓ ·
+279 unit ✓ · build ✓. Live Chromium: 5 persona/gating + 39 a11y/governance ✓.
+Rollback tag `6254d60d…` unchanged.

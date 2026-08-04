@@ -313,7 +313,13 @@ FEATURE_DEFINITIONS: tuple[tuple[str, bool], ...] = (
     ("dashboard_studio", True),
     ("pipeline_studio", True),
     ("dataset_studio", True),
+    # Placeholder modules gated OFF in live mode (no production backend yet):
+    # report_studio/insights/marketplace/billing are recognized capability keys
+    # but are not granted by DEFAULT_ORGANIZATION_ENTITLEMENTS, so their routes
+    # resolve to the upgrade wall and their nav is hidden until the module ships.
     ("report_studio", True),
+    ("insights", False),
+    ("billing", False),
     ("ai_studio", False),
     ("advanced_audit", True),
     ("developer_api", False),
