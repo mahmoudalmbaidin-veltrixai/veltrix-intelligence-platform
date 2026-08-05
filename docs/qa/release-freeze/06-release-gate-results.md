@@ -8,9 +8,11 @@ All final product gates ran from committed product/test SHA
 The first exact MyPy run (`mypy src tests`) failed with five test-only annotation errors
 and a MyPy internal error caused by an untyped nested assignment. Ruff and Ruff format
 had already passed. The earlier remediation report used narrower `mypy src`, so it did
-not exercise these test annotations. Two test files received explicit annotations and
-casts; no application behavior or assertion was weakened. Targeted renderer tests then
-passed 13/13, and the final exact MyPy run passed 0 errors across 221 files.
+not exercise these test annotations. The first corrected MyPy rerun found one remaining
+Pillow metadata annotation error. After the second narrow correction, targeted renderer
+tests passed 13/13 and the third MyPy attempt passed 0 errors across 221 files. Two test
+files received explicit annotations and casts; no application behavior or assertion was
+weakened.
 
 The parallel frontend result from the aborted first orchestration was not treated as a
 pass because its output was not returned. Every frontend gate was rerun independently.
@@ -22,7 +24,7 @@ No browser or integration retry was required.
 | --- | --- | --- |
 | Ruff | pass | first reported run passed |
 | Ruff formatting | 252 files formatted | first reported run passed |
-| MyPy `src tests` | 0 errors / 221 files | first failed; corrected rerun passed |
+| MyPy `src tests` | 0 errors / 221 files | attempt 1: five errors/internal error; attempt 2: one error; attempt 3: passed |
 | Backend unit | 249 passed, 64 deselected | final run passed |
 | PostgreSQL integration | 64 passed, 249 deselected in 89.73s | first run passed; 2.0s timeout unchanged |
 | Frontend ESLint | pass | independent final run passed |
@@ -44,4 +46,3 @@ No browser or integration retry was required.
 
 This is a release-freeze sanity suite, not the independent 20-run certification matrix.
 The independent commands are in `07-independent-certification-handoff.md`.
-

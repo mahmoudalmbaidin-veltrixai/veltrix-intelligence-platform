@@ -4,7 +4,7 @@
   "freeze_base": "b6c85b313c29e161f5b1c23555e00f54b2352454",
   "product_test_gate_sha": "1e286a20eb535633a3eb341a2e0d3e38693fa5ac",
   "final_sha_resolution": "git rev-parse HEAD (exact value recorded in release-manager response)",
-  "commit_count": 5,
+  "commit_count": 6,
   "commits": [
     {
       "sha": "eecf683c49e97635aae51e54e6e599a8db98f136",
@@ -23,9 +23,13 @@
       "subject": "test(certification): fix strict typing coverage"
     },
     {
+      "sha": "d2ccdfdf038b15bb204a127096204bced0d00fd2",
+      "subject": "docs(qa): record committed-state release gates"
+    },
+    {
       "sha": "SELF",
       "sha_resolution": "git rev-parse HEAD",
-      "subject": "docs(qa): record committed-state release gates"
+      "subject": "docs(qa): complete release retry history"
     }
   ],
   "file_count": 163,

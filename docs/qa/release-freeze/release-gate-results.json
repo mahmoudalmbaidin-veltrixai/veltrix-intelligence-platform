@@ -8,7 +8,7 @@
       "result": "failed",
       "details": "Five test annotation errors followed by an internal error at an untyped nested assignment.",
       "resolution": "Added explicit test-only annotations/casts; no product behavior or assertion was weakened.",
-      "corrected_result": "0 errors across 221 files"
+      "corrected_result": "Attempt 2 found one remaining Pillow metadata error; attempt 3 passed with 0 errors across 221 files."
     }
   ],
   "unreported_attempts": [
@@ -20,7 +20,7 @@
   "gates": [
     { "name": "ruff", "passed": true },
     { "name": "ruff_format", "passed": true, "files": 252 },
-    { "name": "mypy_src_tests", "passed": true, "files": 221, "errors": 0, "attempt": 2 },
+    { "name": "mypy_src_tests", "passed": true, "files": 221, "errors": 0, "attempt": 3 },
     { "name": "backend_unit", "passed": true, "passed_tests": 249, "deselected": 64 },
     { "name": "backend_integration", "passed": true, "passed_tests": 64, "deselected": 249, "seconds": 89.73, "connect_timeout_seconds": 2.0, "attempt": 1 },
     { "name": "frontend_eslint", "passed": true },
