@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "path": "artifacts/",
+      "category": 6,
+      "decision": "exclude and keep ignored",
+      "reason": "Immutable freeze backups, raw QA outputs, and DPAPI-encrypted local credentials are local state."
+    },
+    {
+      "path": "test-results/",
+      "category": 7,
+      "decision": "exclude and keep ignored",
+      "reason": "Raw Playwright result and trace material; scanned in place."
+    },
+    {
+      "path": "playwright-report/",
+      "category": 7,
+      "decision": "exclude and keep ignored",
+      "reason": "Generated browser report; scanned in place."
+    },
+    {
+      "path": ".env.local",
+      "category": 8,
+      "decision": "exclude and keep ignored",
+      "reason": "Local environment and credential material."
+    },
+    {
+      "path": ".env.test",
+      "category": 8,
+      "decision": "exclude and keep ignored",
+      "reason": "Local integration environment and credential material."
+    },
+    {
+      "path": "Docker named volumes",
+      "category": 9,
+      "decision": "exclude; outside Git worktree",
+      "reason": "PostgreSQL, Redis, MySQL, files, worker, and dashboard storage state."
+    },
+    {
+      "path": "*.bkp / backup files",
+      "category": 9,
+      "decision": "exclude and keep ignored",
+      "reason": "Backups are preserved locally and not source-controlled."
+    },
+    {
+      "path": "node_modules/, dist/, caches, .venv/",
+      "category": 10,
+      "decision": "exclude and keep ignored",
+      "reason": "Reproducible dependency, build, and cache output."
+    }
+  ]
+}

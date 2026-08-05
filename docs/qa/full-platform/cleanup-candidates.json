@@ -1,0 +1,14 @@
+{
+  "executed": [
+    {"table":"group_role_assignments","id":"325e5dd2-9f23-44fb-b071-cab642e697eb","tenant_id":"17a4e171-ced9-40cf-883d-e42ff2dc4267","workspace_id":"b26c56a6-b743-4ce4-ae20-4da17cdb6e36","reason":"interrupted QA bootstrap created an incorrect role assignment","method":"scoped API"},
+    {"table":"group_role_assignments","id":"edc4f5ed-0976-44a9-91f2-c44aa60deec1","tenant_id":"17a4e171-ced9-40cf-883d-e42ff2dc4267","workspace_id":"b26c56a6-b743-4ce4-ae20-4da17cdb6e36","reason":"interrupted QA bootstrap created an incorrect role assignment","method":"scoped API"},
+    {"table":"group_memberships","id":"95672c63-841a-4bd9-8a71-fb8c8aeb00cb","tenant_id":"17a4e171-ced9-40cf-883d-e42ff2dc4267","workspace_id":"b26c56a6-b743-4ce4-ae20-4da17cdb6e36","reason":"interrupted QA bootstrap created an incorrect group membership","method":"scoped API"}
+  ],
+  "retained_for_uat": [
+    {"table":"organizations","id":"17a4e171-ced9-40cf-883d-e42ff2dc4267"},
+    {"table":"organizations","id":"e1520ab1-01e5-4623-91d2-1e6b4cb70696"},
+    {"table":"organizations","id":"0e350eca-90d5-46ea-88a4-7f7e958ca6b6"},
+    {"table":"organizations","id":"0ae1abab-07c3-443b-bc42-6a322e8cb4be"}
+  ],
+  "warning": "Expand exact descendants and verify DB/storage/Redis references before later cleanup. Never delete by prefix alone."
+}

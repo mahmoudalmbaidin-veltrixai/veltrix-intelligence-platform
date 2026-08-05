@@ -1,0 +1,18 @@
+# Root Cause Report
+
+| Blocker | Verified root cause | Corrective control |
+|---|---|---|
+| Firefox auth/bootstrap | Login completion preceded `/auth/me`, tenant bootstrap, cookie adoption, and awaited route replacement; overlapping attempts could commit stale state. | Generation-scoped single-flight login that confirms session, user, organization/workspace state, and one awaited authoritative navigation. |
+| Dashboard save paths | The base single-flight implementation existed, but failure/race/guard/cache/version-conflict behavior lacked deterministic behavioral coverage. | Joined saves, dirty-generation tracking, guarded post-create navigation, publish prerequisite enforcement, conflict/error handling, and 15 behavioral scenarios. |
+| Export parity | Format renderers projected partial definitions and used family-generic visuals. | One immutable published manifest, lossless metadata in every format, structured CSV v2, and distinct metric/stacked/scatter/gauge/progress/map rendering. |
+| Arabic/bidi | Text was truncated before logical wrapping and bidi shaping; fallback fonts were not consistently selected. | Logical word wrapping before shaping, DejaVu/Arial production font resolution, bidi ordering, and full bilingual evidence. |
+| AI placeholder exposure | Route discovery relied on a feature flag without a complete production entitlement/readiness boundary. | Fail-closed route/navigation/command/search gating requiring flag, entitlement, and permitted development mock mode; live production mock surfaces are inaccessible. |
+| API certification | Existing sweep proved schema structure and anonymous rejection, not authenticated operation/security coverage. | 247-operation classifier mapped to real PostgreSQL tests, personas, and security dimensions; authenticated schema/error/security sweeps added. |
+| MyPy | A stale ignore remained and untyped bidi output escaped as `Any`. | Removed the unused ignore and converted the bidi library result to `str`. |
+| Browser fixtures | Specs referenced obsolete demo identities and selected mutable resources by list order. | Protected credential provider plus idempotent exact-name fixture verification/repair for users, tenant context, dataset, model, ACL, and destination connection. |
+| Pipeline destination | The browser journey selected the first connection, which could be MySQL/unhealthy. | Resolve one exact immutable fixture; assert PostgreSQL type and health before use. |
+| Route waits | Route smoke used 100/250 ms sleeps because the application exposed no readiness/query-idle contract. | Router-ready and query-activity signals plus URL/loading/DOM-driven waits and timeout diagnostics. |
+| Credential artifacts | Playwright error context could retain entered passwords and CI retained raw artifacts. | Text/ZIP sanitizer, global teardown, CI secret scan, short retention, and protected non-committed credentials. |
+| Explicit denies | Collection services skipped lowest-level denies for broad workspace roles. | Every collection now subtracts active resource denies before returning results; direct access and collection omission are tested. |
+| Weak all-widget evidence | Synthetic evidence covered four families and bypassed persistence/publication/jobs. | Real integration lifecycle for all 20 types plus canonical worker/scheduler/email proof and deterministic visual artifacts. |
+| SSE full-suite 429 | The 30/minute event-subscription bucket was shared by every authenticated session for one user/workspace, so legitimate independent browser sessions consumed each other's reconnect budget. | Preserve the 30/minute control but scope it to user+tenant+workspace+authenticated session; login/session ceilings still bound bucket creation. |

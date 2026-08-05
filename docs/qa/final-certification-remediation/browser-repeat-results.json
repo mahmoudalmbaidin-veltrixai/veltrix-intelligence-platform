@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "retries_enabled": false,
+  "final_tree": [
+    {"suite":"firefox dashboard batch 1","project":"firefox-desktop","first_attempt_passed":20,"first_attempt_failed":0,"retries":0,"result":"pass"},
+    {"suite":"firefox dashboard batch 2","project":"firefox-desktop","first_attempt_passed":20,"first_attempt_failed":0,"retries":0,"result":"pass"},
+    {"suite":"governed pipeline","project":"chrome-desktop","first_attempt_passed":10,"first_attempt_failed":0,"retries":0,"result":"pass"},
+    {"suite":"chromium full","project":"chrome-desktop","first_attempt_passed":66,"first_attempt_failed":0,"retries":0,"result":"pass"},
+    {"suite":"firefox full corrected","project":"firefox-desktop","first_attempt_passed":66,"first_attempt_failed":0,"retries":0,"result":"pass"},
+    {"suite":"webkit final full","project":"webkit-desktop","first_attempt_passed":66,"first_attempt_failed":0,"retries":0,"result":"pass"},
+    {"suite":"accessibility high DPI","project":"chrome-high-dpi","first_attempt_passed":18,"first_attempt_failed":0,"retries":0,"result":"pass"},
+    {"suite":"high DPI mobile tagged","project":"chrome-high-dpi","first_attempt_passed":5,"first_attempt_failed":0,"retries":0,"result":"pass"},
+    {"suite":"mobile viewport","project":"chromium-mobile","first_attempt_passed":5,"first_attempt_failed":0,"retries":0,"result":"pass"}
+  ],
+  "retained_failures": [
+    {"suite":"chromium pre-fix","passed":42,"failed":6,"disposition":"fixture/test defects corrected; final full 48/48"},
+    {"suite":"tenant personas first refactor","passed":2,"failed":2,"disposition":"persona mapping corrected; subsequent 4/4"},
+    {"suite":"webkit infrastructure","passed":0,"failed":48,"disposition":"pinned browser runtime was absent; no product assertion reached"},
+    {"suite":"webkit first product run","passed":45,"failed":3,"disposition":"focus restoration corrected; final full 48/48"},
+    {"suite":"firefox final selector setup","passed":0,"failed":0,"disposition":"no tests matched; corrected batches 20/20 twice"},
+    {"suite":"firefox final full before SSE correction","passed":65,"failed":1,"disposition":"user-shared event subscription bucket produced 429; session-scoped limiter added; corrected full 66/66"}
+  ],
+  "artifact_secret_findings": 0
+}

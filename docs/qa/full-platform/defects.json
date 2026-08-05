@@ -1,0 +1,20 @@
+{
+  "open": [
+    {"id":"VIP-QA-001","severity":"critical","summary":"Mock, placeholder, or feature-gated modules remain"},
+    {"id":"VIP-QA-002","severity":"high","summary":"Exhaustive contract matrix not run for all 247 API operations"},
+    {"id":"VIP-QA-003","severity":"high","summary":"Controlled dataset/file corpus incomplete; XLSX unsupported"},
+    {"id":"VIP-QA-004","severity":"high","summary":"Firefox dashboard first-save navigation is order/timing flaky","evidence":"2 failures and 2 passes across four executions"},
+    {"id":"VIP-QA-005","severity":"high","summary":"Repeat integration runs hit different PostgreSQL 2-second connect timeouts","evidence":"two runs at 59/60"},
+    {"id":"VIP-QA-006","severity":"medium","summary":"WebKit unavailable"},
+    {"id":"VIP-QA-007","severity":"medium","summary":"Archived-user lifecycle unsupported"},
+    {"id":"VIP-QA-008","severity":"medium","summary":"Four legacy tenant browser tests require unavailable demo credentials"},
+    {"id":"VIP-QA-009","severity":"medium","summary":"Dashboard export/report/email parity matrix incomplete"},
+    {"id":"VIP-QA-010","severity":"medium","summary":"Controlled load and outage/recovery matrix incomplete"}
+  ],
+  "fixed": [
+    {"id":"VIP-QA-011","summary":"Firefox console object errors were opaque","fix":"Serialize arguments and source location"},
+    {"id":"VIP-QA-012","summary":"Pipeline E2E could select the wrong connector type","fix":"Explicit connection-name selector"},
+    {"id":"VIP-QA-013","summary":"Authenticated fixture hard-coded a tenant","fix":"Explicit QA organization variable"},
+    {"id":"VIP-QA-014","summary":"Platform-admin negative test hard-coded a user","fix":"Explicit normal-user variables"}
+  ]
+}

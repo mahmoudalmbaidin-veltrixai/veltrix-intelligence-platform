@@ -1,0 +1,6 @@
+{
+  "captured_before_mutation": true,
+  "baseline": {"users":15,"organizations":13,"workspaces":22,"roles_total":8,"system_roles":7,"permissions":126,"sessions":405,"connections":111,"datasets":86,"pipelines":164,"dashboards":188,"files":98,"jobs":33,"audit_events":10711},
+  "invariants_after_scoped_cleanup": {"preexisting_users_preserved":15,"preexisting_organizations_preserved":13,"system_roles_preserved":7,"permissions_preserved":126,"alembic_head":"20260803_0019","alembic_heads":1},
+  "protected_categories": ["unknown records","legitimate users and tenants","audit history","migration history","system roles","permissions","feature flags","entitlements","encryption metadata","storage references","Redis configuration","legacy B5/B8.5 tables"]
+}

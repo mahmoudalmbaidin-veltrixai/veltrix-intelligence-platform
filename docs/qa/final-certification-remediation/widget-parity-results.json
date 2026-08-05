@@ -1,0 +1,486 @@
+{
+  "schema_version": 1,
+  "widget_count": 20,
+  "channels": [
+    "editor_create",
+    "save",
+    "reload",
+    "publish",
+    "viewer",
+    "pdf",
+    "png",
+    "csv",
+    "json",
+    "scheduled_export",
+    "email_attachment"
+  ],
+  "canonical_dashboard_version_id": "738d7956-a831-5c73-bb8f-19961b248130",
+  "rows": [
+    {
+      "widget_type": "kpi",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "metric-comparison",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "table",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "pivot",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "bar",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "stacked-bar",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "column",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "line",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "area",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "pie",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "donut",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "scatter",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "gauge",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "progress",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "text",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "rich-text",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "image",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "filter",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "date-filter",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    },
+    {
+      "widget_type": "map",
+      "results": {
+        "editor_create": "pass",
+        "save": "pass",
+        "reload": "pass",
+        "publish": "pass",
+        "viewer": "pass",
+        "pdf": "pass",
+        "png": "pass",
+        "csv": "pass",
+        "json": "pass",
+        "scheduled_export": "pass",
+        "email_attachment": "pass"
+      },
+      "proof": {
+        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "render": "test_all_twenty_widget_types_render_and_preserve_definition",
+        "schedule": "test_due_schedule_dispatches_and_dedupes",
+        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+      }
+    }
+  ],
+  "artifacts": {
+    "pdf": {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.pdf",
+      "content_type": "application/pdf",
+      "bytes": 268518,
+      "sha256": "ec4cfb4740fe903885a59e25cf2462dd0fae08b42fd5e8090ff3b0378e8be5e2"
+    },
+    "png": {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.png",
+      "content_type": "image/png",
+      "bytes": 872132,
+      "sha256": "aa2a325a3480da74ae6e65ae2692329cc88d66d609909c194190f0f1ccf9d943"
+    },
+    "csv": {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.csv",
+      "content_type": "text/csv; charset=utf-8",
+      "bytes": 91681,
+      "sha256": "bd5dfdc601b985e6dbbf0555d5527e3f2c07bb05203edd31d8c4b119b5344c92"
+    },
+    "json": {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.json",
+      "content_type": "application/json",
+      "bytes": 42843,
+      "sha256": "5b31ad42e50ba9ed61e9fb3c124508536616a1b0c93838b92455cc7511acdcff"
+    }
+  }
+}

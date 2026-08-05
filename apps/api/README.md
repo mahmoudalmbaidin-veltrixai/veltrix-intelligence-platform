@@ -263,7 +263,7 @@ With PostgreSQL and Redis available and the test URLs exported:
 ```bash
 # PowerShell
 $env:RUN_INTEGRATION_TESTS="1"
-$env:DATABASE_URL="postgresql+asyncpg://vip:vip_local_dev_only@localhost:5432/vip_test"
+$env:DATABASE_URL="postgresql+asyncpg://vip:vip_local_dev_only@127.0.0.1:5432/vip_test?ssl=disable"
 $env:REDIS_URL="redis://localhost:6379/15"
 pytest -m integration
 

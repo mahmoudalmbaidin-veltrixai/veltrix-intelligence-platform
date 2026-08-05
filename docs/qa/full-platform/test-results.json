@@ -1,0 +1,23 @@
+{
+  "verdict": "VIP FULL PLATFORM QA INCOMPLETE — BLOCKERS REMAIN",
+  "static": {"ruff":"pass","ruff_format_files":245,"mypy_files":218,"frontend_lint":"pass","frontend_typecheck":"pass","frontend_format":"pass","frontend_build":"pass"},
+  "unit": {"backend":{"passed":240,"failed":0,"deselected":60},"frontend":{"files_passed":45,"passed":279,"failed":0}},
+  "integration": [
+    {"run":1,"passed":60,"failed":0,"deselected":240,"clean":true},
+    {"run":2,"passed":59,"errors":1,"cause":"PostgreSQL connection exceeded 2s timeout","clean":false},
+    {"retry":"failed password recovery case","passed":1,"failed":0},
+    {"run":3,"passed":59,"failed":1,"cause":"different PostgreSQL connection exceeded 2s timeout","clean":false}
+  ],
+  "browser": {
+    "chromium_core_initial":{"passed":41,"failed":2,"executed":43,"fixture_failures_later_resolved":true},
+    "firefox_core":{"passed":35,"failed":3,"executed":38},
+    "firefox_isolated_triage":{"passed":2,"failed":1,"executed":3},
+    "firefox_dashboard_repeat":{"passed":2,"failed":0,"executed":2},
+    "accessibility":{"passed":18,"failed":0},
+    "mobile":{"passed":5,"failed":0},
+    "webkit":"unavailable"
+  },
+  "security_marked": {"collected":18,"passed_in_clean_unit_or_integration_runs":18},
+  "worker_job_scheduler_related": {"collected":48,"passed_in_clean_unit_or_integration_runs":48},
+  "migration":{"heads":1,"head":"20260803_0019"}
+}

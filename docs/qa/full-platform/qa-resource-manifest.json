@@ -1,0 +1,27 @@
+{
+  "organizations": [
+    {"id":"17a4e171-ced9-40cf-883d-e42ff2dc4267","name":"QA_Enterprise_A_20260804"},
+    {"id":"e1520ab1-01e5-4623-91d2-1e6b4cb70696","name":"QA_Enterprise_B_20260804"}
+  ],
+  "workspaces": [
+    {"id":"b26c56a6-b743-4ce4-ae20-4da17cdb6e36","name":"Default","organization_id":"17a4e171-ced9-40cf-883d-e42ff2dc4267"},
+    {"id":"a9a2e87a-5466-4ba4-a3a1-6b60c88d223e","name":"QA_Analytics","organization_id":"17a4e171-ced9-40cf-883d-e42ff2dc4267"},
+    {"id":"60ae5883-c411-4c4f-9c4a-64010165fc21","name":"QA_Restricted","organization_id":"17a4e171-ced9-40cf-883d-e42ff2dc4267"},
+    {"id":"c37523c8-523d-4809-b36e-764b0d9fb8d3","name":"Default","organization_id":"e1520ab1-01e5-4623-91d2-1e6b4cb70696"},
+    {"id":"1f289763-b780-4b2a-8ecb-c86c04f24e60","name":"QA_Analytics_B","organization_id":"e1520ab1-01e5-4623-91d2-1e6b4cb70696"},
+    {"id":"e7d693e1-d917-4618-84bb-bef1f7fe110a","name":"QA_Isolated_B","organization_id":"e1520ab1-01e5-4623-91d2-1e6b4cb70696"}
+  ],
+  "groups": [
+    {"id":"2f720f8c-a7bb-4a0b-977c-1e817dca86b6","name":"QA_Group_Resource_Access"},
+    {"id":"6ff7676d-971a-4ac0-916b-99aed359d9df","name":"QA_Group_Role_Assignees"}
+  ],
+  "connections": [
+    {"id":"28d83dff-9b1a-40ea-9590-ca32d19c3df3","name":"QA_PostgreSQL_Valid","type":"postgresql","result":"success"},
+    {"id":"de494cd4-35d4-4d42-8800-991bc4be9c04","name":"QA_PostgreSQL_Invalid_Credentials","type":"postgresql","result":"CONNECTION_AUTHENTICATION_FAILED"},
+    {"id":"00e77b1a-788e-4fc2-8515-6cf43ca13b7b","name":"QA_PostgreSQL_Unreachable","type":"postgresql","result":"retained scenario"},
+    {"id":"fc69ff28-c5f9-423b-830d-cba39023a751","name":"QA_MySQL_Valid","type":"mysql","result":"success"}
+  ],
+  "counts": {"users":38,"custom_roles":13,"groups":2,"workspaces":6},
+  "contains_secrets": false,
+  "authoritative_runtime_manifest": "artifacts/qa/full-platform/qa-resource-manifest.json"
+}

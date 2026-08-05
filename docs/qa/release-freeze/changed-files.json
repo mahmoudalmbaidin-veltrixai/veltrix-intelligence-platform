@@ -1,0 +1,985 @@
+{
+  "schema_version": 1,
+  "freeze_base": "b6c85b313c29e161f5b1c23555e00f54b2352454",
+  "file_count": 163,
+  "files": [
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 3
+    },
+    {
+      "path": "apps/api/Dockerfile",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 3
+    },
+    {
+      "path": "apps/api/README.md",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 4
+    },
+    {
+      "path": "apps/api/pyproject.toml",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 3
+    },
+    {
+      "path": "apps/api/requirements.runtime.lock",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 3
+    },
+    {
+      "path": "apps/api/scripts/__init__.py",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/scripts/build_api_operation_coverage.py",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/scripts/full-platform-qa-seed.ps1",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/scripts/render-dashboard-parity-evidence.py",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/scripts/reset-qa-bootstrap-password.py",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/scripts/resume-full-platform-qa-seed.ps1",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/scripts/sanitize-playwright-artifacts.py",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/scripts/show-full-platform-qa-credentials.ps1",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/src/vip_api/api/operation_coverage.py",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/connections/dependencies.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/connections/services.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/core/config.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboard_delivery/rendering.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboard_delivery/scheduler.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboard_delivery/schemas.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboard_delivery/services.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboard_delivery/worker.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboards/query.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboards/schemas.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboards/services.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/datasets/services.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/events/routes.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/governance/role_assignment_service.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/home/routes.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/main.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/pipelines/services.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/src/vip_api/semantic/services.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "apps/api/tests/conftest.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/tests/integration/test_dashboard_lifecycle_integrity.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/tests/integration/test_production_api_contract_sweep.py",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/tests/integration/test_resource_authorization_domains.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/tests/unit/test_artifact_sanitizer.py",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/tests/unit/test_dashboard_delivery.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/tests/unit/test_dashboards.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/tests/unit/test_platform_jobs_files_events.py",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "apps/api/uv.lock",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 3
+    },
+    {
+      "path": "docs/backend/PIPELINE_BACKEND.md",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 4
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/00-executive-summary.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/01-preflight.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/02-independent-blocker-reproduction.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/03-root-cause-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/04-files-changed.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/05-firefox-auth-bootstrap-fix.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/06-dashboard-save-behavioral-tests.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/07-dashboard-parity-contract.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/08-all-widget-parity-matrix.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/09-arabic-unicode-export-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/10-ai-placeholder-disposition.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/11-authenticated-api-contract-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/12-browser-fixture-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/13-security-artifact-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/14-static-analysis-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/15-regression-results.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/16-remaining-risks.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/17-independent-recertification-handoff.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/api-operation-coverage.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/artifact-secret-scan.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/blocker-results.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/browser-repeat-results.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/changed-files.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.csv",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.pdf",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.png",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/evidence.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/widget-parity-results.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/00-executive-summary.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/01-environment-preflight.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/02-existing-data-inventory.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/03-protected-data-register.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/04-safe-cleanup-plan.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/05-cleanup-execution-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/06-qa-user-persona-matrix.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/07-qa-data-catalog.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/08-module-test-matrix.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/09-api-test-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/10-frontend-browser-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/11-accessibility-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/12-security-negative-test-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/13-performance-review.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/14-defect-register.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/15-fixes-implemented.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/16-automated-test-coverage.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/17-full-regression-results.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/18-manual-uat-guide.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/19-qa-data-cleanup-manifest.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/20-final-certification.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/cleanup-candidates.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/defects.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/protected-records.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/qa-resource-manifest.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/qa-users.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/full-platform/test-results.json",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/independent-certification/01-independent-verification-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/independent-certification/02-verified-fix-matrix.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/independent-certification/03-regression-assessment.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/independent-certification/04-security-assessment.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/independent-certification/05-remaining-risks.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/independent-certification/06-release-recommendation.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/production-remediation/01-root-cause-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/production-remediation/02-files-changed.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/production-remediation/03-production-fix-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/production-remediation/04-regression-report.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/production-remediation/05-remaining-risks.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/production-remediation/06-final-production-readiness-assessment.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/00-executive-summary.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/01-file-classification.md",
+      "initial_state": "release-freeze deliverable",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/02-secret-and-artifact-review.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/03-remediation-diff-verification.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/04-commit-plan.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/05-commits-created.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/06-release-gate-results.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/07-independent-certification-handoff.md",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/artifact-secret-scan.json",
+      "initial_state": "release-freeze deliverable",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/changed-files.json",
+      "initial_state": "release-freeze deliverable",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/committed-files.json",
+      "initial_state": "release-freeze deliverable",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/excluded-artifacts.json",
+      "initial_state": "release-freeze deliverable",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/file-classification.json",
+      "initial_state": "release-freeze deliverable",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/release-gate-results.json",
+      "initial_state": "release-freeze deliverable",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "docs/qa/release-freeze/repository-secret-scan.json",
+      "initial_state": "release-freeze deliverable",
+      "commit_decision": "commit",
+      "category": 5
+    },
+    {
+      "path": "playwright.config.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 3
+    },
+    {
+      "path": "src/app/navigation.spec.ts",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "src/app/navigation.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/app/router/index.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/app/router/meta.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/app/shell/AppSidebar.vue",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/app/shell/AppTopbar.vue",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/app/shell/MobileNav.vue",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/modules/auth/LoginView.vue",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/modules/dashboards/DashboardShareDialog.vue",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/modules/dashboards/DashboardStudioView.spec.ts",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "src/modules/dashboards/DashboardStudioView.vue",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/modules/dashboards/dashboards.service.spec.ts",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "src/modules/dashboards/dashboards.service.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/modules/dashboards/delivery.service.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/shared/lib/query.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/shared/stores/auth.spec.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "src/shared/stores/auth.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/shared/ui/VipDialog.vue",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/shared/ui/VipDrawer.vue",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/shared/ui/command/CommandPalette.vue",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/shared/ui/command/providers.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/shared/viz/MapChart.spec.ts",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "src/shared/viz/MapChart.vue",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "src/shared/viz/VisualRenderer.vue",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 1
+    },
+    {
+      "path": "tests/e2e/b8-5-pipeline-source.spec.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/b9-1b-pipeline-dataset.spec.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/connections.spec.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/dashboard-save-reliability.spec.ts",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/fixtures.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/global-teardown.ts",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/governance.spec.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/personas.ts",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/platform-admin.spec.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/route-smoke.spec.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/run-local-certification.ps1",
+      "initial_state": "untracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/semantic-personas.spec.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    },
+    {
+      "path": "tests/e2e/tenant-isolation.spec.ts",
+      "initial_state": "modified tracked",
+      "commit_decision": "commit",
+      "category": 2
+    }
+  ]
+}

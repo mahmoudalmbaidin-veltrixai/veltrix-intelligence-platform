@@ -124,7 +124,7 @@ cd apps/api
 .\.venv\Scripts\python.exe -m ruff format --check .
 .\.venv\Scripts\python.exe -m mypy src tests
 $env:RUN_INTEGRATION_TESTS="1"
-$env:DATABASE_URL="postgresql+asyncpg://vip:vip_local_dev_only@localhost:5432/vip_test"
+$env:DATABASE_URL="postgresql+asyncpg://vip:vip_local_dev_only@127.0.0.1:5432/vip_test?ssl=disable"
 .\.venv\Scripts\python.exe -m pytest
 cd ../..
 pnpm typecheck
