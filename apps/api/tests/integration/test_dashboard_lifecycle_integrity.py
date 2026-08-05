@@ -523,7 +523,7 @@ async def test_all_widget_types_traverse_real_publish_and_export_contract(
             persisted_widgets = cast(list[dict[str, object]], page["widgets"])
             assert [item["type"] for item in persisted_widgets] == list(ALL_WIDGET_TYPES)
 
-            results = {
+            results: dict[str, object] = {
                 str(item["id"]): {
                     "columns": [
                         {"key": "category", "label": "Category / الفئة", "role": "dimension"},

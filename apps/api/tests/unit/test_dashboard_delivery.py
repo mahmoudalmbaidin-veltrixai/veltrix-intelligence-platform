@@ -60,7 +60,7 @@ def test_bidi_wrapping_preserves_every_logical_word() -> None:
 
 
 def test_export_number_and_conditional_formatting_matches_definition() -> None:
-    widget = {
+    widget: dict[str, object] = {
         "config": {
             "number_style": "currency",
             "currency": "SAR",
@@ -190,7 +190,8 @@ def test_exports_preserve_the_published_definition_and_grid_contract() -> None:
 
     png_artifact = PngDashboardRenderer().render(source)
     with Image.open(io.BytesIO(png_artifact.content)) as image:
-        manifest = json.loads(image.text["vip.dashboard.definition"])
+        metadata = cast(dict[str, str], getattr(image, "text", {}))
+        manifest = json.loads(metadata["vip.dashboard.definition"])
     assert manifest["pages"] == source.snapshot["pages"]
 
 
@@ -320,8 +321,9 @@ def test_all_twenty_widget_types_render_and_preserve_definition() -> None:
             "truncated": False,
         }
     source.snapshot["pages"] = pages
-    source.snapshot["dashboard"]["title"] = "Enterprise / المؤسسة"
-    expected_types = [page["widgets"][0]["type"] for page in pages]
+    dashboard = cast(dict[str, object], source.snapshot["dashboard"])
+    dashboard["title"] = "Enterprise / المؤسسة"
+    expected_types = widget_types
 
     json_payload = json.loads(JsonDashboardRenderer().render(source).content)
     assert [
@@ -338,7 +340,8 @@ def test_all_twenty_widget_types_render_and_preserve_definition() -> None:
     assert pdf.content.startswith(b"%PDF")
     png = PngDashboardRenderer().render(source)
     with Image.open(io.BytesIO(png.content)) as image:
-        png_manifest = json.loads(image.text["vip.dashboard.definition"])
+        metadata = cast(dict[str, str], getattr(image, "text", {}))
+        png_manifest = json.loads(metadata["vip.dashboard.definition"])
         colors = image.convert("RGB").getcolors(maxcolors=image.width * image.height)
     assert [page["widgets"][0]["type"] for page in png_manifest["pages"]] == expected_types
     assert colors is not None
