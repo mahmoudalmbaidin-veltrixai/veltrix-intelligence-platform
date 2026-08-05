@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, cast
 from uuid import UUID, uuid4
 
@@ -16,7 +19,7 @@ from starlette.testclient import TestClient
 from vip_api.api.operation_coverage import build_coverage
 from vip_api.auth.models import User, UserStatus
 from vip_api.auth.password import PasswordService
-from vip_api.core.config import Settings
+from vip_api.core.config import AppEnvironment, Settings
 from vip_api.database.session import Database
 from vip_api.governance.models import (
     Entitlement,
@@ -37,6 +40,7 @@ from vip_api.tenancy.models import (
 )
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
+_ANONYMOUS_EXECUTED_OPERATION_IDS: set[str] = set()
 
 
 @dataclass(frozen=True)
@@ -188,6 +192,53 @@ async def _cleanup_contract_personas(settings: Settings, personas: ContractPerso
         await database.dispose()
 
 
+async def _configure_ai_gates(
+    settings: Settings,
+    personas: ContractPersonas,
+    *,
+    flag_enabled: bool,
+    entitlement_enabled: bool,
+) -> None:
+    database = Database(settings)
+    try:
+        async with database.session_factory() as db:
+            feature = await db.scalar(select(FeatureFlag).where(FeatureFlag.key == "ai_studio"))
+            entitlement = await db.scalar(select(Entitlement).where(Entitlement.key == "ai_studio"))
+            assert feature is not None and entitlement is not None
+            await db.execute(
+                delete(FeatureFlagOverride).where(
+                    FeatureFlagOverride.feature_flag_id == feature.id,
+                    FeatureFlagOverride.organization_id == personas.organizations["alpha"],
+                )
+            )
+            await db.execute(
+                delete(OrganizationEntitlement).where(
+                    OrganizationEntitlement.organization_id == personas.organizations["alpha"],
+                    OrganizationEntitlement.entitlement_id == entitlement.id,
+                )
+            )
+            db.add(
+                FeatureFlagOverride(
+                    feature_flag_id=feature.id,
+                    organization_id=personas.organizations["alpha"],
+                    workspace_id=personas.workspaces["alpha"],
+                    enabled=flag_enabled,
+                )
+            )
+            if entitlement_enabled:
+                db.add(
+                    OrganizationEntitlement(
+                        organization_id=personas.organizations["alpha"],
+                        entitlement_id=entitlement.id,
+                        status="active",
+                        source="test",
+                    )
+                )
+            await db.commit()
+    finally:
+        await database.dispose()
+
+
 def _operations(document: dict[str, Any]) -> Iterator[tuple[str, str, dict[str, Any]]]:
     for path, path_item in document["paths"].items():
         for method, operation in path_item.items():
@@ -300,6 +351,9 @@ def test_every_production_operation_has_a_resolvable_contract_and_fails_closed(
                     ):
                         runtime_errors.append(f"{method.upper()} {path}: malformed error envelope")
     assert not runtime_errors, "\n".join(runtime_errors)
+    _ANONYMOUS_EXECUTED_OPERATION_IDS.update(
+        str(operation["operationId"]) for _, _, operation in operations
+    )
 
 
 @pytest.mark.integration
@@ -309,16 +363,20 @@ def test_every_operation_is_classified_for_authenticated_certification(settings:
     operations = cast(list[dict[str, object]], coverage["operations"])
     assert coverage["operation_count"] == 247
     assert coverage["classified_count"] == 247
+    assert coverage["test_mapped_count"] == 247
+    assert coverage["executed_count"] == 0
     assert len({item["operation_id"] for item in operations}) == 247
     for item in operations:
-        assert item["test_ids"]
+        assert item["test_evidence"]
         assert item["personas"]
-        dimensions = cast(list[str], item["security_dimensions"])
-        assert {"declared_response_schema", "error_envelope", "status_code"} <= set(dimensions)
-        if item["authentication_level"] != "public":
-            assert {"unauthenticated", "suspended_user"} <= set(dimensions)
+        dimensions = cast(list[str], item["claimed_dimensions"])
+        assert "openapi_contract" in dimensions
+        if item["authentication_level"] == "public":
+            assert "public_probe" in dimensions
+        else:
+            assert {"unauthenticated_probe", "authenticated_probe"} <= set(dimensions)
         if item["authentication_level"] == "workspace":
-            assert {"forbidden", "cross_tenant", "acl_denial"} <= set(dimensions)
+            assert {"restricted_role_probe", "cross_tenant_header_probe"} <= set(dimensions)
 
 
 def _login(client: TestClient, username: str, password: str) -> None:
@@ -355,6 +413,97 @@ def _assert_safe_contract_response(
         assert str(response.status_code) in responses or "default" in responses
 
 
+def _runtime_path(path: str, operation: dict[str, Any]) -> str:
+    resolved = _path_for(path, operation)
+    if path == "/api/v1/events/stream":
+        return f"{resolved}?cursor=invalid-contract-cursor"
+    return resolved
+
+
+def _validate_json_schema(document: dict[str, Any], schema: object, value: object) -> None:
+    """Validate the OpenAPI shapes exercised by successful contract probes."""
+    if not isinstance(schema, dict):
+        return
+    reference = schema.get("$ref")
+    if isinstance(reference, str):
+        _validate_json_schema(document, _resolve_ref(document, reference), value)
+        return
+    alternatives = schema.get("anyOf") or schema.get("oneOf")
+    if isinstance(alternatives, list):
+        errors: list[AssertionError] = []
+        for alternative in alternatives:
+            try:
+                _validate_json_schema(document, alternative, value)
+                return
+            except AssertionError as exc:
+                errors.append(exc)
+        raise AssertionError(f"response matched no schema alternative: {errors}")
+    if value is None and schema.get("nullable") is True:
+        return
+    expected = schema.get("type")
+    if expected == "object" or "properties" in schema:
+        assert isinstance(value, dict), f"expected object, got {type(value).__name__}"
+        required = schema.get("required", [])
+        assert all(key in value for key in required), f"missing required response keys: {required}"
+        properties = schema.get("properties", {})
+        if isinstance(properties, dict):
+            for key, nested in properties.items():
+                if key in value:
+                    _validate_json_schema(document, nested, value[key])
+    elif expected == "array":
+        assert isinstance(value, list), f"expected array, got {type(value).__name__}"
+        for item in value:
+            _validate_json_schema(document, schema.get("items", {}), item)
+    elif expected == "string":
+        assert isinstance(value, str), f"expected string, got {type(value).__name__}"
+    elif expected == "integer":
+        assert isinstance(value, int) and not isinstance(value, bool)
+    elif expected == "number":
+        assert isinstance(value, int | float) and not isinstance(value, bool)
+    elif expected == "boolean":
+        assert isinstance(value, bool)
+    enum = schema.get("enum")
+    if isinstance(enum, list):
+        assert value in enum, f"response value {value!r} is outside enum"
+
+
+def _validate_success_schema(
+    document: dict[str, Any], operation: dict[str, Any], response: Any
+) -> bool:
+    if not 200 <= response.status_code < 300 or response.status_code == 204:
+        return False
+    declaration = operation.get("responses", {}).get(str(response.status_code), {})
+    content = declaration.get("content", {}) if isinstance(declaration, dict) else {}
+    media = next(
+        (
+            item
+            for key, item in content.items()
+            if key == "application/json" or key.endswith("+json")
+        ),
+        None,
+    )
+    if not isinstance(media, dict) or "schema" not in media:
+        return False
+    _validate_json_schema(document, media["schema"], response.json())
+    return True
+
+
+def _new_record(operation_id: str, probes: list[str]) -> dict[str, object]:
+    return {
+        "operation_id": operation_id,
+        "executed_dimensions": ["openapi_contract"],
+        "required_probes": probes,
+        "observations": {},
+        "result": "pending",
+    }
+
+
+def _add_dimension(record: dict[str, object], dimension: str) -> None:
+    dimensions = cast(list[str], record["executed_dimensions"])
+    if dimension not in dimensions:
+        dimensions.append(dimension)
+
+
 @pytest.mark.integration
 def test_authenticated_personas_exercise_every_protected_operation(settings: Settings) -> None:
     """Use real cookie sessions and real tenant memberships for the surface sweep.
@@ -371,13 +520,31 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
         str(item["operation_id"]): str(item["authentication_level"])
         for item in cast(list[dict[str, object]], coverage["operations"])
     }
-    operations = [
-        (path, method, operation)
-        for path, method, operation in _operations(document)
-        if not path.startswith("/auth/")
-        and path != "/api/v1/events/stream"
-        and scopes[operation["operationId"]] != "public"
-    ]
+    operations = list(_operations(document))
+    operation_ids = {str(operation["operationId"]) for _, _, operation in operations}
+    assert operation_ids == _ANONYMOUS_EXECUTED_OPERATION_IDS, (
+        "Anonymous contract execution evidence is absent. Run the complete contract-sweep "
+        "module so classification, anonymous probes, and authenticated probes share one run."
+    )
+    coverage_by_id = {
+        str(item["operation_id"]): item
+        for item in cast(list[dict[str, object]], coverage["operations"])
+    }
+    records = {
+        operation["operationId"]: _new_record(
+            operation["operationId"],
+            cast(list[str], coverage_by_id[operation["operationId"]]["claimed_dimensions"]),
+        )
+        for _, _, operation in operations
+    }
+    for path, method, operation in operations:
+        record = records[operation["operationId"]]
+        scope = scopes[operation["operationId"]]
+        _add_dimension(record, "public_probe" if scope == "public" else "unauthenticated_probe")
+        if "{" in path:
+            _add_dimension(record, "invalid_uuid_probe")
+        if method in {"post", "put", "patch"}:
+            _add_dimension(record, "empty_payload_probe")
     try:
         with TestClient(app, raise_server_exceptions=False) as client:
             _login(client, personas.usernames["admin"], personas.password)
@@ -388,15 +555,59 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
                 personas.workspaces["alpha"],
             )
             for path, method, operation in operations:
+                operation_id = operation["operationId"]
+                if scopes[operation_id] == "public" or path.startswith("/auth/"):
+                    continue
                 response = client.request(
                     method.upper(),
-                    _path_for(path, operation),
+                    _runtime_path(path, operation),
                     headers=headers,
                     json={} if method in {"post", "put", "patch"} else None,
                     follow_redirects=False,
                 )
                 assert response.status_code != 401
                 _assert_safe_contract_response(response, path, method, operation)
+                record = records[operation_id]
+                cast(dict[str, object], record["observations"])["authenticated"] = (
+                    response.status_code
+                )
+                _add_dimension(record, "authenticated_probe")
+                if 200 <= response.status_code < 300:
+                    _add_dimension(record, "authenticated_success")
+                if _validate_success_schema(document, operation, response):
+                    _add_dimension(record, "response_schema_validated")
+
+        # Authentication endpoints get isolated sessions so logout/password
+        # actions cannot invalidate the remaining operation probes.
+        for path, method, operation in operations:
+            operation_id = operation["operationId"]
+            if scopes[operation_id] == "public" or not path.startswith("/auth/"):
+                continue
+            with TestClient(app, raise_server_exceptions=False) as client:
+                _login(client, personas.usernames["admin"], personas.password)
+                headers = _tenant_headers(
+                    client,
+                    settings,
+                    personas.organizations["alpha"],
+                    personas.workspaces["alpha"],
+                )
+                response = client.request(
+                    method.upper(),
+                    _runtime_path(path, operation),
+                    headers=headers,
+                    json={} if method in {"post", "put", "patch"} else None,
+                    follow_redirects=False,
+                )
+                _assert_safe_contract_response(response, path, method, operation)
+                record = records[operation_id]
+                cast(dict[str, object], record["observations"])["authenticated"] = (
+                    response.status_code
+                )
+                _add_dimension(record, "authenticated_probe")
+                if 200 <= response.status_code < 300:
+                    _add_dimension(record, "authenticated_success")
+                if _validate_success_schema(document, operation, response):
+                    _add_dimension(record, "response_schema_validated")
 
         with TestClient(app, raise_server_exceptions=False) as client:
             _login(client, personas.usernames["restricted"], personas.password)
@@ -408,11 +619,12 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
             )
             restricted_denials = 0
             for path, method, operation in operations:
-                if scopes[operation["operationId"]] != "workspace":
+                operation_id = operation["operationId"]
+                if scopes[operation_id] != "workspace":
                     continue
                 response = client.request(
                     method.upper(),
-                    _path_for(path, operation),
+                    _runtime_path(path, operation),
                     headers=headers,
                     json={} if method in {"post", "put", "patch"} else None,
                     follow_redirects=False,
@@ -420,6 +632,11 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
                 assert response.status_code != 401
                 restricted_denials += response.status_code == 403
                 _assert_safe_contract_response(response, path, method, operation)
+                record = records[operation_id]
+                cast(dict[str, object], record["observations"])["restricted"] = response.status_code
+                _add_dimension(record, "restricted_role_probe")
+                if response.status_code == 403:
+                    _add_dimension(record, "forbidden_observed")
             assert restricted_denials > 0
 
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -431,11 +648,12 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
                 personas.workspaces["alpha"],
             )
             for path, method, operation in operations:
-                if scopes[operation["operationId"]] != "workspace":
+                operation_id = operation["operationId"]
+                if scopes[operation_id] != "workspace":
                     continue
                 response = client.request(
                     method.upper(),
-                    _path_for(path, operation),
+                    _runtime_path(path, operation),
                     headers=manipulated_headers,
                     json={} if method in {"post", "put", "patch"} else None,
                     follow_redirects=False,
@@ -449,6 +667,12 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
                 elif "{" in path:
                     assert response.status_code in {403, 404, 422}
                 _assert_safe_contract_response(response, path, method, operation)
+                record = records[operation_id]
+                cast(dict[str, object], record["observations"])["cross_tenant"] = (
+                    response.status_code
+                )
+                _add_dimension(record, "cross_tenant_header_probe")
+                _add_dimension(record, "cross_tenant_isolated")
 
         with TestClient(app, raise_server_exceptions=False) as client:
             suspended = client.post(
@@ -460,5 +684,146 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
             )
             assert suspended.status_code in {401, 403}
             assert settings.AUTH_ACCESS_COOKIE_NAME not in suspended.cookies
+
+        for record in records.values():
+            required = set(cast(list[str], record.pop("required_probes")))
+            executed = set(cast(list[str], record["executed_dimensions"]))
+            assert required <= executed, (
+                f"{record['operation_id']} missing executed probes: {sorted(required - executed)}"
+            )
+            record["result"] = "pass"
+        execution = {str(key): value for key, value in records.items()}
+        verified = build_coverage(document, execution)
+        assert verified["executed_count"] == 247
+        assert verified["passed_count"] == 247
+        report_path = os.getenv("VIP_API_OPERATION_EVIDENCE_PATH")
+        if report_path:
+            target = Path(report_path)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "operation_count": 247,
+                        "executed_count": 247,
+                        "passed_count": 247,
+                        "operations": sorted(
+                            records.values(), key=lambda item: str(item["operation_id"])
+                        ),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+    finally:
+        asyncio.run(_cleanup_contract_personas(settings, personas))
+
+
+@pytest.mark.integration
+def test_ai_catalog_direct_api_fails_closed_in_live_mode(settings: Settings) -> None:
+    personas = asyncio.run(_seed_contract_personas(settings))
+    routes = (
+        "/api/v1/ai/knowledge",
+        "/api/v1/ai/assistants",
+        "/api/v1/ai/agents",
+        "/api/v1/ai/conversations",
+        "/api/v1/ai/agent-runs",
+    )
+    try:
+        for flag_enabled, entitlement_enabled in (
+            (False, False),
+            (True, False),
+            (False, True),
+            (True, True),
+        ):
+            asyncio.run(
+                _configure_ai_gates(
+                    settings,
+                    personas,
+                    flag_enabled=flag_enabled,
+                    entitlement_enabled=entitlement_enabled,
+                )
+            )
+            live = settings.model_copy(
+                update={
+                    "APP_ENV": AppEnvironment.PRODUCTION,
+                    "AI_CAPABILITIES_PRODUCTION_READY": False,
+                    "AI_DEVELOPMENT_MOCK_MODE": False,
+                }
+            )
+            with TestClient(create_application(live), raise_server_exceptions=False) as client:
+                _login(client, personas.usernames["admin"], personas.password)
+                headers = _tenant_headers(
+                    client,
+                    live,
+                    personas.organizations["alpha"],
+                    personas.workspaces["alpha"],
+                )
+                for route in routes:
+                    response = client.get(route, headers=headers)
+                    assert response.status_code in {403, 404}
+                    error = response.json()["error"]
+                    assert error["code"] in {
+                        "FEATURE_DISABLED",
+                        "ENTITLEMENT_REQUIRED",
+                        "AI_CAPABILITY_UNAVAILABLE",
+                    }
+
+        # A configuration claim cannot expose an empty production placeholder
+        # until the implementation readiness constant is changed with the real
+        # capability itself.
+        configured_ready = settings.model_copy(
+            update={
+                "APP_ENV": AppEnvironment.PRODUCTION,
+                "AI_CAPABILITIES_PRODUCTION_READY": True,
+                "AI_DEVELOPMENT_MOCK_MODE": False,
+            }
+        )
+        with TestClient(
+            create_application(configured_ready), raise_server_exceptions=False
+        ) as client:
+            _login(client, personas.usernames["admin"], personas.password)
+            headers = _tenant_headers(
+                client,
+                configured_ready,
+                personas.organizations["alpha"],
+                personas.workspaces["alpha"],
+            )
+            for route in routes:
+                response = client.get(route, headers=headers)
+                assert response.status_code == 404
+                assert response.json()["error"]["code"] == "AI_CAPABILITY_UNAVAILABLE"
+
+        asyncio.run(
+            _configure_ai_gates(
+                settings,
+                personas,
+                flag_enabled=True,
+                entitlement_enabled=True,
+            )
+        )
+        development_mock = settings.model_copy(
+            update={
+                "APP_ENV": AppEnvironment.DEVELOPMENT,
+                "AI_CAPABILITIES_PRODUCTION_READY": False,
+                "AI_DEVELOPMENT_MOCK_MODE": True,
+            }
+        )
+        with TestClient(
+            create_application(development_mock), raise_server_exceptions=False
+        ) as client:
+            _login(client, personas.usernames["admin"], personas.password)
+            headers = _tenant_headers(
+                client,
+                development_mock,
+                personas.organizations["alpha"],
+                personas.workspaces["alpha"],
+            )
+            for route in routes:
+                response = client.get(route, headers=headers)
+                assert response.status_code == 200
+                assert response.json() == []
     finally:
         asyncio.run(_cleanup_contract_personas(settings, personas))

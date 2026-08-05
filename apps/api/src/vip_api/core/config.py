@@ -46,6 +46,12 @@ class Settings(BaseSettings):
 
     API_V1_PREFIX: str = "/api/v1"
 
+    # Incomplete AI surfaces are unavailable unless an explicit readiness
+    # decision has been made. Development mock mode is separately opt-in and is
+    # rejected by the production settings validator below.
+    AI_CAPABILITIES_PRODUCTION_READY: bool = False
+    AI_DEVELOPMENT_MOCK_MODE: bool = False
+
     DATABASE_URL: SecretStr
     DATABASE_POOL_SIZE: int = Field(default=10, ge=1)
     DATABASE_MAX_OVERFLOW: int = Field(default=20, ge=0)
@@ -232,6 +238,8 @@ class Settings(BaseSettings):
             raise ValueError("LOG_LEVEL must be a standard Python logging level")
         if not self.API_V1_PREFIX.startswith("/"):
             raise ValueError("API_V1_PREFIX must start with '/'")
+        if self.APP_ENV is AppEnvironment.PRODUCTION and self.AI_DEVELOPMENT_MOCK_MODE:
+            raise ValueError("AI development mock mode cannot be enabled in production")
         if not self.database_url.startswith("postgresql+asyncpg://"):
             raise ValueError("DATABASE_URL must use the postgresql+asyncpg scheme")
         if not self.redis_url.startswith(("redis://", "rediss://")):
