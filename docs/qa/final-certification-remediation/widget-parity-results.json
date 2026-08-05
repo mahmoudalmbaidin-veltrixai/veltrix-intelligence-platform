@@ -32,10 +32,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -54,10 +55,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -76,10 +78,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -98,10 +101,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -120,10 +124,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -142,10 +147,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -164,10 +170,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -186,10 +193,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -208,10 +216,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -230,10 +239,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -252,10 +262,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -274,10 +285,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -296,10 +308,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -318,10 +331,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -340,10 +354,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -362,10 +377,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -384,10 +400,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -406,10 +423,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -428,10 +446,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     },
     {
@@ -450,10 +469,11 @@
         "email_attachment": "pass"
       },
       "proof": {
-        "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+        "lifecycle": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
         "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-        "schedule": "test_due_schedule_dispatches_and_dedupes",
-        "email": "test_email_composition_preserves_attachments_and_hides_bcc"
+        "visual_chart_configuration": "test_chart_renderers_draw_configured_legends_and_axis_titles",
+        "schedule": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email",
+        "email": "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
       }
     }
   ],
@@ -461,14 +481,14 @@
     "pdf": {
       "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.pdf",
       "content_type": "application/pdf",
-      "bytes": 268518,
-      "sha256": "ec4cfb4740fe903885a59e25cf2462dd0fae08b42fd5e8090ff3b0378e8be5e2"
+      "bytes": 268859,
+      "sha256": "568b9b6a5e7b61043050ac5ef8fc7b4aad85f0697b0c7cac9f8c1f9eff9ac298"
     },
     "png": {
       "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.png",
       "content_type": "image/png",
-      "bytes": 872132,
-      "sha256": "aa2a325a3480da74ae6e65ae2692329cc88d66d609909c194190f0f1ccf9d943"
+      "bytes": 957484,
+      "sha256": "c51bcf5284e5b4801598bd7338724fe4a3ac7fe11ab3853cc5155ca421bef041"
     },
     "csv": {
       "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.csv",

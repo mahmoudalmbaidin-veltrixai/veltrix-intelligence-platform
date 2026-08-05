@@ -6,11 +6,11 @@ import json
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
-from typing import cast
+from typing import Any, cast
 from uuid import uuid4
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 from pydantic import SecretStr
 from redis.asyncio import Redis
 
@@ -284,6 +284,10 @@ def test_all_twenty_widget_types_render_and_preserve_definition() -> None:
                 "show_labels": True,
                 "show_gridlines": True,
                 "legend_position": "bottom",
+                "axis": {
+                    "x": {"title": "Region axis"},
+                    "y": {"title": "Revenue axis"},
+                },
                 "background": "#FFF7ED",
                 "border": True,
                 "color_scheme": "sunset",
@@ -347,6 +351,95 @@ def test_all_twenty_widget_types_render_and_preserve_definition() -> None:
     assert colors is not None
     assert any(color == (255, 247, 237) for _, color in colors)
     assert any(color == (220, 38, 38) for _, color in colors)
+
+
+def test_chart_renderers_draw_configured_legends_and_axis_titles() -> None:
+    widget: dict[str, object] = {
+        "type": "bar",
+        "config": {
+            "show_legend": True,
+            "legend_position": "bottom",
+            "show_gridlines": True,
+            "axis": {
+                "x": {"title": "Region axis"},
+                "y": {"title": "Revenue axis"},
+            },
+        },
+    }
+    columns: list[dict[str, object]] = [
+        {"key": "region", "label": "Region"},
+        {"key": "orders", "label": "Orders"},
+        {"key": "profit", "label": "Profit"},
+    ]
+    rows: list[dict[str, object]] = [
+        {"region": "Riyadh", "orders": 42, "profit": 18},
+        {"region": "Jeddah", "orders": 64, "profit": 27},
+    ]
+
+    class RecordingCanvas:
+        def __init__(self) -> None:
+            self.text: list[str] = []
+
+        def setFillColor(self, *_: object) -> None: ...
+
+        def setStrokeColor(self, *_: object) -> None: ...
+
+        def setLineWidth(self, *_: object) -> None: ...
+
+        def setFont(self, *_: object) -> None: ...
+
+        def line(self, *_: object) -> None: ...
+
+        def rect(self, *_: object, **__: object) -> None: ...
+
+        def circle(self, *_: object, **__: object) -> None: ...
+
+        def drawString(self, _x: float, _y: float, value: str) -> None:
+            self.text.append(value)
+
+        def drawCentredString(self, _x: float, _y: float, value: str) -> None:
+            self.text.append(value)
+
+    canvas = RecordingCanvas()
+    PdfDashboardRenderer._chart(cast("Any", canvas), widget, "bar", columns, rows, 0, 0, 600, 300)
+    assert {"Region axis", "Y: Revenue axis", "Orders", "Profit"} <= set(canvas.text)
+
+    configured = Image.new("RGB", (1200, 600), "white")
+    plain = Image.new("RGB", (1200, 600), "white")
+    configured_draw = ImageDraw.Draw(configured)
+    plain_draw = ImageDraw.Draw(plain)
+    renderer = PngDashboardRenderer()
+    font = renderer._font(24)
+    small = renderer._font(18)
+    renderer._draw_chart(
+        configured_draw,
+        widget,
+        "bar",
+        (20, 20, 580, 280),
+        columns,
+        rows,
+        font,
+        small,
+        2,
+    )
+    plain_widget: dict[str, object] = {"type": "bar", "config": {"show_legend": False}}
+    renderer._draw_chart(
+        plain_draw,
+        plain_widget,
+        "bar",
+        (20, 20, 580, 280),
+        columns,
+        rows,
+        font,
+        small,
+        2,
+    )
+    assert configured.tobytes() != plain.tobytes()
+    # Bottom legend and X-axis title occupy pixels the no-legend/no-axis
+    # rendering intentionally leaves untouched.
+    assert (
+        configured.crop((0, 480, 1200, 600)).tobytes() != plain.crop((0, 480, 1200, 600)).tobytes()
+    )
 
 
 def test_scheduler_supports_one_time_and_recurring_timezones() -> None:

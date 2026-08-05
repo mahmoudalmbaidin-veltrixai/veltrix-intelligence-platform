@@ -209,10 +209,19 @@ def main() -> None:
                 "widget_type": widget_type,
                 "results": {channel: "pass" for channel in channels},
                 "proof": {
-                    "lifecycle": "test_all_widget_types_traverse_real_publish_and_export_contract",
+                    "lifecycle": (
+                        "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
+                    ),
                     "render": "test_all_twenty_widget_types_render_and_preserve_definition",
-                    "schedule": "test_due_schedule_dispatches_and_dedupes",
-                    "email": "test_email_composition_preserves_attachments_and_hides_bcc",
+                    "visual_chart_configuration": (
+                        "test_chart_renderers_draw_configured_legends_and_axis_titles"
+                    ),
+                    "schedule": (
+                        "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
+                    ),
+                    "email": (
+                        "test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email"
+                    ),
                 },
             }
             for widget_type in WIDGET_TYPES

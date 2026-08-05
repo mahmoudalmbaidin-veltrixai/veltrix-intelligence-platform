@@ -153,6 +153,7 @@ class WidgetInput(StrictModel):
             "show_labels",
             "show_gridlines",
             "legend_position",
+            "axis",
             "color_scheme",
             "subtitle",
             "background",

@@ -650,9 +650,17 @@ class PdfDashboardRenderer:
             canvas.drawString(x, y + height / 2, "No chart data")
             return
         show_legend = bool(_config(widget).get("show_legend", True))
-        legend_width = min(width * 0.32, 110) if show_legend else 0
-        size = max(4.0, min(width - legend_width, height) - 8)
-        left, bottom = x + (width - size) / 2, y + (height - size) / 2
+        legend_position = str(_config(widget).get("legend_position") or "right")
+        horizontal_legend = show_legend and legend_position in {"top", "bottom"}
+        legend_width = (
+            min(width * 0.32, 110) if show_legend and legend_position in {"left", "right"} else 0
+        )
+        legend_height = 13 if horizontal_legend else 0
+        size = max(4.0, min(width - legend_width, height - legend_height) - 8)
+        chart_x = x + legend_width if show_legend and legend_position == "left" else x
+        chart_y = y + legend_height if show_legend and legend_position == "bottom" else y
+        left = chart_x + (width - legend_width - size) / 2
+        bottom = chart_y + (height - legend_height - size) / 2
         start = 90.0
         colors = _palette(widget)
         for index, value in enumerate(values):
@@ -669,16 +677,25 @@ class PdfDashboardRenderer:
                 (_column_key(item) for item in columns if _column_key(item) != numeric_key), ""
             )
             canvas.setFont(PDF_FONT, 6.5)
+            cursor = x
             for index, row in enumerate(rows[: min(8, len(values))]):
-                legend_y = y + height - 10 - index * 11
+                if horizontal_legend:
+                    legend_x = cursor
+                    legend_y = y + 2 if legend_position == "bottom" else y + height - 9
+                else:
+                    legend_x = x + 2 if legend_position == "left" else x + width - legend_width + 2
+                    legend_y = y + height - 10 - index * 11
                 canvas.setFillColor(HexColor(colors[index % len(colors)]))
-                canvas.rect(x + width - legend_width + 2, legend_y - 2, 6, 6, stroke=0, fill=1)
+                canvas.rect(legend_x, legend_y - 2, 6, 6, stroke=0, fill=1)
                 canvas.setFillColor(HexColor(INK))
+                label = _display_text(_text(row.get(category_key), 22))
                 canvas.drawString(
-                    x + width - legend_width + 11,
+                    legend_x + 9,
                     legend_y - 2,
-                    _display_text(_text(row.get(category_key), 22)),
+                    label,
                 )
+                if horizontal_legend:
+                    cursor += min(120.0, stringWidth(label, PDF_FONT, 6.5) + 24)
 
     @staticmethod
     def _map(
@@ -930,11 +947,38 @@ class PdfDashboardRenderer:
             for key in numeric_keys
             if (value := _numeric(row.get(key))) is not None
         ]
-        maximum = max(values, default=1) or 1
-        plot_y = y + 18
-        plot_h = height - 30
         config = _config(widget)
+        axis = cast(dict[str, object], config.get("axis", {}))
+        x_axis = cast(dict[str, object], axis.get("x", {}))
+        y_axis = cast(dict[str, object], axis.get("y", {}))
+        supports_axes = widget_type not in {"pie", "donut"}
+        x_axis_title = str(x_axis.get("title") or "") if supports_axes else ""
+        y_axis_title = str(y_axis.get("title") or "") if supports_axes else ""
+        legend_position = str(config.get("legend_position") or "top")
+        show_legend = bool(config.get("show_legend", True)) and len(numeric_keys) > 1
+        bottom_legend = 12.0 if show_legend and legend_position == "bottom" else 0.0
+        top_legend = 12.0 if show_legend and legend_position == "top" else 0.0
+        axis_title_height = 10.0 if x_axis_title else 0.0
+        maximum = max(values, default=1) or 1
+        plot_y = y + 18 + bottom_legend + axis_title_height
+        plot_h = max(12.0, height - 30 - bottom_legend - top_legend - axis_title_height)
         colors = _palette(widget)
+        if x_axis_title:
+            canvas.setFillColor(HexColor(MUTED))
+            canvas.setFont(PDF_FONT_BOLD, 6.5)
+            canvas.drawCentredString(
+                x + width / 2,
+                y + bottom_legend + 1,
+                _display_text(_text(x_axis_title, 48)),
+            )
+        if y_axis_title:
+            canvas.setFillColor(HexColor(MUTED))
+            canvas.setFont(PDF_FONT_BOLD, 6.5)
+            canvas.drawString(
+                x,
+                y + height - top_legend - 17,
+                _display_text(f"Y: {_text(y_axis_title, 36)}"),
+            )
         if bool(config.get("show_gridlines", True)):
             canvas.setStrokeColor(HexColor(BORDER))
             for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
@@ -1006,20 +1050,28 @@ class PdfDashboardRenderer:
             lines = _wrap_text(label, available, lambda line: stringWidth(line, PDF_FONT, 6.5))
             for line_index, display_label in enumerate(lines[:2]):
                 label_width = stringWidth(display_label, PDF_FONT, 6.5)
-                canvas.drawString(px - label_width / 2, y + 8 - line_index * 7, display_label)
-        if bool(config.get("show_legend", True)) and len(numeric_keys) > 1:
+                canvas.drawString(
+                    px - label_width / 2,
+                    y + bottom_legend + axis_title_height + 8 - line_index * 7,
+                    display_label,
+                )
+        if show_legend:
             canvas.setFont(PDF_FONT, 6.5)
-            cursor = x
+            vertical_legend = legend_position in {"left", "right"}
+            cursor = x + width - 105 if legend_position == "right" else x
+            legend_y = y + 2 if legend_position == "bottom" else y + height - 7
             for series_index, key in enumerate(numeric_keys):
+                item_y = legend_y - series_index * 11 if vertical_legend else legend_y
                 canvas.setFillColor(HexColor(colors[series_index % len(colors)]))
-                canvas.rect(cursor, y + height - 7, 6, 6, stroke=0, fill=1)
+                canvas.rect(cursor, item_y, 6, 6, stroke=0, fill=1)
                 canvas.setFillColor(HexColor(INK))
                 label = next(
                     (_column_label(item) for item in columns if _column_key(item) == key), key
                 )
                 display = _display_text(_text(label, 24))
-                canvas.drawString(cursor + 9, y + height - 7, display)
-                cursor += min(100.0, stringWidth(display, PDF_FONT, 6.5) + 22)
+                canvas.drawString(cursor + 9, item_y, display)
+                if not vertical_legend:
+                    cursor += min(100.0, stringWidth(display, PDF_FONT, 6.5) + 22)
 
 
 class PngDashboardRenderer:
@@ -1473,6 +1525,73 @@ class PngDashboardRenderer:
         if not data or not numeric_keys:
             draw.text((x1 * scale, (y1 + 30) * scale), "No chart data", font=font, fill=MUTED)
             return
+        config = _config(widget)
+        colors = _palette(widget)
+        axis = cast(dict[str, object], config.get("axis", {}))
+        x_axis = cast(dict[str, object], axis.get("x", {}))
+        y_axis = cast(dict[str, object], axis.get("y", {}))
+        supports_axes = widget_type not in {"pie", "donut"}
+        x_axis_title = str(x_axis.get("title") or "") if supports_axes else ""
+        y_axis_title = str(y_axis.get("title") or "") if supports_axes else ""
+        legend_position = str(config.get("legend_position") or "top")
+        show_legend = bool(config.get("show_legend", True)) and (
+            len(numeric_keys) > 1 or widget_type in {"pie", "donut"}
+        )
+
+        def draw_legend(labels: list[str]) -> None:
+            if not show_legend:
+                return
+            if legend_position == "bottom":
+                cursor_x, cursor_y = x1, y2 - 25
+            elif legend_position == "right":
+                cursor_x, cursor_y = x2 - 150, y1 + 3
+            elif legend_position == "left":
+                cursor_x, cursor_y = x1, y1 + 3
+            else:
+                cursor_x, cursor_y = x1, y1 + 3
+            for index, label in enumerate(labels[:8]):
+                if legend_position in {"left", "right"}:
+                    item_x = cursor_x
+                    item_y = cursor_y + index * 18
+                else:
+                    item_x = cursor_x + index * 145
+                    item_y = cursor_y
+                draw.rectangle(
+                    (
+                        item_x * scale,
+                        item_y * scale,
+                        (item_x + 8) * scale,
+                        (item_y + 8) * scale,
+                    ),
+                    fill=colors[index % len(colors)],
+                )
+                draw.text(
+                    ((item_x + 12) * scale, (item_y - 2) * scale),
+                    _display_text(_text(label, 22)),
+                    font=small,
+                    fill=INK,
+                )
+
+        bottom_reserve = 28 if show_legend and legend_position == "bottom" else 0
+        top_reserve = 22 if show_legend and legend_position == "top" else 0
+        axis_reserve = 18 if x_axis_title else 0
+        plot_top = y1 + top_reserve + (16 if y_axis_title else 0)
+        plot_bottom = y2 - 30 - bottom_reserve - axis_reserve
+        if y_axis_title:
+            draw.text(
+                (x1 * scale, (y1 + top_reserve) * scale),
+                _display_text(f"Y: {_text(y_axis_title, 40)}"),
+                font=small,
+                fill=MUTED,
+            )
+        if x_axis_title:
+            draw.text(
+                (((x1 + x2) / 2) * scale, (y2 - bottom_reserve - 4) * scale),
+                _display_text(_text(x_axis_title, 48)),
+                font=small,
+                fill=MUTED,
+                anchor="ms",
+            )
         maximum = (
             max(
                 (
@@ -1485,20 +1604,17 @@ class PngDashboardRenderer:
             )
             or 1
         )
-        plot_bottom = y2 - 30
         group = (x2 - x1) / len(data)
         bar_width = max(3, group * 0.7 / len(numeric_keys))
-        config = _config(widget)
-        colors = _palette(widget)
         if widget_type in {"pie", "donut"}:
             values = [max(0.0, _numeric(row.get(numeric_keys[0])) or 0.0) for row in data]
             total = sum(values)
             if total <= 0:
                 draw.text((x1 * scale, (y1 + 30) * scale), "No chart data", font=font, fill=MUTED)
                 return
-            diameter = max(8.0, min(x2 - x1, y2 - y1) - 8)
+            diameter = max(8.0, min(x2 - x1, plot_bottom - plot_top) - 8)
             left = x1 + ((x2 - x1) - diameter) / 2
-            top = y1 + ((y2 - y1) - diameter) / 2
+            top = plot_top + ((plot_bottom - plot_top) - diameter) / 2
             start = -90.0
             for index, value in enumerate(values):
                 end = start + 360.0 * value / total
@@ -1525,10 +1641,12 @@ class PngDashboardRenderer:
                     ),
                     fill=WHITE,
                 )
+            category_labels = [str(row.get(category, index + 1)) for index, row in enumerate(data)]
+            draw_legend(category_labels)
             return
         if bool(config.get("show_gridlines", True)):
             for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
-                grid_y = y1 + fraction * (plot_bottom - y1)
+                grid_y = plot_top + fraction * (plot_bottom - plot_top)
                 draw.line(
                     (x1 * scale, grid_y * scale, x2 * scale, grid_y * scale),
                     fill=BORDER,
@@ -1542,7 +1660,7 @@ class PngDashboardRenderer:
             max_y = max((abs(value) for value in y_values), default=1) or 1
             for x_value, y_value in zip(x_values, y_values, strict=True):
                 px = x1 + max(0.0, x_value) / max_x * (x2 - x1)
-                py = plot_bottom - max(0.0, y_value) / max_y * (plot_bottom - y1 - 12)
+                py = plot_bottom - max(0.0, y_value) / max_y * (plot_bottom - plot_top - 12)
                 radius = 4 * scale
                 draw.ellipse(
                     (
@@ -1562,7 +1680,7 @@ class PngDashboardRenderer:
                             plot_bottom
                             - max(0.0, _numeric(row.get(key)) or 0.0)
                             / maximum
-                            * (plot_bottom - y1 - 12)
+                            * (plot_bottom - plot_top - 12)
                         )
                         * scale,
                     )
@@ -1602,7 +1720,7 @@ class PngDashboardRenderer:
                 left = x1 + row_index * group + group * 0.15
                 for series_index, key in enumerate(numeric_keys):
                     value = max(0.0, _numeric(row.get(key)) or 0.0)
-                    height = value / stacked_maximum * (plot_bottom - y1 - 12)
+                    height = value / stacked_maximum * (plot_bottom - plot_top - 12)
                     draw.rectangle(
                         (
                             left * scale,
@@ -1617,7 +1735,7 @@ class PngDashboardRenderer:
             for row_index, row in enumerate(data):
                 for series_index, key in enumerate(numeric_keys):
                     value = max(0, _numeric(row.get(key)) or 0)
-                    height = value / maximum * (plot_bottom - y1 - 12)
+                    height = value / maximum * (plot_bottom - plot_top - 12)
                     left = x1 + row_index * group + group * 0.15 + series_index * bar_width
                     draw.rounded_rectangle(
                         (
@@ -1647,6 +1765,11 @@ class PngDashboardRenderer:
                     fill=MUTED,
                     anchor="ma",
                 )
+        series_labels = [
+            next((_column_label(item) for item in columns if _column_key(item) == key), key)
+            for key in numeric_keys
+        ]
+        draw_legend(series_labels)
 
 
 class RendererRegistry:
