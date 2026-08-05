@@ -231,6 +231,17 @@ async def test_resource_authorization_across_domains(settings: Settings) -> None
                     _acl(org.id, ws.id, "dataset", dataset.id, viewer.id, "query"),
                     _acl(org.id, ws.id, "dataset", dataset.id, denied.id, "query"),
                     _acl(org.id, ws.id, "dataset", dataset.id, denied.id, "query", effect="deny"),
+                    # A broad-role owner is still subject to an explicit resource
+                    # deny; collection visibility must preserve that precedence.
+                    _acl(
+                        org.id,
+                        ws.id,
+                        "dataset",
+                        other_dataset.id,
+                        owner.id,
+                        "query",
+                        effect="deny",
+                    ),
                     _acl(
                         org.id, ws.id, "dataset", dataset.id, devs.id, "edit", subject_type="group"
                     ),
@@ -283,11 +294,12 @@ async def test_resource_authorization_across_domains(settings: Settings) -> None
                 db, denied_ctx, page=1, page_size=50, search=None, status=None
             )
             assert denied_list.total == 0
-            # Broad-role owner sees both.
+            # Explicit deny still hides a resource from a broad-role owner.
             owner_list = await list_datasets(
                 db, owner_ctx, page=1, page_size=50, search=None, status=None
             )
-            assert {dataset.id, other_dataset.id} <= {row.id for row in owner_list.items}
+            assert dataset.id in {row.id for row in owner_list.items}
+            assert other_dataset.id not in {row.id for row in owner_list.items}
 
             # ---- CONNECTION -------------------------------------------------
             conn = await get_connection(db, viewer_ctx, connection.id)

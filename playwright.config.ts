@@ -1,11 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const ci = !!process.env.CI
-
 export default defineConfig({
   testDir: './tests/e2e',
+  globalTeardown: './tests/e2e/global-teardown.ts',
   fullyParallel: true,
-  forbidOnly: ci,
+  forbidOnly: !!process.env.CI,
   retries: 0,
   // Live control-plane and connection tests intentionally share a seeded tenant.
   // Serial execution keeps session/rate-limit state deterministic across personas.
@@ -24,6 +23,7 @@ export default defineConfig({
     { name: 'chrome-desktop', use: { ...devices['Desktop Chrome'], browserName: 'chromium' } },
     { name: 'edge-desktop', use: { ...devices['Desktop Chrome'], channel: 'msedge' } },
     { name: 'firefox-desktop', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit-desktop', use: { ...devices['Desktop Safari'], browserName: 'webkit' } },
     {
       name: 'chrome-high-dpi',
       grep: /@a11y|@mobile/,
@@ -36,13 +36,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run build && npm run preview',
     url: 'http://localhost:3009',
-    reuseExistingServer: !ci,
+    reuseExistingServer: false,
     timeout: 120_000,
     env: {
       VITE_API_MODE: 'live',
-      VITE_APP_ENV: 'development',
+      VITE_APP_ENV: 'production',
       VITE_ENABLE_MOCK_LATENCY: 'false',
       VITE_API_BASE_URL: 'http://localhost:8000/api/v1',
     },

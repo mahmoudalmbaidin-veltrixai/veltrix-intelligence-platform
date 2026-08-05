@@ -1,11 +1,10 @@
 import { expect, resetClientState, signInAs, test } from './fixtures'
-
-const password = process.env.VIP_GOVERNANCE_ADMIN_PASSWORD ?? process.env.VIP_E2E_PASSWORD ?? ''
+import { browserFixtures } from './personas'
 
 async function signInAdmin(page: Parameters<typeof signInAs>[0]) {
   await page.context().clearCookies()
   await resetClientState(page)
-  await signInAs(page, 'governance-admin@vip.demo', password)
+  await signInAs(page, browserFixtures.governanceAdmin.email, browserFixtures.governanceAdmin.password)
 }
 
 test('admin creates a live connection without credential disclosure and receives sanitized test result', async ({
@@ -89,10 +88,9 @@ test('admin creates a live connection without credential disclosure and receives
 })
 
 test('viewer and restricted users cannot bypass connection mutations', async ({ page }) => {
-  const viewerPassword = process.env.VIP_GOVERNANCE_VIEWER_PASSWORD ?? process.env.VIP_E2E_PASSWORD ?? ''
   await page.context().clearCookies()
   await resetClientState(page)
-  await signInAs(page, 'governance-viewer@vip.demo', viewerPassword)
+  await signInAs(page, browserFixtures.governanceViewer.email, browserFixtures.governanceViewer.password)
   const viewer = await page.evaluate(async () => {
     const tenant = JSON.parse(localStorage.getItem('vip.tenancy.preference') ?? '{}') as {
       orgId?: string
@@ -118,10 +116,33 @@ test('viewer and restricted users cannot bypass connection mutations', async ({ 
   expect(viewer.status).toBe(403)
   expect(viewer.body.error.code).toBe('PERMISSION_DENIED')
 
-  const restrictedPassword = process.env.VIP_GOVERNANCE_RESTRICTED_PASSWORD ?? process.env.VIP_E2E_PASSWORD ?? ''
   await page.context().clearCookies()
   await resetClientState(page)
-  await signInAs(page, 'governance-restricted@vip.demo', restrictedPassword)
+  await signInAs(page, browserFixtures.moduleRestricted.email, browserFixtures.moduleRestricted.password)
   await page.goto('/connections')
-  await expect(page).toHaveURL(/\/forbidden/)
+  await expect(page).toHaveURL(/\/connections/)
+  const restrictedCreate = await page.evaluate(async () => {
+    const tenant = JSON.parse(localStorage.getItem('vip.tenancy.preference') ?? '{}') as {
+      orgId?: string
+      wsId?: string
+    }
+    const csrf = document.cookie
+      .split('; ')
+      .find((value) => value.startsWith('vip_csrf_token='))
+      ?.split('=')[1]
+    const response = await fetch('http://localhost:8000/api/v1/connections', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Organization-ID': tenant.orgId ?? '',
+        'X-Workspace-ID': tenant.wsId ?? '',
+        'X-CSRF-Token': csrf ?? '',
+      },
+      body: JSON.stringify({ name: 'Denied', connection_type: 'postgresql', configuration: {}, credentials: {} }),
+    })
+    return { status: response.status, body: await response.json() }
+  })
+  expect(restrictedCreate.status).toBe(403)
+  expect(restrictedCreate.body.error.code).toBe('PERMISSION_DENIED')
 })

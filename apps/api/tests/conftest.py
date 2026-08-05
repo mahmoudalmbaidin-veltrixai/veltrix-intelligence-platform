@@ -13,7 +13,13 @@ os.environ.setdefault(
     "DATABASE_URL",
     os.getenv(
         "TEST_DATABASE_URL",
-        "postgresql+asyncpg://vip:vip_local_dev_only@localhost:5432/vip_test",
+        # The local Docker test service does not offer TLS. asyncpg defaults to
+        # ssl=prefer, which first attempts TLS and then reconnects in plaintext;
+        # under Windows/Docker checkpoint load that double handshake can consume
+        # the entire strict two-second connect budget. Pin loopback IPv4 and the
+        # known local transport explicitly. Production URLs keep their own TLS
+        # policy and are never rewritten here.
+        "postgresql+asyncpg://vip:vip_local_dev_only@127.0.0.1:5432/vip_test?ssl=disable",
     ),
 )
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")

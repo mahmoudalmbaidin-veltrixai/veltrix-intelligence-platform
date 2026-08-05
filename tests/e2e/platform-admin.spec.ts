@@ -1,4 +1,5 @@
-import { test, expect, signInAs, E2E_PASSWORD } from './fixtures'
+import { test, expect, signInAs } from './fixtures'
+import { browserFixtures } from './personas'
 
 // The platform super-admin console is a cross-tenant operator surface. tenant-a is
 // granted the platform-admin flag during seeding; tenant-b is a normal tenant user.
@@ -25,7 +26,7 @@ test('platform admin can open the cross-tenant console', async ({ authenticatedP
 })
 
 test('a normal tenant user cannot see or reach the platform console', async ({ page }) => {
-  await signInAs(page, 'tenant-b@vip.demo', E2E_PASSWORD)
+  await signInAs(page, browserFixtures.normalUser.email, browserFixtures.normalUser.password)
 
   // No Platform Admin nav entry.
   await expect(page.getByRole('link', { name: 'Platform Admin' })).toHaveCount(0)

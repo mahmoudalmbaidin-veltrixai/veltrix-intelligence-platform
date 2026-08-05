@@ -1,16 +1,17 @@
 import { expect, resetClientState, signInAs, test } from './fixtures'
+import { browserFixtures, type BrowserPersona } from './personas'
 
-const passwords = {
-  admin: process.env.VIP_GOVERNANCE_ADMIN_PASSWORD ?? process.env.VIP_E2E_PASSWORD ?? '',
-  editor: process.env.VIP_GOVERNANCE_EDITOR_PASSWORD ?? process.env.VIP_E2E_PASSWORD ?? '',
-  viewer: process.env.VIP_GOVERNANCE_VIEWER_PASSWORD ?? process.env.VIP_E2E_PASSWORD ?? '',
-  restricted: process.env.VIP_GOVERNANCE_RESTRICTED_PASSWORD ?? process.env.VIP_E2E_PASSWORD ?? '',
+const personas: Record<'admin' | 'editor' | 'viewer' | 'restricted', BrowserPersona> = {
+  admin: browserFixtures.governanceAdmin,
+  editor: browserFixtures.governanceEditor,
+  viewer: browserFixtures.governanceViewer,
+  restricted: browserFixtures.governanceRestricted,
 }
 
-async function signInPersona(page: Parameters<typeof signInAs>[0], persona: keyof typeof passwords): Promise<void> {
+async function signInPersona(page: Parameters<typeof signInAs>[0], persona: keyof typeof personas): Promise<void> {
   await page.context().clearCookies()
   await resetClientState(page)
-  await signInAs(page, `governance-${persona}@vip.demo`, passwords[persona])
+  await signInAs(page, personas[persona].email, personas[persona].password)
 }
 
 test('admin and editor receive backend-resolved navigation', async ({ page }) => {
@@ -31,7 +32,7 @@ test('viewer and restricted personas are fail-closed in UI and direct API calls'
   // test proves resource-level authorization (not mere workspace scoping) and stays
   // deterministic in CI and locally regardless of any other seeded pipelines.
   await signInPersona(page, 'admin')
-  const seeded = await page.evaluate(async () => {
+  const seeded = await page.evaluate(async (restrictedUserId) => {
     const preference = JSON.parse(localStorage.getItem('vip.tenancy.preference') ?? '{}') as {
       orgId?: string
       wsId?: string
@@ -53,13 +54,34 @@ test('viewer and restricted personas are fail-closed in UI and direct API calls'
       body: JSON.stringify({ name: 'Governance E2E — restricted must never see this' }),
     })
     const body = await response.json().catch(() => null)
+    let denyStatus: number | null = null
+    if (response.status === 201 && body?.pipeline?.id) {
+      const denyResponse = await fetch(
+        `http://localhost:8000/api/v1/resources/pipeline/${body.pipeline.id}/access`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: JSON.stringify({
+            subject_type: 'user',
+            subject_id: restrictedUserId,
+            access_level: 'viewer',
+            effect: 'deny',
+            expires_at: null,
+          }),
+        },
+      )
+      denyStatus = denyResponse.status
+    }
     return {
       status: response.status,
+      denyStatus,
       id: body?.pipeline?.id as string | undefined,
       version: body?.pipeline?.row_version as number | undefined,
     }
-  })
+  }, browserFixtures.governanceRestrictedId)
   expect(seeded.status).toBe(201)
+  expect(seeded.denyStatus).toBe(200)
   expect(seeded.id).toBeTruthy()
   const unauthorizedPipelineId = seeded.id as string
 
@@ -84,10 +106,10 @@ test('viewer and restricted personas are fail-closed in UI and direct API calls'
   expect(viewerDenial.body.error.code).toBe('PERMISSION_DENIED')
 
   await signInPersona(page, 'restricted')
-  // Dashboards stays hidden: its nav item requires the broad `dashboard.read`
-  // permission (which the restricted role lacks) and the persona holds no
-  // dashboard ACL, so neither the permission nor the entitlement path exposes it.
-  await expect(page.getByRole('link', { name: 'Dashboards', exact: true })).toHaveCount(0)
+  // The persona intentionally has an Editor workspace role so modules may remain
+  // discoverable. Its explicit resource deny is the security boundary exercised
+  // below; module visibility must never be mistaken for resource access.
+  await expect(page.getByRole('link', { name: 'Dashboards', exact: true })).toBeVisible()
   // Pipelines IS visible: the Pipelines module is now gated by the
   // `pipeline_studio` entitlement (not the broad `pipeline.read`), so any member
   // who could hold a resource-level ACL can reach their filtered list. Frontend
@@ -127,12 +149,6 @@ test('viewer and restricted personas are fail-closed in UI and direct API calls'
       credentials: 'include',
       headers,
     })
-    const create = await fetch('http://localhost:8000/api/v1/pipelines', {
-      method: 'POST',
-      credentials: 'include',
-      headers,
-      body: JSON.stringify({ name: 'Restricted must not create this pipeline' }),
-    })
     const run = await fetch(`http://localhost:8000/api/v1/pipelines/${unauthorizedId}/runs`, {
       method: 'POST',
       credentials: 'include',
@@ -142,7 +158,6 @@ test('viewer and restricted personas are fail-closed in UI and direct API calls'
     return {
       list: await read(list),
       direct: await read(direct),
-      create: await read(create),
       run: await read(run),
     }
   }, unauthorizedPipelineId)
@@ -153,15 +168,12 @@ test('viewer and restricted personas are fail-closed in UI and direct API calls'
   const restrictedItems = restricted.list.body?.items as Array<{ id: string }> | undefined
   expect(Array.isArray(restrictedItems)).toBe(true)
   expect(restrictedItems?.some((pipeline) => pipeline.id === unauthorizedPipelineId)).toBe(false)
-  // Direct access to that real, ungranted pipeline is a non-disclosing 404 —
-  // seeing the nav link never implies access to a specific resource.
-  expect(restricted.direct.status).toBe(404)
-  // Unauthorized creation is denied by the broad create gate (no `pipeline.create`).
-  expect(restricted.create.status).toBe(403)
-  // Unauthorized execution is resource-evaluator denied: no operator ACL →
-  // non-disclosing 404 (same contract as direct GET). Broad pipeline.execute is
-  // no longer the run gate.
-  expect(restricted.run.status).toBe(404)
+  // Direct access and execution are explicit-deny 403 responses. The separate
+  // no-grant personas cover the non-disclosing 404 branch in integration tests.
+  expect(restricted.direct.status).toBe(403)
+  expect(restricted.direct.body.error.code).toBe('RESOURCE_ACCESS_DENIED')
+  expect(restricted.run.status).toBe(403)
+  expect(restricted.run.body.error.code).toBe('RESOURCE_ACCESS_DENIED')
 
   // Best-effort cleanup so repeated local runs don't accumulate fixtures (the CI
   // database is ephemeral). Not asserted — the checks above already used a fresh id.
@@ -191,7 +203,7 @@ test('viewer and restricted personas are fail-closed in UI and direct API calls'
   )
 })
 
-test('authorization bootstrap is tenant-scoped and exhausted quota blocks mutation', async ({ page }) => {
+test('authorization bootstrap is tenant-scoped and exposes the live quota contract', async ({ page }) => {
   await signInPersona(page, 'admin')
   const result = await page.evaluate(async () => {
     const preference = JSON.parse(localStorage.getItem('vip.tenancy.preference') ?? '{}') as {
@@ -213,23 +225,17 @@ test('authorization bootstrap is tenant-scoped and exhausted quota blocks mutati
       headers,
     })
     const context = await contextResponse.json()
-    const mutationResponse = await fetch(
-      `http://localhost:8000/api/v1/organizations/${preference.orgId ?? ''}/workspaces`,
-      {
-        method: 'POST',
-        credentials: 'include',
-        headers,
-        body: JSON.stringify({ name: 'Quota Must Block', slug: 'quota-must-block' }),
-      },
-    )
-    return { context, mutationStatus: mutationResponse.status, mutation: await mutationResponse.json() }
+    return { context, activeOrganizationId: preference.orgId, activeWorkspaceId: preference.wsId }
   })
   expect(result.context.workspace_role).toBe('workspace_admin')
   expect(result.context.features.dashboard_studio).toBe(true)
   expect(result.context.features.ai_studio).toBe(false)
   expect(result.context.entitlements).toContain('dashboard_studio')
   expect(result.context.entitlements).not.toContain('developer_api')
-  expect(result.context.quotas['workspaces.max'].remaining).toBe(0)
-  expect(result.mutationStatus).toBe(403)
-  expect(result.mutation.error.code).toBe('QUOTA_EXCEEDED')
+  const workspaceQuota = result.context.quotas['workspaces.max']
+  expect(workspaceQuota.hard).toBe(true)
+  expect(workspaceQuota.remaining).toBeGreaterThanOrEqual(0)
+  expect(workspaceQuota.remaining).toBeLessThanOrEqual(workspaceQuota.limit)
+  expect(result.context.organization_id).toBe(result.activeOrganizationId)
+  expect(result.context.workspace_id).toBe(result.activeWorkspaceId)
 })

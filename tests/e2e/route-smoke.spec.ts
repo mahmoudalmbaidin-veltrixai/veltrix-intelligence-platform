@@ -1,8 +1,10 @@
 import { test, expect } from './fixtures'
+import type { Page } from '@playwright/test'
 
 const routes = [
   '/',
   '/home',
+  '/platform',
   '/favorites',
   '/activity',
   '/connections',
@@ -22,17 +24,10 @@ const routes = [
   '/dashboards/deliveries',
   '/dashboards/new',
   '/explore',
-  '/automation',
-  '/automation/new',
-  '/automation/runs',
-  '/automation/approvals',
-  '/automation/au_1',
   '/notifications',
   '/operations/activity',
   '/audit',
   '/usage',
-  '/developer',
-  '/admin/platform',
   '/admin/organization',
   '/admin/workspace',
   '/admin/members',
@@ -41,7 +36,6 @@ const routes = [
   '/settings/personal',
   '/settings/workspace',
   '/settings/organization',
-  '/settings/developer',
   '/settings/security',
   '/forbidden',
   '/upgrade',
@@ -50,10 +44,9 @@ const routes = [
 
 const featureGatedRoutes = ['/ai/assistant', '/ai/studio', '/ai/knowledge', '/ai/agents', '/ai/agent-runs'] as const
 
-// Placeholder modules with no production backend: gated OFF in live mode by an
-// entitlement that DEFAULT_ORGANIZATION_ENTITLEMENTS does not grant, so their
-// routes resolve to the upgrade wall and never present an empty/fake surface as
-// complete. (See governance/policies.py + seed.py and src/app/router/index.ts.)
+// Placeholder modules with no production backend remain entitlement-gated.
+// AI routes use the stricter production-live-mode gate above and cannot be
+// enabled by combining a tenant feature flag with an entitlement.
 const entitlementGatedRoutes = [
   '/reports',
   '/reports/new',
@@ -62,7 +55,32 @@ const entitlementGatedRoutes = [
   '/marketplace',
   '/marketplace/ext_snowflake',
   '/billing',
+  '/developer',
+  '/settings/developer',
+  '/automation',
+  '/automation/new',
+  '/automation/runs',
+  '/automation/approvals',
+  '/automation/00000000-0000-0000-0000-000000000000',
 ] as const
+
+async function waitForApplicationReady(page: Page, route: string): Promise<void> {
+  const expectedPath = route === '/' ? '/home' : route
+  await expect(page).toHaveURL(new RegExp(`${expectedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`))
+  const main = page.locator('#vip-main')
+  await expect(main, `${route} should render inside the application layout`).toBeVisible()
+  await expect(main, `${route} should render an intentional nonblank surface`).not.toBeEmpty()
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => ({
+          route: document.documentElement.dataset.vipRoute,
+          active: (window as typeof window & { __vipQueryActivity?: { active: number } }).__vipQueryActivity?.active ?? 0,
+        })),
+      { message: `${route} should settle its route and server-state queries` },
+    )
+    .toEqual({ route: expectedPath, active: 0 })
+}
 
 test('disabled AI preview routes remain inaccessible in production navigation', async ({ authenticatedPage: page }) => {
   for (const route of featureGatedRoutes) {
@@ -93,12 +111,27 @@ test('all router destinations render an intentional nonblank surface without run
   authenticatedPage: page,
 }) => {
   test.setTimeout(120_000)
-  await page.waitForTimeout(250)
+  await waitForApplicationReady(page, '/home')
   const consoleErrors: string[] = []
+  const pendingConsoleErrors: Array<Promise<void>> = []
   const networkFailures: string[] = []
   const failedResponses: string[] = []
   page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text())
+    if (message.type() !== 'error') return
+    pendingConsoleErrors.push(
+      Promise.all(
+        message.args().map(async (argument) => {
+          try {
+            return JSON.stringify(await argument.jsonValue())
+          } catch {
+            return argument.toString()
+          }
+        }),
+      ).then((values) => {
+        const location = message.location()
+        consoleErrors.push(`${values.join(' ')} (${location.url}:${location.lineNumber}:${location.columnNumber})`)
+      }),
+    )
   })
   page.on('requestfailed', (request) => {
     // A route transition can cancel an in-flight read from the surface being left.
@@ -157,11 +190,8 @@ test('all router destinations render an intentional nonblank surface without run
         window.dispatchEvent(new PopStateEvent('popstate'))
       }, route)
     }
-    await expect(page).toHaveURL(route === '/' ? /\/home$/ : new RegExp(`${route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`))
-    await page.waitForTimeout(100)
+    await waitForApplicationReady(page, route)
     const main = page.locator('#vip-main')
-    await expect(main, `${route} should render inside the application layout`).toBeVisible()
-    await expect(main, `${route} should render an intentional nonblank surface`).not.toBeEmpty()
     const text = (await main.textContent())?.trim() ?? ''
     if (!text) blankRoutes.push(route)
     const title = await page.title()
@@ -172,6 +202,7 @@ test('all router destinations render an intentional nonblank surface without run
   expect(blankRoutes, 'blank route surfaces').toEqual([])
   expect(badTitles, 'invalid route titles').toEqual([])
   expect(failedResponses, 'unsuccessful route-transition responses').toEqual([])
+  await Promise.all(pendingConsoleErrors)
   expect(consoleErrors, 'browser console errors').toEqual([])
   expect(networkFailures, 'failed route-transition requests').toEqual([])
 })

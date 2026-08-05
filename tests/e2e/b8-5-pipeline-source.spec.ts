@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { test, expect } from './fixtures'
+import { browserFixtures } from './personas'
 
 // This is the longest live browser journey: it uploads and ingests a CSV,
 // publishes and executes a worker-backed pipeline, then profiles the result.
@@ -22,7 +23,30 @@ test('Pipeline Studio uploads, previews, persists, and publishes a governed CSV 
   await page.getByRole('button', { name: 'Add Dataset node' }).press('Enter')
   await expect(page.getByLabel('Source type')).toBeVisible()
   await page.getByLabel('Source type').selectOption('file')
-  await page.getByLabel('Destination connection').selectOption({ index: 1 })
+  const destinationConnectionName = browserFixtures.destinationConnection
+  const destinationConnection = page.getByLabel('Destination connection')
+  const option = destinationConnection.locator('option').filter({ hasText: destinationConnectionName })
+  await expect(option, `Expected exact healthy PostgreSQL fixture ${destinationConnectionName}`).toHaveCount(1, {
+    timeout: 20_000,
+  })
+  await expect(option).toContainText('(healthy)')
+  const connectionId = await option.getAttribute('value')
+  if (!connectionId) throw new Error(`Browser fixture ${destinationConnectionName} has no immutable connection ID.`)
+  const connectionDetails = await page.evaluate(async (id) => {
+    const tenancy = JSON.parse(localStorage.getItem('vip.tenancy.preference') ?? '{}') as { orgId?: string; wsId?: string }
+    const response = await fetch(`http://localhost:8000/api/v1/connections/${id}`, {
+      credentials: 'include',
+      headers: {
+        'X-Organization-ID': tenancy.orgId ?? '',
+        'X-Workspace-ID': tenancy.wsId ?? '',
+      },
+    })
+    return { status: response.status, body: await response.json() }
+  }, connectionId)
+  expect(connectionDetails.status).toBe(200)
+  expect(connectionDetails.body.type?.key).toBe('postgresql')
+  expect(connectionDetails.body.health_status).toBe('healthy')
+  await destinationConnection.selectOption(connectionId)
   await page.getByLabel('Destination schema').fill('public')
   await page.getByLabel('Destination table').fill(tableName)
   await page.getByLabel('Dataset name').fill(datasetName)

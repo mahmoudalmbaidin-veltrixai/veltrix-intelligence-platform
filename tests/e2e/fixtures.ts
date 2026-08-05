@@ -1,7 +1,9 @@
 import { test as base, expect, type Page } from '@playwright/test'
+import { browserFixtures } from './personas'
 
-export const E2E_EMAIL = process.env.VIP_E2E_EMAIL ?? ''
-export const E2E_PASSWORD = process.env.VIP_E2E_PASSWORD ?? ''
+export const E2E_EMAIL = browserFixtures.primary.email
+export const E2E_PASSWORD = browserFixtures.primary.password
+export const E2E_ORGANIZATION_NAME = browserFixtures.organizationA
 
 async function resetClientState(page: Page) {
   await page.context().clearCookies()
@@ -49,7 +51,7 @@ export const test = base.extend<{ authenticatedPage: Page }>({
     await resetClientState(page)
     await signIn(page)
     await expect(page.locator('#vip-main')).toBeVisible()
-    await selectOrganizationByName(page, 'Organization Alpha')
+    await selectOrganizationByName(page, E2E_ORGANIZATION_NAME)
     await use(page)
   },
 })

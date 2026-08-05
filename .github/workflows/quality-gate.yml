@@ -55,7 +55,7 @@ jobs:
       VITE_APP_ENV: development
       VITE_ENABLE_MOCK_LATENCY: 'false'
       VITE_API_BASE_URL: http://localhost:8000/api/v1
-      DATABASE_URL: postgresql+asyncpg://vip:vip_test@localhost:5432/vip_test
+      DATABASE_URL: postgresql+asyncpg://vip:vip_test@127.0.0.1:5432/vip_test?ssl=disable
       REDIS_URL: redis://localhost:6379/14
       APP_ENV: test
       CORS_ALLOWED_ORIGINS: http://localhost:3009
@@ -96,6 +96,33 @@ jobs:
           password="$(openssl rand -base64 36 | tr -d '\n')"
           echo "::add-mask::$password"
           echo "VIP_E2E_PASSWORD=$password" >> "$GITHUB_ENV"
+          for variable in \
+            VIP_E2E_TENANT_A_PASSWORD VIP_E2E_TENANT_B_PASSWORD \
+            VIP_E2E_GOVERNANCE_ADMIN_PASSWORD VIP_E2E_GOVERNANCE_EDITOR_PASSWORD \
+            VIP_E2E_GOVERNANCE_VIEWER_PASSWORD VIP_E2E_GOVERNANCE_RESTRICTED_PASSWORD \
+            VIP_E2E_NORMAL_USER_PASSWORD; do
+            echo "$variable=$password" >> "$GITHUB_ENV"
+          done
+          cat >> "$GITHUB_ENV" <<'EOF'
+          VIP_E2E_TENANT_A_EMAIL=governance-viewer@vip.demo
+          VIP_E2E_TENANT_B_EMAIL=tenant-b@vip.demo
+          VIP_E2E_GOVERNANCE_ADMIN_EMAIL=governance-admin@vip.demo
+          VIP_E2E_GOVERNANCE_EDITOR_EMAIL=governance-editor@vip.demo
+          VIP_E2E_GOVERNANCE_VIEWER_EMAIL=governance-viewer@vip.demo
+          VIP_E2E_GOVERNANCE_RESTRICTED_EMAIL=governance-restricted@vip.demo
+          VIP_E2E_NORMAL_USER_EMAIL=tenant-b@vip.demo
+          VIP_E2E_ORGANIZATION_NAME=Organization Alpha
+          VIP_E2E_ORGANIZATION_A_NAME=Organization Alpha
+          VIP_E2E_ORGANIZATION_B_NAME=Organization Beta
+          VIP_E2E_WORKSPACE_A_PRIMARY=Alpha Workspace 1
+          VIP_E2E_WORKSPACE_A_SECONDARY=Alpha Workspace 2
+          VIP_E2E_WORKSPACE_B_PRIMARY=Beta Workspace 1
+          VIP_E2E_TENANT_A_ORGANIZATION_NAME=Governance Demo
+          VIP_E2E_TENANT_A_WORKSPACE_NAME=Default
+          VIP_E2E_TENANT_B_ORGANIZATION_NAME=Organization Beta
+          VIP_E2E_TENANT_B_WORKSPACE_NAME=Beta Workspace 1
+          VIP_E2E_DESTINATION_CONNECTION_NAME=VIP B5 Demo Warehouse
+          EOF
       - name: Seed browser-test tenants
         run: |
           VIP_DEMO_USER_A_PASSWORD="$VIP_E2E_PASSWORD" \
@@ -181,6 +208,16 @@ jobs:
       - run: npx playwright install --with-deps chromium firefox msedge
       - run: npm run test:e2e -- --max-failures=1
       - run: npm run test:a11y
+      - name: Sanitize and scan browser evidence for credentials
+        if: always()
+        run: >-
+          python apps/api/scripts/sanitize-playwright-artifacts.py
+          --path test-results
+          --path playwright-report
+          --path apps/api/api.log
+          --path apps/api/dashboard-worker.log
+          --path apps/api/pipeline-worker.log
+          --report test-results/artifact-secret-scan.json
       - name: Upload browser evidence on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -192,7 +229,7 @@ jobs:
             apps/api/api.log
             apps/api/dashboard-worker.log
             apps/api/pipeline-worker.log
-          retention-days: 14
+          retention-days: 3
 
   backend-static-and-unit:
     runs-on: ubuntu-latest
@@ -244,7 +281,7 @@ jobs:
     env:
       APP_ENV: test
       ENABLE_DOCS: 'false'
-      DATABASE_URL: postgresql+asyncpg://vip:vip_test@localhost:5432/vip_test
+      DATABASE_URL: postgresql+asyncpg://vip:vip_test@127.0.0.1:5432/vip_test?ssl=disable
       REDIS_URL: redis://localhost:6379/15
       RUN_INTEGRATION_TESTS: '1'
       CONNECTION_ENCRYPTION_KEY: REREREREREREREREREREREREREREREREREREREREREQ=

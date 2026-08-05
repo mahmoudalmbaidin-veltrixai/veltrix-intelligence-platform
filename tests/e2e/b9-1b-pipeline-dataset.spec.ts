@@ -3,16 +3,12 @@
  * Requires running API + frontend in VITE_API_MODE=live and governance demo users.
  */
 import { expect, resetClientState, signInAs, test } from './fixtures'
-
-const password =
-  process.env.VIP_GOVERNANCE_ADMIN_PASSWORD ??
-  process.env.VIP_E2E_PASSWORD ??
-  'Enterprise review 2026!'
+import { browserFixtures } from './personas'
 
 async function signInAdmin(page: Parameters<typeof signInAs>[0]) {
   await page.context().clearCookies()
   await resetClientState(page)
-  await signInAs(page, 'governance-admin@vip.demo', password)
+  await signInAs(page, browserFixtures.governanceAdmin.email, browserFixtures.governanceAdmin.password)
 }
 
 test('B9.1B pipeline studio exposes run controls and artifact empty state for admin', async ({ page }) => {
@@ -37,7 +33,7 @@ test('B9.1B dataset detail live tabs have no fabricated mock rows', async ({ pag
   await expect(page.getByRole('heading', { name: /Datasets/i }).first()).toBeVisible({ timeout: 20_000 })
 
   // Resolve a real dataset id from the live API (list rows are not anchors).
-  const datasetId = await page.evaluate(async () => {
+  const datasetId = await page.evaluate(async (expectedName) => {
     const preference = JSON.parse(localStorage.getItem('vip.tenancy.preference') ?? '{}') as {
       orgId?: string
       wsId?: string
@@ -49,14 +45,14 @@ test('B9.1B dataset detail live tabs have no fabricated mock rows', async ({ pag
         'X-Workspace-ID': preference.wsId ?? '',
       },
     })
-    const body = (await response.json()) as { items?: Array<{ id: string }> }
-    return body.items?.[0]?.id ?? null
-  })
+    const body = (await response.json()) as { items?: Array<{ id: string; display_name: string }> }
+    return body.items?.find((dataset) => dataset.display_name === expectedName)?.id ?? null
+  }, browserFixtures.certificationDataset)
   expect(datasetId).toBeTruthy()
   await page.goto(`/datasets/${datasetId}`)
   await expect(page).toHaveURL(new RegExp(`/datasets/${datasetId}`, 'i'), { timeout: 20_000 })
 
-  await expect(page.getByRole('heading', { name: 'Certification' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Certification', exact: true })).toBeVisible()
 
   await page.getByRole('tab', { name: 'Lineage' }).click()
   await expect(page.getByText('Revenue Nightly ETL')).toHaveCount(0)

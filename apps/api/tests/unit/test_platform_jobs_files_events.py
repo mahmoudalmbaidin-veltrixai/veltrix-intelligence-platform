@@ -10,15 +10,39 @@ from uuid import uuid4
 
 import pytest
 
+from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
 from vip_api.events.broker import PlatformEvent, RedisEventBroker
+from vip_api.events.routes import _subscription_rate_key
 from vip_api.files.scanning import ClamAvScanner, DefenderScanner
 from vip_api.files.storage import LocalStorageProvider, StorageProviderError
 from vip_api.files.validation import inspect_signature, sanitize_filename, validate_file_type
+from vip_api.governance.context import AuthorizationContext
 from vip_api.jobs.models import Job
 from vip_api.jobs.registry import JobContextProtocol, registry
 from vip_api.jobs.retry import RetryPolicy, RetryStrategy
 from vip_api.jobs.worker import GenericJobWorker
+
+
+def test_event_subscription_rate_limit_is_tenant_and_session_scoped() -> None:
+    settings = cast(Settings, SimpleNamespace(JOB_QUEUE_PREFIX="vip:jobs"))
+    context = cast(
+        AuthorizationContext,
+        SimpleNamespace(
+            organization_id=uuid4(),
+            workspace_id=uuid4(),
+            user_id=uuid4(),
+        ),
+    )
+    first_session = uuid4()
+    second_session = uuid4()
+
+    first_key = _subscription_rate_key(settings, context, first_session)
+    assert first_key == _subscription_rate_key(settings, context, first_session)
+    assert first_key != _subscription_rate_key(settings, context, second_session)
+    assert str(context.organization_id) in first_key
+    assert str(context.workspace_id) in first_key
+    assert str(context.user_id) in first_key
 
 
 def test_retry_policies_are_bounded_and_deterministic() -> None:

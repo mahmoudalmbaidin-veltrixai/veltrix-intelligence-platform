@@ -36,6 +36,41 @@ def test_widget_contract_rejects_raw_sql_html_and_unknown_configuration() -> Non
         WidgetInput.model_validate({**base, "config": {"custom_css": "body{}"}})
 
 
+def test_api_accepts_every_widget_type_exposed_by_dashboard_studio() -> None:
+    data_types = {
+        "kpi",
+        "metric-comparison",
+        "table",
+        "pivot",
+        "bar",
+        "stacked-bar",
+        "column",
+        "line",
+        "area",
+        "pie",
+        "donut",
+        "scatter",
+        "gauge",
+        "progress",
+        "map",
+    }
+    content_types = {"text", "rich-text", "image", "filter", "date-filter"}
+    for widget_type in data_types | content_types:
+        payload: dict[str, object] = {
+            "type": widget_type,
+            "title": widget_type,
+            "layout": {"x": 0, "y": 0, "w": 4, "h": 3},
+        }
+        if widget_type in data_types:
+            payload.update(
+                {
+                    "semantic_model_id": str(uuid4()),
+                    "query": {"metrics": ["total_revenue"]},
+                }
+            )
+        assert WidgetInput.model_validate(payload).type == widget_type
+
+
 def test_aggregate_requires_unique_pages_and_bounds_widget_count() -> None:
     page = {"key": "overview", "name": "Overview", "position": 0, "widgets": []}
     with pytest.raises(ValidationError):
