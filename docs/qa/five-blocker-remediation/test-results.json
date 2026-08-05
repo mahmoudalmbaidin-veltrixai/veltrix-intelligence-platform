@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "baseline_sha": "f6eac93989bdb6028b8bc4b1af9b159b15cb7424",
+  "retries": 0,
+  "static": {
+    "ruff": "pass",
+    "ruff_format": "pass",
+    "mypy_errors": 0,
+    "frontend_lint": "pass",
+    "frontend_typecheck": "pass",
+    "frontend_format": "pass",
+    "frontend_build": "pass"
+  },
+  "backend_unit": {"passed": 255, "failed": 0},
+  "backend_integration": [
+    {"run": 1, "attempt": 1, "passed": 66, "failed": 0, "seconds": 117.88},
+    {"run": 2, "attempt": 1, "passed": 66, "failed": 0, "seconds": 114.02},
+    {"run": 3, "attempt": 1, "passed": 66, "failed": 0, "seconds": 149.27}
+  ],
+  "frontend_unit": {"files_passed": 49, "passed": 303, "failed": 0},
+  "browser": {
+    "firefox_dashboard_repeat_1": {"passed": 20, "failed": 0, "retries": 0},
+    "firefox_dashboard_repeat_2": {"passed": 20, "failed": 0, "retries": 0},
+    "chromium_full": {"passed": 66, "failed": 0, "retries": 0},
+    "firefox_full": {"passed": 66, "failed": 0, "retries": 0},
+    "webkit_full": {"passed": 66, "failed": 0, "retries": 0},
+    "high_dpi": {"passed": 23, "failed": 0, "retries": 0},
+    "mobile": {"passed": 5, "failed": 0, "retries": 0},
+    "governed_pipeline": {"passed": 10, "failed": 0, "retries": 0}
+  },
+  "api": {
+    "paths": 192,
+    "operations": 247,
+    "classified": 247,
+    "mapped": 247,
+    "executed": 247,
+    "passed": 247,
+    "authenticated_success_observed": 42,
+    "response_schema_validated": 42,
+    "forbidden_observed": 143,
+    "cross_tenant_isolated": 205
+  },
+  "dashboard_lifecycle": {"widgets": 20, "passed": true},
+  "ai_live_fail_closed": true,
+  "dynamic_cookie_canary": true,
+  "artifact_findings": 0,
+  "database_connect_timeout_seconds": 2.0
+}

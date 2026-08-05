@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "baseline_sha": "f6eac93989bdb6028b8bc4b1af9b159b15cb7424",
+  "categories": {
+    "production_code": [
+      "apps/api/src/vip_api/api/operation_coverage.py",
+      "apps/api/src/vip_api/catalog/routes.py",
+      "apps/api/src/vip_api/core/config.py",
+      "apps/api/src/vip_api/dashboard_delivery/rendering.py",
+      "apps/api/src/vip_api/dashboards/schemas.py"
+    ],
+    "automated_tests": [
+      "apps/api/tests/integration/test_dashboard_delivery_scheduler.py",
+      "apps/api/tests/integration/test_production_api_contract_sweep.py",
+      "apps/api/tests/unit/test_artifact_sanitizer.py",
+      "apps/api/tests/unit/test_dashboard_delivery.py",
+      "apps/api/tests/unit/test_operation_coverage.py"
+    ],
+    "ci_and_build": [".github/workflows/quality-gate.yml"],
+    "certification_tools": [
+      "apps/api/scripts/render-dashboard-parity-evidence.py",
+      "apps/api/scripts/sanitize-playwright-artifacts.py"
+    ],
+    "sanitized_certification_evidence": [
+      "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.pdf",
+      "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.png",
+      "docs/qa/final-certification-remediation/evidence/dashboard-parity/evidence.json",
+      "docs/qa/final-certification-remediation/widget-parity-results.json",
+      "docs/qa/five-blocker-remediation/00-remediation-report.md",
+      "docs/qa/five-blocker-remediation/api-operation-coverage.json",
+      "docs/qa/five-blocker-remediation/artifact-secret-scan.json",
+      "docs/qa/five-blocker-remediation/widget-lifecycle-evidence.json",
+      "docs/qa/five-blocker-remediation/test-results.json",
+      "docs/qa/five-blocker-remediation/file-classification.json",
+      "docs/qa/five-blocker-remediation/changed-files.json"
+    ]
+  },
+  "excluded_generated_paths": [
+    "test-results/",
+    "playwright-report/",
+    "tmp/",
+    "dist/"
+  ],
+  "sensitive_material_committed": false,
+  "migration_added": false
+}
