@@ -2,6 +2,7 @@
 import { usePlatformStore } from '@/shared/stores/platform'
 import { useAuthStore } from '@/shared/stores/auth'
 import { useAuthorizationStore } from '@/shared/stores/authorization'
+import { config } from '@/shared/config/env'
 import './meta'
 
 /* Lazy module chunks â€” route-level code splitting. */
@@ -396,6 +397,7 @@ const routes: RouteRecordRaw[] = [
       permission: 'ai.use',
       entitlement: 'ai_studio',
       featureFlag: 'ai_studio',
+      developmentMockOnly: true,
       fullBleed: true,
     },
   },
@@ -408,7 +410,9 @@ const routes: RouteRecordRaw[] = [
       layout: 'app',
       requiresAuth: true,
       permission: 'ai.configure',
+      entitlement: 'ai_studio',
       featureFlag: 'ai_studio',
+      developmentMockOnly: true,
     },
   },
   {
@@ -420,7 +424,9 @@ const routes: RouteRecordRaw[] = [
       layout: 'app',
       requiresAuth: true,
       permission: 'ai.configure',
+      entitlement: 'ai_studio',
       featureFlag: 'ai_studio',
+      developmentMockOnly: true,
     },
   },
   {
@@ -434,6 +440,7 @@ const routes: RouteRecordRaw[] = [
       permission: 'ai.configure',
       entitlement: 'ai_studio',
       featureFlag: 'ai_studio',
+      developmentMockOnly: true,
     },
   },
   {
@@ -447,6 +454,7 @@ const routes: RouteRecordRaw[] = [
       permission: 'ai.configure',
       entitlement: 'ai_studio',
       featureFlag: 'ai_studio',
+      developmentMockOnly: true,
     },
   },
 
@@ -480,19 +488,38 @@ const routes: RouteRecordRaw[] = [
     path: '/automation/runs',
     name: 'automation-runs',
     component: () => import('@/modules/automation/AutomationRunsView.vue'),
-    meta: { title: 'Automation Runs', layout: 'app', requiresAuth: true, permission: 'automation.read' },
+    meta: {
+      title: 'Automation Runs',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'automation.read',
+      entitlement: 'automation',
+    },
   },
   {
     path: '/automation/approvals',
     name: 'approvals',
     component: () => import('@/modules/automation/ApprovalsView.vue'),
-    meta: { title: 'Approvals', layout: 'app', requiresAuth: true, permission: 'automation.read' },
+    meta: {
+      title: 'Approvals',
+      layout: 'app',
+      requiresAuth: true,
+      permission: 'automation.read',
+      entitlement: 'automation',
+    },
   },
   {
     path: '/automation/:id',
     name: 'automation-builder',
     component: () => import('@/modules/automation/AutomationBuilderView.vue'),
-    meta: { title: 'Automation', layout: 'studio', requiresAuth: true, permission: 'automation.read', fullBleed: true },
+    meta: {
+      title: 'Automation',
+      layout: 'studio',
+      requiresAuth: true,
+      permission: 'automation.read',
+      entitlement: 'automation',
+      fullBleed: true,
+    },
   },
 
   // Operations
@@ -730,8 +757,14 @@ router.beforeEach(async (to) => {
   if (to.meta.permission && !authorization.can(to.meta.permission)) {
     return { name: 'forbidden', query: { from: to.fullPath } }
   }
+  if (to.name === 'settings' && to.params.section === 'developer' && !platform.entitled('developer_api')) {
+    return { name: 'upgrade', query: { feature: 'developer_api', from: to.fullPath } }
+  }
   if (to.meta.entitlement && !platform.entitled(to.meta.entitlement)) {
     return { name: 'upgrade', query: { feature: to.meta.entitlement, from: to.fullPath } }
+  }
+  if (to.meta.developmentMockOnly && config.apiMode !== 'mock') {
+    return { name: 'not-found' }
   }
   if (to.meta.featureFlag && !platform.flagEnabled(to.meta.featureFlag)) {
     return { name: 'not-found' }
@@ -742,4 +775,6 @@ router.beforeEach(async (to) => {
 router.afterEach((to) => {
   const base = 'VIP — Veltrix Intelligence Platform'
   document.title = to.meta.title ? `${to.meta.title} · ${base}` : base
+  document.documentElement.dataset.vipRoute = to.fullPath
+  window.dispatchEvent(new CustomEvent('vip:route-settled', { detail: { path: to.fullPath } }))
 })

@@ -9,6 +9,7 @@ tenant-isolated and audited; bulk operations return per-item outcomes.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -38,7 +39,7 @@ class AssignmentView:
     role_name: str
     scope: str
     workspace_id: UUID | None
-    created_at: object
+    created_at: datetime
 
 
 @dataclass(frozen=True, slots=True)

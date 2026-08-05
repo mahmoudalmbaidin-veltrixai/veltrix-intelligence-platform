@@ -6,6 +6,8 @@
 #
 alembic==1.18.5
     # via vip-api (pyproject.toml)
+arabic-reshaper==3.0.1
+    # via vip-api (pyproject.toml)
 annotated-doc==0.0.4
     # via fastapi
 annotated-types==0.7.0
@@ -70,6 +72,8 @@ pydantic==2.13.4
 pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.14.2
+    # via vip-api (pyproject.toml)
+python-bidi==0.6.11
     # via vip-api (pyproject.toml)
 python-dotenv==1.2.2
     # via pydantic-settings

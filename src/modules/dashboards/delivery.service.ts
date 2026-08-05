@@ -5,7 +5,7 @@ import { downloadBlob } from '@/shared/lib/download'
 const API = '/api/v1'
 
 export type ExportFormat = 'pdf' | 'png' | 'json' | 'csv'
-export type DeliveryFormat = 'pdf' | 'png' | 'csv'
+export type DeliveryFormat = ExportFormat
 export type DeliveryCadence = 'one_time' | 'daily' | 'weekly' | 'monthly' | 'cron'
 export type ExportStatus = 'queued' | 'rendering' | 'completed' | 'failed' | 'cancelled' | 'expired'
 

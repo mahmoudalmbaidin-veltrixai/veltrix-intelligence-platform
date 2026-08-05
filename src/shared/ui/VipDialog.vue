@@ -17,6 +17,11 @@ const emit = defineEmits<{ close: [] }>()
 const panel = ref<HTMLElement>()
 let lastFocused: HTMLElement | null = null
 
+function restoreFocus() {
+  if (lastFocused?.isConnected) lastFocused.focus({ preventScroll: true })
+  lastFocused = null
+}
+
 function close() {
   if (props.closable) emit('close')
 }
@@ -55,7 +60,6 @@ watch(
     } else {
       document.body.style.overflow = ''
       document.removeEventListener('keydown', onDocumentKeydown)
-      lastFocused?.focus()
     }
   },
 )
@@ -67,7 +71,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <Transition name="vip-dialog">
+    <Transition name="vip-dialog" @after-leave="restoreFocus">
       <div v-if="open" class="vip-dialog__scrim" @click.self="close" @keydown="onKeydown">
         <div
           ref="panel"

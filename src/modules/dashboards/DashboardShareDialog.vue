@@ -410,6 +410,7 @@ async function cancelDelivery(item: ScheduledDelivery) {
               { value: 'pdf', label: 'PDF' },
               { value: 'png', label: 'PNG image' },
               { value: 'csv', label: 'CSV data' },
+              { value: 'json', label: 'JSON definition + data' },
             ]"
           />
           <VipSelect

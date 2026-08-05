@@ -203,7 +203,9 @@ async def _dispatch_slot(
                 db,
                 context,
                 slot.dashboard_id,
-                ExportCreate(format=slot.format, filters=slot.filters, timezone=slot.timezone),
+                ExportCreate.model_validate(
+                    {"format": slot.format, "filters": slot.filters, "timezone": slot.timezone}
+                ),
                 settings,
                 delivery_run_id=slot.run_id,
                 queue=queue,

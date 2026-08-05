@@ -17,7 +17,6 @@ from vip_api.core.errors import ApplicationError
 from vip_api.governance import resource_access_service
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
-from vip_api.governance.models import ResourceAccessEntry
 from vip_api.governance.services import consume_quota
 from vip_api.pipelines.models import (
     Pipeline,
@@ -233,33 +232,16 @@ async def list_pipelines(
     # Otherwise the collection is filtered to resources reachable through
     # ownership or a non-expired ACL allow (direct or group), minus viewer-level
     # denies — matching the centralized evaluator's visibility semantics.
+    subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
+        db, org, context.user_id
+    )
+    allowed_ids, denied_ids = resource_access_service.collection_visibility_subqueries(
+        "pipeline", subjects, now=datetime.now(UTC)
+    )
+    query = query.where(Pipeline.id.notin_(denied_ids))
     if resource_access_service.role_level("pipeline", context.permissions) is None:
-        subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
-            db, org, context.user_id
-        )
-        now = datetime.now(UTC)
-        allowed_ids = select(ResourceAccessEntry.resource_id).where(
-            ResourceAccessEntry.resource_type == "pipeline",
-            ResourceAccessEntry.subject_id.in_(subjects),
-            ResourceAccessEntry.effect == "allow",
-            or_(
-                ResourceAccessEntry.expires_at.is_(None),
-                ResourceAccessEntry.expires_at > now,
-            ),
-        )
-        denied_ids = select(ResourceAccessEntry.resource_id).where(
-            ResourceAccessEntry.resource_type == "pipeline",
-            ResourceAccessEntry.subject_id.in_(subjects),
-            ResourceAccessEntry.effect == "deny",
-            ResourceAccessEntry.access_level == "viewer",
-            or_(
-                ResourceAccessEntry.expires_at.is_(None),
-                ResourceAccessEntry.expires_at > now,
-            ),
-        )
         query = query.where(
             or_(Pipeline.owner_user_id == context.user_id, Pipeline.id.in_(allowed_ids)),
-            Pipeline.id.notin_(denied_ids),
         )
     rows = (await db.scalars(query.order_by(Pipeline.updated_at.desc()).limit(limit))).all()
     return ListPage(items=[await _summary(db, item) for item in rows])

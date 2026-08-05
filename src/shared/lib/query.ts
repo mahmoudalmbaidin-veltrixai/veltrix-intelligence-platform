@@ -14,8 +14,18 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>()
 const listeners = new Map<string, Set<() => void>>()
+let activeRequests = 0
 
 const DEFAULT_STALE = 15_000
+
+function publishQueryActivity(): void {
+  if (typeof window === 'undefined') return
+  const target = window as typeof window & { __vipQueryActivity?: { active: number } }
+  target.__vipQueryActivity = { active: activeRequests }
+  window.dispatchEvent(new CustomEvent('vip:query-activity', { detail: target.__vipQueryActivity }))
+}
+
+publishQueryActivity()
 
 function notify(prefix: string) {
   for (const [key, set] of listeners) {
@@ -108,6 +118,8 @@ export function useQuery<T>(
     }
 
     const promise = attempt(0)
+    activeRequests += 1
+    publishQueryActivity()
     cache.set(key, { data: cached?.data, ts: cached?.ts ?? 0, inflight: promise })
 
     try {
@@ -124,6 +136,8 @@ export function useQuery<T>(
       if (c) c.inflight = undefined
       if (currentKey === key) error.value = e as ApiError
     } finally {
+      activeRequests = Math.max(0, activeRequests - 1)
+      publishQueryActivity()
       if (currentKey === key) {
         isFetching.value = false
         isLoading.value = false

@@ -7,6 +7,7 @@ import CartesianChart from './CartesianChart.vue'
 import PieChart from './PieChart.vue'
 import GaugeChart from './GaugeChart.vue'
 import ScatterChart from './ScatterChart.vue'
+import MapChart from './MapChart.vue'
 import Sparkline from './Sparkline.vue'
 import { formatNumber, formatPct } from '@/shared/lib/format'
 import type { NumberFormat } from '@/shared/types/semantic'
@@ -193,11 +194,7 @@ void onBarClick
       <!-- scatter -->
       <ScatterChart v-else-if="widget.type === 'scatter'" :points="scatterPoints" :scheme="widget.format.colorScheme" />
 
-      <!-- map foundation -->
-      <div v-else-if="widget.type === 'map'" class="viz__map">
-        <VipIcon name="target" :size="26" />
-        <span>Map visual — geospatial rendering is a backend/tiles dependency.</span>
-      </div>
+      <MapChart v-else-if="widget.type === 'map'" :points="scatterPoints" />
 
       <!-- cartesian: bar/column/line/area/stacked -->
       <CartesianChart

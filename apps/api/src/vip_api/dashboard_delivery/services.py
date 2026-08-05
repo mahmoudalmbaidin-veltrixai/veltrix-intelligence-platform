@@ -634,10 +634,12 @@ async def test_delivery(
         db,
         context,
         schedule.dashboard_id,
-        ExportCreate(
-            format=cast(ExportFormat, schedule.format),
-            filters=schedule.filters,
-            timezone=schedule.timezone,
+        ExportCreate.model_validate(
+            {
+                "format": cast(ExportFormat, schedule.format),
+                "filters": schedule.filters,
+                "timezone": schedule.timezone,
+            }
         ),
         settings,
         delivery_run_id=run.id,

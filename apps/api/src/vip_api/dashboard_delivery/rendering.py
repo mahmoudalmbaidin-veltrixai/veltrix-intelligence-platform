@@ -14,10 +14,14 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 from uuid import UUID
 
-from PIL import Image, ImageDraw, ImageFont
+import arabic_reshaper  # type: ignore[import-untyped]
+from bidi.algorithm import get_display  # type: ignore[import-untyped]
+from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 from reportlab.lib.colors import HexColor  # type: ignore[import-untyped]
 from reportlab.lib.pagesizes import A4, landscape, portrait  # type: ignore[import-untyped]
+from reportlab.pdfbase import pdfmetrics  # type: ignore[import-untyped]
 from reportlab.pdfbase.pdfmetrics import stringWidth  # type: ignore[import-untyped]
+from reportlab.pdfbase.ttfonts import TTFont  # type: ignore[import-untyped]
 from reportlab.pdfgen.canvas import Canvas  # type: ignore[import-untyped]
 
 from vip_api.core.errors import ApplicationError
@@ -31,11 +35,74 @@ SURFACE = "#F5F7FB"
 BORDER = "#DCE3EE"
 WHITE = "#FFFFFF"
 PALETTE = (BRAND, ACCENT, "#7C3AED", "#F59E0B", "#EF4444", "#0891B2")
+COLOR_SCHEMES: dict[str, tuple[str, ...]] = {
+    "default": PALETTE,
+    "ocean": ("#0369A1", "#0EA5E9", "#06B6D4", "#14B8A6", "#22C55E"),
+    "sunset": ("#7C2D12", "#EA580C", "#F59E0B", "#FACC15", "#EF4444"),
+    "monochrome": ("#172033", "#334155", "#64748B", "#94A3B8", "#CBD5E1"),
+}
+ARABIC_RANGES = ((0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF))
+
+
+def _font_path(*, bold: bool = False) -> Path | None:
+    filename = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
+    candidates = (
+        Path("/usr/share/fonts/TTF") / filename,
+        Path("/usr/share/fonts/truetype/dejavu") / filename,
+        Path("/usr/local/share/fonts") / filename,
+        Path("C:/Windows/Fonts") / ("arialbd.ttf" if bold else "arial.ttf"),
+        Path(filename),
+    )
+    return next((candidate for candidate in candidates if candidate.is_file()), None)
+
+
+def _display_text(value: object) -> str:
+    """Shape bidirectional Arabic for renderers without a native layout engine."""
+    text = str(value)
+    has_arabic = any(
+        start <= ord(character) <= end for character in text for start, end in ARABIC_RANGES
+    )
+    if not has_arabic:
+        return text
+    return str(get_display(arabic_reshaper.reshape(text)))
+
+
+def _wrap_text(value: object, max_width: float, measure: Any) -> list[str]:
+    """Wrap logical text before bidi shaping, preserving complete words."""
+    logical_lines = str(value).replace("\r", "").split("\n")
+    lines: list[str] = []
+    for logical_line in logical_lines:
+        words = logical_line.split(" ")
+        current = ""
+        for word in words:
+            candidate = word if not current else f"{current} {word}"
+            if not current or measure(_display_text(candidate)) <= max_width:
+                current = candidate
+                continue
+            lines.append(_display_text(current))
+            current = word
+        lines.append(_display_text(current))
+    return lines or [""]
+
+
+def _register_pdf_fonts() -> tuple[str, str]:
+    regular = _font_path()
+    bold = _font_path(bold=True)
+    if regular is None or bold is None:
+        return "Helvetica", "Helvetica-Bold"
+    if "VIPSans" not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(TTFont("VIPSans", str(regular)))
+        pdfmetrics.registerFont(TTFont("VIPSans-Bold", str(bold)))
+    return "VIPSans", "VIPSans-Bold"
+
+
+PDF_FONT, PDF_FONT_BOLD = _register_pdf_fonts()
 
 
 @dataclass(frozen=True, slots=True)
 class RenderDocument:
     dashboard_id: UUID
+    dashboard_version_id: UUID
     dashboard_version: int
     organization_id: UUID
     workspace_id: UUID
@@ -64,6 +131,7 @@ class DashboardRenderer(Protocol):
 def _metadata(document: RenderDocument) -> dict[str, object]:
     return {
         "dashboard_id": str(document.dashboard_id),
+        "dashboard_version_id": str(document.dashboard_version_id),
         "dashboard_version": document.dashboard_version,
         "tenant_id": str(document.organization_id),
         "generated_at": document.generated_at.isoformat(),
@@ -84,6 +152,89 @@ def _visible_widgets(document: RenderDocument) -> list[dict[str, object]]:
         for widget in cast(list[dict[str, object]], page.get("widgets", []))
         if not widget.get("hidden", False)
     ]
+
+
+def _layout(widget: dict[str, object]) -> dict[str, int]:
+    value = cast(dict[str, object], widget.get("layout", {}))
+    return {
+        "x": int(cast(Any, value.get("x", 0))),
+        "y": int(cast(Any, value.get("y", 0))),
+        "w": int(cast(Any, value.get("w", 12))),
+        "h": int(cast(Any, value.get("h", 4))),
+    }
+
+
+def _config(widget: dict[str, object]) -> dict[str, object]:
+    return cast(dict[str, object], widget.get("config", {}))
+
+
+def _palette(widget: dict[str, object]) -> tuple[str, ...]:
+    return COLOR_SCHEMES.get(str(_config(widget).get("color_scheme", "default")), PALETTE)
+
+
+def _formatted_value(value: object, widget: dict[str, object]) -> str:
+    number = _numeric(value)
+    if number is None:
+        return _text(value)
+    config = _config(widget)
+    decimals = max(0, min(8, int(cast(Any, config.get("decimals", 0)))))
+    style = str(config.get("number_style", "plain"))
+    if style == "percent":
+        return f"{number * 100:,.{decimals}f}%"
+    if style == "currency":
+        currency = str(config.get("currency") or "USD")
+        return f"{currency} {number:,.{decimals}f}"
+    if style == "compact":
+        for divisor, suffix in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
+            if abs(number) >= divisor:
+                return f"{number / divisor:,.{decimals}f}{suffix}"
+    return f"{number:,.{decimals}f}"
+
+
+def _conditional_color(value: object, widget: dict[str, object], fallback: str) -> str:
+    number = _numeric(value)
+    if number is None:
+        return fallback
+    rules = cast(list[dict[str, object]], _config(widget).get("conditional", []))
+    for rule in rules:
+        threshold = _numeric(rule.get("value"))
+        upper = _numeric(rule.get("value2"))
+        when = str(rule.get("when", ""))
+        matched = (
+            (when == "gt" and threshold is not None and number > threshold)
+            or (when == "lt" and threshold is not None and number < threshold)
+            or (when == "eq" and threshold is not None and number == threshold)
+            or (
+                when == "between"
+                and threshold is not None
+                and upper is not None
+                and threshold <= number <= upper
+            )
+        )
+        if matched:
+            color = str(rule.get("color", ""))
+            if color.startswith("#") and len(color) in {4, 7}:
+                return color
+    return fallback
+
+
+def _parity_manifest(document: RenderDocument) -> dict[str, object]:
+    """Lossless immutable definition shared by viewer, exports, and delivery.
+
+    The snapshot is copied instead of rebuilt from a selected field list. This is
+    deliberate: newly introduced definition metadata must survive every export
+    without waiting for each renderer to learn about the new field.
+    """
+    manifest = dict(document.snapshot)
+    manifest.setdefault("schema_version", 1)
+    manifest.setdefault("dashboard", {"name": document.dashboard_name})
+    manifest.setdefault("pages", [])
+    manifest.setdefault("filters", [])
+    manifest["dashboard_id"] = str(document.dashboard_id)
+    manifest["dashboard_version_id"] = str(document.dashboard_version_id)
+    manifest["dashboard_version"] = document.dashboard_version
+    manifest["applied_filters"] = document.filters
+    return manifest
 
 
 def _safe_results(document: RenderDocument) -> dict[str, object]:
@@ -158,15 +309,8 @@ class JsonDashboardRenderer:
         safe_results = _safe_results(document)
         payload = {
             "metadata": _metadata(document),
-            "dashboard": {"name": document.dashboard_name},
-            "widgets": [
-                {
-                    "title": widget.get("title", "Widget"),
-                    "type": widget.get("type"),
-                    "data": safe_results.get(str(widget.get("id")), {}),
-                }
-                for widget in _visible_widgets(document)
-            ],
+            "definition": _parity_manifest(document),
+            "widget_data": safe_results,
         }
         return RenderedArtifact(
             json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode(),
@@ -176,31 +320,31 @@ class JsonDashboardRenderer:
 
 
 class CsvDashboardRenderer:
-    """Merged, Excel-compatible UTF-8 CSV with one ordered section per table."""
+    """Lossless UTF-8 CSV package with canonical JSON and per-widget data.
+
+    CSV cannot visually represent dashboard layout or non-tabular widgets. The
+    canonical JSON record therefore provides a deterministic, round-trippable
+    representation while subsequent sections remain convenient in spreadsheets.
+    """
 
     format = "csv"
 
     def render(self, document: RenderDocument) -> RenderedArtifact:
-        widgets = [
-            item
-            for item in _visible_widgets(document)
-            if item.get("type") in {"table", "pivot"} and _result(document, item)[1]
-        ]
-        if not widgets:
-            widgets = [item for item in _visible_widgets(document) if _result(document, item)[1]]
-        if not widgets:
-            raise ApplicationError(
-                code="DASHBOARD_CSV_NO_DATA",
-                message="The dashboard does not contain exportable tabular data.",
-                status_code=422,
-            )
-
         binary = io.BytesIO()
         binary.write(b"\xef\xbb\xbf")
         output = io.TextIOWrapper(binary, encoding="utf-8", newline="", write_through=True)
         writer = csv.writer(output, lineterminator="\r\n")
-        writer.writerow(["VIP Dashboard Export"])
+        manifest = _parity_manifest(document)
+        writer.writerow(["VIP Dashboard Export", "2"])
+        writer.writerow(
+            [
+                "Canonical Definition",
+                json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+            ]
+        )
         writer.writerow(["Dashboard", document.dashboard_name])
+        writer.writerow(["Dashboard ID", str(document.dashboard_id)])
+        writer.writerow(["Dashboard Version ID", str(document.dashboard_version_id)])
         writer.writerow(["Version", document.dashboard_version])
         writer.writerow(
             [
@@ -215,8 +359,14 @@ class CsvDashboardRenderer:
         writer.writerow(["Filters", _filter_summary(document.filters)])
         writer.writerow([])
 
-        for index, widget in enumerate(widgets):
+        widgets = [
+            (page, widget)
+            for page in _pages(document)
+            for widget in cast(list[dict[str, object]], page.get("widgets", []))
+        ]
+        for index, (page, widget) in enumerate(widgets):
             columns, rows = _result(document, widget)
+            layout = _layout(widget)
             keys = [_column_key(column) for column in columns if _column_key(column)]
             if not keys:
                 keys = list(rows[0]) if rows else []
@@ -225,10 +375,57 @@ class CsvDashboardRenderer:
                 for column in columns
                 if _column_key(column)
             }
-            writer.writerow([f"Table {index + 1}", _text(widget.get("title", "Table"), 200)])
-            writer.writerow([labels.get(key, key.replace("_", " ").title()) for key in keys])
-            for row in rows:
-                writer.writerow([row.get(key) for key in keys])
+            writer.writerow([f"Widget {index + 1}", _text(widget.get("title", "Widget"), 200)])
+            writer.writerow(
+                [
+                    "Page Definition",
+                    json.dumps(
+                        {key: value for key, value in page.items() if key != "widgets"},
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                ]
+            )
+            writer.writerow(
+                [
+                    "Widget Definition",
+                    json.dumps(
+                        widget,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                ]
+            )
+            writer.writerow(
+                [
+                    "Widget Result",
+                    json.dumps(
+                        _safe_results(document).get(str(widget.get("id", "")), {}),
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                ]
+            )
+            writer.writerow(
+                ["Widget ID", str(widget.get("id", "")), "Type", str(widget.get("type", ""))]
+            )
+            writer.writerow(
+                [
+                    "Grid Layout",
+                    f"x={layout['x']}",
+                    f"y={layout['y']}",
+                    f"w={layout['w']}",
+                    f"h={layout['h']}",
+                ]
+            )
+            if keys:
+                writer.writerow(["Data"])
+                writer.writerow([labels.get(key, key.replace("_", " ").title()) for key in keys])
+                for row in rows:
+                    writer.writerow([row.get(key) for key in keys])
             if index + 1 < len(widgets):
                 writer.writerow([])
                 writer.writerow([])
@@ -254,6 +451,9 @@ class PdfDashboardRenderer:
         canvas.setTitle(document.dashboard_name)
         canvas.setAuthor("Veltrix Intelligence Platform")
         canvas.setSubject("Executive dashboard export")
+        canvas.setKeywords(
+            json.dumps(_parity_manifest(document), ensure_ascii=False, separators=(",", ":"))
+        )
         page_number = 0
 
         def start_page(title: str) -> float:
@@ -262,25 +462,29 @@ class PdfDashboardRenderer:
             canvas.setFillColor(HexColor(BRAND_DARK))
             canvas.rect(0, height - 70, width, 70, stroke=0, fill=1)
             canvas.setFillColor(HexColor(WHITE))
-            canvas.setFont("Helvetica-Bold", 18)
-            canvas.drawString(34, height - 32, document.dashboard_name[:85])
-            canvas.setFont("Helvetica", 8)
-            canvas.drawString(34, height - 49, title[:95])
+            canvas.setFont(PDF_FONT_BOLD, 18)
+            canvas.drawString(34, height - 32, _display_text(document.dashboard_name[:85]))
+            canvas.setFont(PDF_FONT, 8)
+            canvas.drawString(34, height - 49, _display_text(title[:95]))
             canvas.drawRightString(
                 width - 34,
                 height - 49,
-                f"Generated {document.generated_at:%d %b %Y %H:%M} · {document.timezone}",
+                _display_text(
+                    f"Generated {document.generated_at:%d %b %Y %H:%M} · {document.timezone}"
+                ),
             )
             canvas.setFillColor(HexColor(MUTED))
-            canvas.setFont("Helvetica", 7.5)
-            canvas.drawString(34, height - 84, _filter_summary(document.filters)[:160])
+            canvas.setFont(PDF_FONT, 7.5)
+            canvas.drawString(
+                34, height - 84, _display_text(_filter_summary(document.filters)[:160])
+            )
             return float(height - 102)
 
         def finish_page() -> None:
             canvas.setStrokeColor(HexColor(BORDER))
             canvas.line(34, 28, width - 34, 28)
             canvas.setFillColor(HexColor(MUTED))
-            canvas.setFont("Helvetica", 7.5)
+            canvas.setFont(PDF_FONT, 7.5)
             canvas.drawString(34, 16, "Veltrix Intelligence Platform · Confidential")
             canvas.drawRightString(
                 width - 34,
@@ -296,30 +500,41 @@ class PdfDashboardRenderer:
                 if not item.get("hidden", False)
             ]
             page_title = str(dashboard_page.get("name") or "Dashboard")
-            y = start_page(page_title)
+            start_page(page_title)
+            left, right, bottom, top = 34.0, width - 34.0, 42.0, height - 102.0
+            max_row = max(
+                (_layout(widget)["y"] + _layout(widget)["h"] for widget in widgets),
+                default=8,
+            )
+            max_row = max(8, max_row)
+            gap_x = 5.0
+            gap_y = min(5.0, (top - bottom) / max_row * 0.08)
+            cell_w = (right - left - gap_x * 11) / 12
+            cell_h = (top - bottom - gap_y * (max_row - 1)) / max_row
             for widget in widgets:
                 columns, rows = _result(document, widget)
-                widget_type = str(widget.get("type") or "table")
-                required = 230 if widget_type in {"table", "pivot"} else 155
-                if y - required < 42:
-                    finish_page()
-                    canvas.showPage()
-                    y = start_page(f"{page_title} · continued")
-                card_height = min(required, y - 42)
+                layout = _layout(widget)
+                card_x = left + layout["x"] * (cell_w + gap_x)
+                card_y = (
+                    top
+                    - (layout["y"] + layout["h"]) * cell_h
+                    - (layout["y"] + layout["h"] - 1) * gap_y
+                )
+                card_width = layout["w"] * cell_w + (layout["w"] - 1) * gap_x
+                card_height = layout["h"] * cell_h + (layout["h"] - 1) * gap_y
                 self._card(
                     canvas,
                     widget,
                     columns,
                     rows,
-                    34,
-                    y - card_height,
-                    width - 68,
+                    card_x,
+                    card_y,
+                    card_width,
                     card_height,
                 )
-                y -= card_height + 12
             if not widgets:
                 canvas.setFillColor(HexColor(MUTED))
-                canvas.setFont("Helvetica", 11)
+                canvas.setFont(PDF_FONT, 11)
                 canvas.drawCentredString(width / 2, height / 2, "No visible widgets")
             finish_page()
             canvas.showPage()
@@ -337,25 +552,175 @@ class PdfDashboardRenderer:
         width: float,
         height: float,
     ) -> None:
-        canvas.setFillColor(HexColor(WHITE))
+        config = _config(widget)
+        background = str(config.get("background") or WHITE)
+        canvas.setFillColor(HexColor(background))
         canvas.setStrokeColor(HexColor(BORDER))
-        canvas.roundRect(x, y, width, height, 7, stroke=1, fill=1)
+        canvas.roundRect(
+            x,
+            y,
+            width,
+            height,
+            7,
+            stroke=1 if bool(config.get("border", True)) else 0,
+            fill=1,
+        )
         canvas.setFillColor(HexColor(INK))
-        canvas.setFont("Helvetica-Bold", 11)
-        canvas.drawString(x + 15, y + height - 21, _text(widget.get("title", "Widget"), 80))
+        canvas.setFont(PDF_FONT_BOLD, 11)
+        canvas.drawString(
+            x + 15,
+            y + height - 21,
+            _display_text(_text(widget.get("title", "Widget"), 80)),
+        )
+        canvas.setFillColor(HexColor(MUTED))
+        canvas.setFont(PDF_FONT, 6.5)
+        canvas.drawRightString(x + width - 12, y + height - 20, str(widget.get("type", "widget")))
         inner_y = y + 14
-        inner_h = height - 48
+        inner_h = max(1.0, height - 48)
         widget_type = str(widget.get("type") or "table")
-        if widget_type in {"kpi", "gauge"}:
-            self._kpi(canvas, columns, rows, x + 15, inner_y, width - 30, inner_h)
+        if widget_type == "kpi":
+            self._kpi(canvas, widget, columns, rows, x + 15, inner_y, width - 30, inner_h)
+        elif widget_type == "metric-comparison":
+            self._metric_comparison(
+                canvas, widget, columns, rows, x + 15, inner_y, width - 30, inner_h
+            )
+        elif widget_type == "gauge":
+            self._gauge(canvas, widget, columns, rows, x + 15, inner_y, width - 30, inner_h)
+        elif widget_type == "progress":
+            self._progress(canvas, widget, columns, rows, x + 15, inner_y, width - 30, inner_h)
         elif widget_type in {"table", "pivot"}:
-            self._table(canvas, columns, rows, x + 15, inner_y, width - 30, inner_h)
+            self._table(canvas, widget, columns, rows, x + 15, inner_y, width - 30, inner_h)
+        elif widget_type in {"text", "rich-text", "image", "filter", "date-filter"}:
+            self._content(canvas, widget, x + 15, inner_y, width - 30, inner_h)
+        elif widget_type in {"pie", "donut"}:
+            self._pie(
+                canvas, widget, widget_type, columns, rows, x + 15, inner_y, width - 30, inner_h
+            )
+        elif widget_type == "map":
+            self._map(canvas, columns, rows, x + 15, inner_y, width - 30, inner_h)
         else:
-            self._chart(canvas, widget_type, columns, rows, x + 15, inner_y, width - 30, inner_h)
+            self._chart(
+                canvas, widget, widget_type, columns, rows, x + 15, inner_y, width - 30, inner_h
+            )
+
+    @staticmethod
+    def _content(
+        canvas: Canvas,
+        widget: dict[str, object],
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+    ) -> None:
+        content = _text(widget.get("content") or widget.get("description") or "", 500)
+        canvas.setFillColor(HexColor(INK))
+        canvas.setFont(PDF_FONT, 8)
+        lines = _wrap_text(
+            content,
+            width,
+            lambda line: stringWidth(line, PDF_FONT, 8),
+        )
+        for index, line in enumerate(lines[: max(1, int(height / 11))]):
+            canvas.drawString(x, y + height - 10 - index * 11, line)
+
+    @staticmethod
+    def _pie(
+        canvas: Canvas,
+        widget: dict[str, object],
+        widget_type: str,
+        columns: list[dict[str, object]],
+        rows: list[dict[str, object]],
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+    ) -> None:
+        numeric_key = next(
+            (
+                _column_key(column)
+                for column in columns
+                if any(_numeric(row.get(_column_key(column))) is not None for row in rows)
+            ),
+            "",
+        )
+        values = [max(0.0, _numeric(row.get(numeric_key)) or 0.0) for row in rows[:12]]
+        total = sum(values)
+        if not numeric_key or total <= 0:
+            canvas.setFillColor(HexColor(MUTED))
+            canvas.drawString(x, y + height / 2, "No chart data")
+            return
+        show_legend = bool(_config(widget).get("show_legend", True))
+        legend_width = min(width * 0.32, 110) if show_legend else 0
+        size = max(4.0, min(width - legend_width, height) - 8)
+        left, bottom = x + (width - size) / 2, y + (height - size) / 2
+        start = 90.0
+        colors = _palette(widget)
+        for index, value in enumerate(values):
+            extent = 360.0 * value / total
+            canvas.setFillColor(HexColor(colors[index % len(colors)]))
+            canvas.wedge(left, bottom, left + size, bottom + size, start, extent, stroke=0, fill=1)
+            start += extent
+        if widget_type == "donut":
+            inset = size * 0.28
+            canvas.setFillColor(HexColor(WHITE))
+            canvas.circle(left + size / 2, bottom + size / 2, inset, stroke=0, fill=1)
+        if show_legend:
+            category_key = next(
+                (_column_key(item) for item in columns if _column_key(item) != numeric_key), ""
+            )
+            canvas.setFont(PDF_FONT, 6.5)
+            for index, row in enumerate(rows[: min(8, len(values))]):
+                legend_y = y + height - 10 - index * 11
+                canvas.setFillColor(HexColor(colors[index % len(colors)]))
+                canvas.rect(x + width - legend_width + 2, legend_y - 2, 6, 6, stroke=0, fill=1)
+                canvas.setFillColor(HexColor(INK))
+                canvas.drawString(
+                    x + width - legend_width + 11,
+                    legend_y - 2,
+                    _display_text(_text(row.get(category_key), 22)),
+                )
+
+    @staticmethod
+    def _map(
+        canvas: Canvas,
+        columns: list[dict[str, object]],
+        rows: list[dict[str, object]],
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+    ) -> None:
+        numeric_keys = [
+            _column_key(column)
+            for column in columns
+            if any(_numeric(row.get(_column_key(column))) is not None for row in rows)
+        ]
+        if len(numeric_keys) < 2:
+            canvas.setFillColor(HexColor(MUTED))
+            canvas.drawString(x, y + height / 2, "Map requires longitude and latitude values")
+            return
+        longitude_key, latitude_key = numeric_keys[:2]
+        canvas.setFillColor(HexColor("#EFF6FF"))
+        canvas.setStrokeColor(HexColor(BORDER))
+        canvas.roundRect(x, y, width, height, 5, stroke=1, fill=1)
+        canvas.setStrokeColor(HexColor("#CBD5E1"))
+        canvas.setDash(2, 3)
+        for fraction in (0.25, 0.5, 0.75):
+            canvas.line(x + width * fraction, y, x + width * fraction, y + height)
+            canvas.line(x, y + height * fraction, x + width, y + height * fraction)
+        canvas.setDash()
+        canvas.setFillColor(HexColor(BRAND))
+        for row in rows[:100]:
+            longitude = max(-180.0, min(180.0, _numeric(row.get(longitude_key)) or 0.0))
+            latitude = max(-90.0, min(90.0, _numeric(row.get(latitude_key)) or 0.0))
+            px = x + (longitude + 180.0) / 360.0 * width
+            py = y + (latitude + 90.0) / 180.0 * height
+            canvas.circle(px, py, 4, stroke=0, fill=1)
 
     @staticmethod
     def _kpi(
         canvas: Canvas,
+        widget: dict[str, object],
         columns: list[dict[str, object]],
         rows: list[dict[str, object]],
         x: float,
@@ -372,17 +737,120 @@ class PdfDashboardRenderer:
             "",
         )
         value = rows[0].get(key) if rows and key else None
-        canvas.setFillColor(HexColor(BRAND))
-        canvas.setFont("Helvetica-Bold", 28)
-        canvas.drawString(x, y + height / 2 - 4, _text(value))
+        canvas.setFillColor(HexColor(_conditional_color(value, widget, BRAND)))
+        canvas.setFont(PDF_FONT_BOLD, 28)
+        canvas.drawString(x, y + height / 2 - 4, _display_text(_formatted_value(value, widget)))
         canvas.setFillColor(HexColor(MUTED))
-        canvas.setFont("Helvetica", 9)
+        canvas.setFont(PDF_FONT, 9)
         label = next((_column_label(item) for item in columns if _column_key(item) == key), key)
-        canvas.drawString(x, y + height / 2 - 21, label)
+        canvas.drawString(x, y + height / 2 - 21, _display_text(label))
+
+    @staticmethod
+    def _metric_comparison(
+        canvas: Canvas,
+        widget: dict[str, object],
+        columns: list[dict[str, object]],
+        rows: list[dict[str, object]],
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+    ) -> None:
+        numeric_keys = [
+            _column_key(column)
+            for column in columns
+            if rows and _numeric(rows[0].get(_column_key(column))) is not None
+        ]
+        actual = _numeric(rows[0].get(numeric_keys[-1])) if rows and numeric_keys else None
+        target = _numeric(rows[1].get(numeric_keys[-1])) if len(rows) > 1 and numeric_keys else None
+        delta = ((actual - target) / target * 100) if actual is not None and target else 0.0
+        center_y = y + height / 2
+        canvas.setFont(PDF_FONT_BOLD, 21)
+        canvas.setFillColor(HexColor(_conditional_color(actual, widget, BRAND)))
+        canvas.drawString(x, center_y, _display_text(_formatted_value(actual, widget)))
+        canvas.setFillColor(HexColor(ACCENT if delta >= 0 else "#DC2626"))
+        canvas.setFont(PDF_FONT_BOLD, 12)
+        canvas.drawCentredString(x + width / 2, center_y + 4, f"{delta:+.1f}%")
+        canvas.setFillColor(HexColor(MUTED))
+        canvas.setFont(PDF_FONT_BOLD, 21)
+        canvas.drawRightString(x + width, center_y, _display_text(_formatted_value(target, widget)))
+        canvas.setFont(PDF_FONT, 8)
+        canvas.drawString(x, center_y - 17, "Actual")
+        canvas.drawRightString(x + width, center_y - 17, "Target")
+
+    @staticmethod
+    def _gauge(
+        canvas: Canvas,
+        widget: dict[str, object],
+        columns: list[dict[str, object]],
+        rows: list[dict[str, object]],
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+    ) -> None:
+        key = next(
+            (
+                _column_key(column)
+                for column in reversed(columns)
+                if rows and _numeric(rows[0].get(_column_key(column))) is not None
+            ),
+            "",
+        )
+        value = (_numeric(rows[0].get(key)) or 0.0) % 100 if rows and key else 0.0
+        radius = min(width * 0.28, height * 0.72)
+        cx, cy = x + width / 2, y + height * 0.34
+        canvas.setLineWidth(12)
+        canvas.setStrokeColor(HexColor(BORDER))
+        canvas.arc(cx - radius, cy - radius, cx + radius, cy + radius, 0, 180)
+        canvas.setStrokeColor(HexColor(_conditional_color(value, widget, BRAND)))
+        canvas.arc(cx - radius, cy - radius, cx + radius, cy + radius, 0, 180 * value / 100)
+        canvas.setFillColor(HexColor(INK))
+        canvas.setFont(PDF_FONT_BOLD, 19)
+        canvas.drawCentredString(cx, cy - 3, f"{value:.0f}%")
+        canvas.setFillColor(HexColor(MUTED))
+        canvas.setFont(PDF_FONT, 8)
+        canvas.drawCentredString(
+            cx,
+            cy - 18,
+            _display_text(
+                _column_label(next((c for c in columns if _column_key(c) == key), {"key": key}))
+            ),
+        )
+
+    @staticmethod
+    def _progress(
+        canvas: Canvas,
+        widget: dict[str, object],
+        columns: list[dict[str, object]],
+        rows: list[dict[str, object]],
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+    ) -> None:
+        key = next(
+            (
+                _column_key(column)
+                for column in reversed(columns)
+                if rows and _numeric(rows[0].get(_column_key(column))) is not None
+            ),
+            "",
+        )
+        value = (_numeric(rows[0].get(key)) or 0.0) % 100 if rows and key else 0.0
+        bar_y = y + height / 2
+        canvas.setFillColor(HexColor(BORDER))
+        canvas.roundRect(x, bar_y, width, 14, 7, stroke=0, fill=1)
+        canvas.setFillColor(HexColor(_conditional_color(value, widget, BRAND)))
+        canvas.roundRect(x, bar_y, width * value / 100, 14, 7, stroke=0, fill=1)
+        canvas.setFillColor(HexColor(INK))
+        canvas.setFont(PDF_FONT_BOLD, 15)
+        canvas.drawRightString(x + width, bar_y + 23, f"{value:.0f}%")
 
     @staticmethod
     def _table(
         canvas: Canvas,
+        widget: dict[str, object],
         columns: list[dict[str, object]],
         rows: list[dict[str, object]],
         x: float,
@@ -403,25 +871,27 @@ class PdfDashboardRenderer:
         canvas.setFillColor(HexColor(BRAND_DARK))
         canvas.rect(x, y + height - row_height, width, row_height, stroke=0, fill=1)
         canvas.setFillColor(HexColor(WHITE))
-        canvas.setFont("Helvetica-Bold", 7)
+        canvas.setFont(PDF_FONT_BOLD, 7)
         labels = {_column_key(column): _column_label(column) for column in columns}
         for index, key in enumerate(keys):
             canvas.drawString(
                 x + index * col_width + 4,
                 y + height - 12,
-                _text(labels.get(key, key), 20),
+                _display_text(_text(labels.get(key, key), 20)),
             )
-        canvas.setFont("Helvetica", 7)
+        canvas.setFont(PDF_FONT, 7)
         for row_index, row in enumerate(rows[:visible]):
             bottom = y + height - row_height * (row_index + 2)
             canvas.setFillColor(HexColor(SURFACE if row_index % 2 else WHITE))
             canvas.rect(x, bottom, width, row_height, stroke=0, fill=1)
             canvas.setFillColor(HexColor(INK))
             for index, key in enumerate(keys):
+                value = row.get(key)
+                canvas.setFillColor(HexColor(_conditional_color(value, widget, INK)))
                 canvas.drawString(
                     x + index * col_width + 4,
                     bottom + 6,
-                    _text(row.get(key), 22),
+                    _display_text(_formatted_value(value, widget)),
                 )
         if len(rows) > visible:
             canvas.setFillColor(HexColor(MUTED))
@@ -430,6 +900,7 @@ class PdfDashboardRenderer:
     @staticmethod
     def _chart(
         canvas: Canvas,
+        widget: dict[str, object],
         widget_type: str,
         columns: list[dict[str, object]],
         rows: list[dict[str, object]],
@@ -450,7 +921,7 @@ class PdfDashboardRenderer:
         data = rows[:12]
         if not data or not numeric_keys:
             canvas.setFillColor(HexColor(MUTED))
-            canvas.setFont("Helvetica", 9)
+            canvas.setFont(PDF_FONT, 9)
             canvas.drawString(x, y + height / 2, "No chart data")
             return
         values = [
@@ -462,11 +933,27 @@ class PdfDashboardRenderer:
         maximum = max(values, default=1) or 1
         plot_y = y + 18
         plot_h = height - 30
-        canvas.setStrokeColor(HexColor(BORDER))
-        canvas.line(x, plot_y, x + width, plot_y)
-        if widget_type in {"line", "area"}:
+        config = _config(widget)
+        colors = _palette(widget)
+        if bool(config.get("show_gridlines", True)):
+            canvas.setStrokeColor(HexColor(BORDER))
+            for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
+                grid_y = plot_y + fraction * plot_h
+                canvas.line(x, grid_y, x + width, grid_y)
+        if widget_type == "scatter" and len(numeric_keys) >= 2:
+            x_key, y_key = numeric_keys[:2]
+            x_values = [(_numeric(row.get(x_key)) or 0.0) for row in data]
+            y_values = [(_numeric(row.get(y_key)) or 0.0) for row in data]
+            max_x = max((abs(value) for value in x_values), default=1) or 1
+            max_y = max((abs(value) for value in y_values), default=1) or 1
+            canvas.setFillColor(HexColor(colors[0]))
+            for x_value, y_value in zip(x_values, y_values, strict=True):
+                px = x + max(0.0, x_value) / max_x * width
+                py = plot_y + max(0.0, y_value) / max_y * plot_h
+                canvas.circle(px, py, 4, stroke=0, fill=1)
+        elif widget_type in {"line", "area"}:
             for series_index, key in enumerate(numeric_keys):
-                canvas.setStrokeColor(HexColor(PALETTE[series_index]))
+                canvas.setStrokeColor(HexColor(colors[series_index % len(colors)]))
                 canvas.setLineWidth(2)
                 points: list[tuple[float, float]] = []
                 for index, row in enumerate(data):
@@ -478,6 +965,28 @@ class PdfDashboardRenderer:
                     canvas.line(*first, *second)
                 for px, py in points:
                     canvas.circle(px, py, 2, stroke=0, fill=1)
+        elif widget_type == "stacked-bar":
+            group = width / max(1, len(data))
+            bar_width = max(3, group * 0.7)
+            stacked_maximum = (
+                max(
+                    (
+                        sum(max(0.0, _numeric(row.get(key)) or 0.0) for key in numeric_keys)
+                        for row in data
+                    ),
+                    default=1.0,
+                )
+                or 1.0
+            )
+            for row_index, row in enumerate(data):
+                bottom = plot_y
+                bx = x + row_index * group + group * 0.15
+                for series_index, key in enumerate(numeric_keys):
+                    value = max(0.0, _numeric(row.get(key)) or 0.0)
+                    bar_h = value / stacked_maximum * plot_h
+                    canvas.setFillColor(HexColor(colors[series_index % len(colors)]))
+                    canvas.rect(bx, bottom, bar_width, bar_h, stroke=0, fill=1)
+                    bottom += bar_h
         else:
             group = width / max(1, len(data))
             bar_width = max(3, group * 0.72 / len(numeric_keys))
@@ -486,29 +995,61 @@ class PdfDashboardRenderer:
                     value = max(0, _numeric(row.get(key)) or 0)
                     bar_h = value / maximum * plot_h
                     bx = x + row_index * group + group * 0.14 + series_index * bar_width
-                    canvas.setFillColor(HexColor(PALETTE[series_index]))
+                    canvas.setFillColor(HexColor(colors[series_index % len(colors)]))
                     canvas.rect(bx, plot_y, bar_width - 1, bar_h, stroke=0, fill=1)
         canvas.setFillColor(HexColor(MUTED))
-        canvas.setFont("Helvetica", 6.5)
+        canvas.setFont(PDF_FONT, 6.5)
         for index, row in enumerate(data):
-            label = _text(row.get(category_key), 9) if category_key else str(index + 1)
-            label_width = stringWidth(label, "Helvetica", 6.5)
+            label = str(row.get(category_key, "")) if category_key else str(index + 1)
             px = x + (index + 0.5) * (width / len(data))
-            canvas.drawString(px - label_width / 2, y + 3, label)
+            available = max(20.0, width / len(data) - 3)
+            lines = _wrap_text(label, available, lambda line: stringWidth(line, PDF_FONT, 6.5))
+            for line_index, display_label in enumerate(lines[:2]):
+                label_width = stringWidth(display_label, PDF_FONT, 6.5)
+                canvas.drawString(px - label_width / 2, y + 8 - line_index * 7, display_label)
+        if bool(config.get("show_legend", True)) and len(numeric_keys) > 1:
+            canvas.setFont(PDF_FONT, 6.5)
+            cursor = x
+            for series_index, key in enumerate(numeric_keys):
+                canvas.setFillColor(HexColor(colors[series_index % len(colors)]))
+                canvas.rect(cursor, y + height - 7, 6, 6, stroke=0, fill=1)
+                canvas.setFillColor(HexColor(INK))
+                label = next(
+                    (_column_label(item) for item in columns if _column_key(item) == key), key
+                )
+                display = _display_text(_text(label, 24))
+                canvas.drawString(cursor + 9, y + height - 7, display)
+                cursor += min(100.0, stringWidth(display, PDF_FONT, 6.5) + 22)
 
 
 class PngDashboardRenderer:
     format = "png"
 
     def render(self, document: RenderDocument) -> RenderedArtifact:
-        widgets = _visible_widgets(document)
         scale = 2
         width = 1440
         header = 150
-        card_width = (width - 120) // 2
-        card_height = 300
-        rows = max(1, math.ceil(len(widgets) / 2))
-        height = header + rows * (card_height + 24) + 70
+        gap = 10
+        row_height = 76
+        cell_width = (width - 80 - gap * 11) / 12
+        cursor = header
+        page_headers: list[tuple[str, int]] = []
+        entries: list[tuple[dict[str, object], int]] = []
+        for page in _pages(document) or [{"name": "Dashboard", "widgets": []}]:
+            page_widgets = [
+                item
+                for item in cast(list[dict[str, object]], page.get("widgets", []))
+                if not item.get("hidden", False)
+            ]
+            page_headers.append((str(page.get("name") or "Dashboard"), cursor))
+            grid_top = cursor + 38
+            entries.extend((widget, grid_top) for widget in page_widgets)
+            max_row = max(
+                (_layout(widget)["y"] + _layout(widget)["h"] for widget in page_widgets),
+                default=8,
+            )
+            cursor = grid_top + max(8, max_row) * (row_height + gap) + 36
+        height = cursor + 70
         image = Image.new("RGB", (width * scale, height * scale), SURFACE)
         draw = ImageDraw.Draw(image)
         font = self._font(22 * scale)
@@ -517,7 +1058,7 @@ class PngDashboardRenderer:
         small = self._font(12 * scale)
 
         def box(
-            coords: tuple[int, int, int, int],
+            coords: tuple[float, float, float, float],
             *,
             fill: str,
             outline: str,
@@ -533,43 +1074,101 @@ class PngDashboardRenderer:
 
         draw.rectangle((0, 0, width * scale, 104 * scale), fill=BRAND_DARK)
         draw.text(
-            (40 * scale, 26 * scale), document.dashboard_name[:70], font=title_font, fill=WHITE
+            (40 * scale, 26 * scale),
+            _display_text(document.dashboard_name[:70]),
+            font=title_font,
+            fill=WHITE,
         )
         generated = (
             f"Version {document.dashboard_version} · "
             f"{document.generated_at:%d %b %Y %H:%M} · {document.timezone}"
         )
-        draw.text((40 * scale, 112 * scale), generated, font=small, fill=MUTED)
+        draw.text((40 * scale, 112 * scale), _display_text(generated), font=small, fill=MUTED)
         filter_text = _filter_summary(document.filters)
         draw.text(
             (width * scale - 40 * scale, 112 * scale),
-            filter_text[:90],
+            _display_text(filter_text[:90]),
             font=small,
             fill=MUTED,
             anchor="ra",
         )
 
-        for index, widget in enumerate(widgets):
-            column = index % 2
-            row = index // 2
-            x = 40 + column * (card_width + 40)
-            y = header + row * (card_height + 24)
-            box((x, y, x + card_width, y + card_height), fill=WHITE, outline=BORDER, width=scale)
+        for page_name, page_top in page_headers:
+            draw.text(
+                (40 * scale, page_top * scale),
+                _display_text(page_name),
+                font=font,
+                fill=INK,
+            )
+
+        for widget, grid_top in entries:
+            layout = _layout(widget)
+            config = _config(widget)
+            x = 40 + layout["x"] * (cell_width + gap)
+            y = grid_top + layout["y"] * (row_height + gap)
+            card_width = layout["w"] * cell_width + (layout["w"] - 1) * gap
+            card_height = layout["h"] * row_height + (layout["h"] - 1) * gap
+            box(
+                (x, y, x + card_width, y + card_height),
+                fill=str(config.get("background") or WHITE),
+                outline=(
+                    BORDER
+                    if bool(config.get("border", True))
+                    else str(config.get("background") or WHITE)
+                ),
+                width=scale,
+            )
             draw.text(
                 ((x + 20) * scale, (y + 17) * scale),
-                _text(widget.get("title", "Widget"), 58),
+                _display_text(_text(widget.get("title", "Widget"), 58)),
                 font=card_title,
                 fill=INK,
+            )
+            draw.text(
+                ((x + card_width - 16) * scale, (y + 20) * scale),
+                str(widget.get("type", "widget")),
+                font=small,
+                fill=MUTED,
+                anchor="ra",
             )
             columns, result_rows = _result(document, widget)
             kind = str(widget.get("type") or "table")
             bounds = (x + 20, y + 58, x + card_width - 20, y + card_height - 20)
-            if kind in {"kpi", "gauge"}:
-                self._draw_kpi(draw, bounds, columns, result_rows, title_font, small, scale)
+            if kind == "kpi":
+                self._draw_kpi(draw, widget, bounds, columns, result_rows, title_font, small, scale)
+            elif kind == "metric-comparison":
+                self._draw_metric_comparison(
+                    draw, widget, bounds, columns, result_rows, title_font, small, scale
+                )
+            elif kind == "gauge":
+                self._draw_gauge(
+                    draw, widget, bounds, columns, result_rows, title_font, small, scale
+                )
+            elif kind == "progress":
+                self._draw_progress(draw, widget, bounds, columns, result_rows, title_font, scale)
             elif kind in {"table", "pivot"}:
-                self._draw_table(draw, bounds, columns, result_rows, small, scale)
+                self._draw_table(draw, widget, bounds, columns, result_rows, small, scale)
+            elif kind in {"text", "rich-text", "image", "filter", "date-filter"}:
+                content = str(widget.get("content") or widget.get("description") or "")
+                lines = _wrap_text(
+                    content,
+                    (bounds[2] - bounds[0]) * scale,
+                    lambda line: draw.textlength(line, font=small),
+                )
+                visible_lines = lines[: max(1, int((bounds[3] - bounds[1]) / 18))]
+                for line_index, line in enumerate(visible_lines):
+                    draw.text(
+                        (bounds[0] * scale, (bounds[1] + line_index * 18) * scale),
+                        line,
+                        font=small,
+                        fill=INK,
+                    )
+            elif kind == "map":
+                self._draw_map(draw, bounds, columns, result_rows, small, scale)
             else:
-                self._draw_chart(draw, bounds, columns, result_rows, font, small, scale)
+                self._draw_chart(
+                    draw, widget, kind, bounds, columns, result_rows, font, small, scale
+                )
         draw.text(
             (40 * scale, (height - 38) * scale),
             "Veltrix Intelligence Platform · Confidential",
@@ -578,29 +1177,26 @@ class PngDashboardRenderer:
         )
         image = image.resize((width * scale, height * scale), Image.Resampling.LANCZOS)
         output = io.BytesIO()
-        image.save(output, "PNG", optimize=True, dpi=(192, 192))
+        png_info = PngImagePlugin.PngInfo()
+        png_info.add_text(
+            "vip.dashboard.definition",
+            json.dumps(_parity_manifest(document), ensure_ascii=False, separators=(",", ":")),
+        )
+        image.save(output, "PNG", optimize=True, dpi=(192, 192), pnginfo=png_info)
         return RenderedArtifact(output.getvalue(), "image/png", "png")
 
     @staticmethod
     def _font(size: int, *, bold: bool = False) -> Any:
-        filename = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
-        candidates = (
-            Path("/usr/share/fonts/truetype/dejavu") / filename,
-            Path("/usr/local/share/fonts") / filename,
-            Path("C:/Windows/Fonts") / ("arialbd.ttf" if bold else "arial.ttf"),
-            Path(filename),
-        )
-        for candidate in candidates:
-            try:
-                return ImageFont.truetype(str(candidate), size)
-            except OSError:
-                continue
+        candidate = _font_path(bold=bold)
+        if candidate is not None:
+            return ImageFont.truetype(str(candidate), size)
         return ImageFont.load_default()
 
     @staticmethod
     def _draw_kpi(
         draw: ImageDraw.ImageDraw,
-        bounds: tuple[int, int, int, int],
+        widget: dict[str, object],
+        bounds: tuple[float, float, float, float],
         columns: list[dict[str, object]],
         rows: list[dict[str, object]],
         title_font: ImageFont.ImageFont,
@@ -618,17 +1214,154 @@ class PngDashboardRenderer:
         x, y, _, _ = bounds
         draw.text(
             (x * scale, (y + 24) * scale),
-            _text(rows[0].get(key) if rows and key else None),
+            _display_text(_formatted_value(rows[0].get(key) if rows and key else None, widget)),
             font=title_font,
-            fill=BRAND,
+            fill=_conditional_color(rows[0].get(key) if rows and key else None, widget, BRAND),
         )
         label = next((_column_label(item) for item in columns if _column_key(item) == key), key)
-        draw.text((x * scale, (y + 75) * scale), label, font=small, fill=MUTED)
+        draw.text(
+            (x * scale, (y + 75) * scale),
+            _display_text(label),
+            font=small,
+            fill=MUTED,
+        )
+
+    @staticmethod
+    def _draw_metric_comparison(
+        draw: ImageDraw.ImageDraw,
+        widget: dict[str, object],
+        bounds: tuple[float, float, float, float],
+        columns: list[dict[str, object]],
+        rows: list[dict[str, object]],
+        title_font: ImageFont.ImageFont,
+        small: ImageFont.ImageFont,
+        scale: int,
+    ) -> None:
+        x1, y1, x2, _ = bounds
+        numeric_keys = [
+            _column_key(column)
+            for column in columns
+            if rows and _numeric(rows[0].get(_column_key(column))) is not None
+        ]
+        actual = _numeric(rows[0].get(numeric_keys[-1])) if rows and numeric_keys else None
+        target = _numeric(rows[1].get(numeric_keys[-1])) if len(rows) > 1 and numeric_keys else None
+        delta = ((actual - target) / target * 100) if actual is not None and target else 0.0
+        draw.text(
+            (x1 * scale, (y1 + 24) * scale),
+            _display_text(_formatted_value(actual, widget)),
+            font=title_font,
+            fill=_conditional_color(actual, widget, BRAND),
+        )
+        draw.text((x1 * scale, (y1 + 72) * scale), "Actual", font=small, fill=MUTED)
+        draw.text(
+            (((x1 + x2) / 2) * scale, (y1 + 39) * scale),
+            f"{delta:+.1f}%",
+            font=small,
+            fill=ACCENT if delta >= 0 else "#DC2626",
+            anchor="ma",
+        )
+        draw.text(
+            (x2 * scale, (y1 + 24) * scale),
+            _display_text(_formatted_value(target, widget)),
+            font=title_font,
+            fill=MUTED,
+            anchor="ra",
+        )
+        draw.text((x2 * scale, (y1 + 72) * scale), "Target", font=small, fill=MUTED, anchor="ra")
+
+    @staticmethod
+    def _draw_gauge(
+        draw: ImageDraw.ImageDraw,
+        widget: dict[str, object],
+        bounds: tuple[float, float, float, float],
+        columns: list[dict[str, object]],
+        rows: list[dict[str, object]],
+        title_font: ImageFont.ImageFont,
+        small: ImageFont.ImageFont,
+        scale: int,
+    ) -> None:
+        x1, y1, x2, y2 = bounds
+        key = next(
+            (
+                _column_key(column)
+                for column in reversed(columns)
+                if rows and _numeric(rows[0].get(_column_key(column))) is not None
+            ),
+            "",
+        )
+        value = (_numeric(rows[0].get(key)) or 0.0) % 100 if rows and key else 0.0
+        diameter = min((x2 - x1) * 0.55, (y2 - y1) * 1.5)
+        left = (x1 + x2 - diameter) / 2
+        top = y1 + 8
+        box = (left * scale, top * scale, (left + diameter) * scale, (top + diameter) * scale)
+        stroke = 12 * scale
+        draw.arc(box, 180, 360, fill=BORDER, width=stroke)
+        draw.arc(
+            box,
+            180,
+            180 + 180 * value / 100,
+            fill=_conditional_color(value, widget, BRAND),
+            width=stroke,
+        )
+        draw.text(
+            (((x1 + x2) / 2) * scale, (top + diameter * 0.48) * scale),
+            f"{value:.0f}%",
+            font=title_font,
+            fill=INK,
+            anchor="mm",
+        )
+        draw.text(
+            (((x1 + x2) / 2) * scale, (top + diameter * 0.67) * scale),
+            _display_text(key),
+            font=small,
+            fill=MUTED,
+            anchor="ma",
+        )
+
+    @staticmethod
+    def _draw_progress(
+        draw: ImageDraw.ImageDraw,
+        widget: dict[str, object],
+        bounds: tuple[float, float, float, float],
+        columns: list[dict[str, object]],
+        rows: list[dict[str, object]],
+        title_font: ImageFont.ImageFont,
+        scale: int,
+    ) -> None:
+        x1, y1, x2, _ = bounds
+        key = next(
+            (
+                _column_key(column)
+                for column in reversed(columns)
+                if rows and _numeric(rows[0].get(_column_key(column))) is not None
+            ),
+            "",
+        )
+        value = (_numeric(rows[0].get(key)) or 0.0) % 100 if rows and key else 0.0
+        top = y1 + 56
+        draw.rounded_rectangle(
+            (x1 * scale, top * scale, x2 * scale, (top + 18) * scale),
+            radius=9 * scale,
+            fill=BORDER,
+        )
+        draw.rounded_rectangle(
+            (x1 * scale, top * scale, (x1 + (x2 - x1) * value / 100) * scale, (top + 18) * scale),
+            radius=9 * scale,
+            fill=_conditional_color(value, widget, BRAND),
+        )
+        draw.text(
+            (x2 * scale, (y1 + 10) * scale),
+            f"{value:.0f}%",
+            font=title_font,
+            fill=INK,
+            anchor="ra",
+        )
 
     @staticmethod
     def _draw_table(
         draw: ImageDraw.ImageDraw,
-        bounds: tuple[int, int, int, int],
+        widget: dict[str, object],
+        bounds: tuple[float, float, float, float],
         columns: list[dict[str, object]],
         rows: list[dict[str, object]],
         font: ImageFont.ImageFont,
@@ -650,7 +1383,7 @@ class PngDashboardRenderer:
         for index, key in enumerate(keys):
             draw.text(
                 ((x1 + index * col_width + 7) * scale, (y1 + 7) * scale),
-                _text(labels.get(key, key), 14),
+                _display_text(_text(labels.get(key, key), 14)),
                 font=font,
                 fill=WHITE,
             )
@@ -662,17 +1395,64 @@ class PngDashboardRenderer:
                     (x1 * scale, top * scale, x2 * scale, (top + row_height) * scale), fill=SURFACE
                 )
             for index, key in enumerate(keys):
+                value = row.get(key)
                 draw.text(
                     ((x1 + index * col_width + 7) * scale, (top + 7) * scale),
-                    _text(row.get(key), 15),
+                    _display_text(_formatted_value(value, widget)),
                     font=font,
-                    fill=INK,
+                    fill=_conditional_color(value, widget, INK),
                 )
+
+    @staticmethod
+    def _draw_map(
+        draw: ImageDraw.ImageDraw,
+        bounds: tuple[float, float, float, float],
+        columns: list[dict[str, object]],
+        rows: list[dict[str, object]],
+        font: ImageFont.ImageFont,
+        scale: int,
+    ) -> None:
+        x1, y1, x2, y2 = bounds
+        numeric_keys = [
+            _column_key(column)
+            for column in columns
+            if any(_numeric(row.get(_column_key(column))) is not None for row in rows)
+        ]
+        if len(numeric_keys) < 2:
+            draw.text(
+                (x1 * scale, (y1 + 30) * scale),
+                "Map requires longitude and latitude values",
+                font=font,
+                fill=MUTED,
+            )
+            return
+        longitude_key, latitude_key = numeric_keys[:2]
+        draw.rounded_rectangle(
+            (x1 * scale, y1 * scale, x2 * scale, y2 * scale),
+            radius=6 * scale,
+            fill="#EFF6FF",
+            outline=BORDER,
+            width=scale,
+        )
+        for fraction in (0.25, 0.5, 0.75):
+            px = (x1 + (x2 - x1) * fraction) * scale
+            py = (y1 + (y2 - y1) * fraction) * scale
+            draw.line((px, y1 * scale, px, y2 * scale), fill="#CBD5E1", width=scale)
+            draw.line((x1 * scale, py, x2 * scale, py), fill="#CBD5E1", width=scale)
+        for row in rows[:100]:
+            longitude = max(-180.0, min(180.0, _numeric(row.get(longitude_key)) or 0.0))
+            latitude = max(-90.0, min(90.0, _numeric(row.get(latitude_key)) or 0.0))
+            px = (x1 + (longitude + 180.0) / 360.0 * (x2 - x1)) * scale
+            py = (y2 - (latitude + 90.0) / 180.0 * (y2 - y1)) * scale
+            radius = 5 * scale
+            draw.ellipse((px - radius, py - radius, px + radius, py + radius), fill=BRAND)
 
     @staticmethod
     def _draw_chart(
         draw: ImageDraw.ImageDraw,
-        bounds: tuple[int, int, int, int],
+        widget: dict[str, object],
+        widget_type: str,
+        bounds: tuple[float, float, float, float],
         columns: list[dict[str, object]],
         rows: list[dict[str, object]],
         font: ImageFont.ImageFont,
@@ -708,33 +1488,165 @@ class PngDashboardRenderer:
         plot_bottom = y2 - 30
         group = (x2 - x1) / len(data)
         bar_width = max(3, group * 0.7 / len(numeric_keys))
-        draw.line(
-            (x1 * scale, plot_bottom * scale, x2 * scale, plot_bottom * scale),
-            fill=BORDER,
-            width=scale,
-        )
-        for row_index, row in enumerate(data):
-            for series_index, key in enumerate(numeric_keys):
-                value = max(0, _numeric(row.get(key)) or 0)
-                height = value / maximum * (plot_bottom - y1 - 12)
-                left = x1 + row_index * group + group * 0.15 + series_index * bar_width
-                draw.rounded_rectangle(
+        config = _config(widget)
+        colors = _palette(widget)
+        if widget_type in {"pie", "donut"}:
+            values = [max(0.0, _numeric(row.get(numeric_keys[0])) or 0.0) for row in data]
+            total = sum(values)
+            if total <= 0:
+                draw.text((x1 * scale, (y1 + 30) * scale), "No chart data", font=font, fill=MUTED)
+                return
+            diameter = max(8.0, min(x2 - x1, y2 - y1) - 8)
+            left = x1 + ((x2 - x1) - diameter) / 2
+            top = y1 + ((y2 - y1) - diameter) / 2
+            start = -90.0
+            for index, value in enumerate(values):
+                end = start + 360.0 * value / total
+                draw.pieslice(
                     (
                         left * scale,
-                        (plot_bottom - height) * scale,
-                        (left + bar_width - 2) * scale,
-                        plot_bottom * scale,
+                        top * scale,
+                        (left + diameter) * scale,
+                        (top + diameter) * scale,
                     ),
-                    radius=2 * scale,
-                    fill=PALETTE[series_index],
+                    start=start,
+                    end=end,
+                    fill=colors[index % len(colors)],
                 )
-            draw.text(
-                ((x1 + row_index * group + group / 2) * scale, (plot_bottom + 7) * scale),
-                _text(row.get(category), 8) if category else str(row_index + 1),
-                font=small,
-                fill=MUTED,
-                anchor="ma",
+                start = end
+            if widget_type == "donut":
+                inset = diameter * 0.3
+                draw.ellipse(
+                    (
+                        (left + inset) * scale,
+                        (top + inset) * scale,
+                        (left + diameter - inset) * scale,
+                        (top + diameter - inset) * scale,
+                    ),
+                    fill=WHITE,
+                )
+            return
+        if bool(config.get("show_gridlines", True)):
+            for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
+                grid_y = y1 + fraction * (plot_bottom - y1)
+                draw.line(
+                    (x1 * scale, grid_y * scale, x2 * scale, grid_y * scale),
+                    fill=BORDER,
+                    width=scale,
+                )
+        if widget_type == "scatter" and len(numeric_keys) >= 2:
+            x_key, y_key = numeric_keys[:2]
+            x_values = [(_numeric(row.get(x_key)) or 0.0) for row in data]
+            y_values = [(_numeric(row.get(y_key)) or 0.0) for row in data]
+            max_x = max((abs(value) for value in x_values), default=1) or 1
+            max_y = max((abs(value) for value in y_values), default=1) or 1
+            for x_value, y_value in zip(x_values, y_values, strict=True):
+                px = x1 + max(0.0, x_value) / max_x * (x2 - x1)
+                py = plot_bottom - max(0.0, y_value) / max_y * (plot_bottom - y1 - 12)
+                radius = 4 * scale
+                draw.ellipse(
+                    (
+                        px * scale - radius,
+                        py * scale - radius,
+                        px * scale + radius,
+                        py * scale + radius,
+                    ),
+                    fill=BRAND,
+                )
+        elif widget_type in {"line", "area"}:
+            for series_index, key in enumerate(numeric_keys):
+                points = [
+                    (
+                        (x1 + (index + 0.5) * group) * scale,
+                        (
+                            plot_bottom
+                            - max(0.0, _numeric(row.get(key)) or 0.0)
+                            / maximum
+                            * (plot_bottom - y1 - 12)
+                        )
+                        * scale,
+                    )
+                    for index, row in enumerate(data)
+                ]
+                if widget_type == "area" and len(points) > 1:
+                    draw.polygon(
+                        [
+                            (points[0][0], plot_bottom * scale),
+                            *points,
+                            (points[-1][0], plot_bottom * scale),
+                        ],
+                        fill=colors[series_index % len(colors)] + "55",
+                    )
+                if len(points) > 1:
+                    draw.line(points, fill=colors[series_index % len(colors)], width=2 * scale)
+                for px, py in points:
+                    radius = 2 * scale
+                    draw.ellipse(
+                        (px - radius, py - radius, px + radius, py + radius),
+                        fill=colors[series_index % len(colors)],
+                    )
+        elif widget_type == "stacked-bar":
+            stacked_maximum = (
+                max(
+                    (
+                        sum(max(0.0, _numeric(row.get(key)) or 0.0) for key in numeric_keys)
+                        for row in data
+                    ),
+                    default=1.0,
+                )
+                or 1.0
             )
+            stacked_width = max(3, group * 0.7)
+            for row_index, row in enumerate(data):
+                bottom = plot_bottom
+                left = x1 + row_index * group + group * 0.15
+                for series_index, key in enumerate(numeric_keys):
+                    value = max(0.0, _numeric(row.get(key)) or 0.0)
+                    height = value / stacked_maximum * (plot_bottom - y1 - 12)
+                    draw.rectangle(
+                        (
+                            left * scale,
+                            (bottom - height) * scale,
+                            (left + stacked_width) * scale,
+                            bottom * scale,
+                        ),
+                        fill=colors[series_index % len(colors)],
+                    )
+                    bottom -= height
+        else:
+            for row_index, row in enumerate(data):
+                for series_index, key in enumerate(numeric_keys):
+                    value = max(0, _numeric(row.get(key)) or 0)
+                    height = value / maximum * (plot_bottom - y1 - 12)
+                    left = x1 + row_index * group + group * 0.15 + series_index * bar_width
+                    draw.rounded_rectangle(
+                        (
+                            left * scale,
+                            (plot_bottom - height) * scale,
+                            (left + bar_width - 2) * scale,
+                            plot_bottom * scale,
+                        ),
+                        radius=2 * scale,
+                        fill=colors[series_index % len(colors)],
+                    )
+        for row_index, row in enumerate(data):
+            label = str(row.get(category, "")) if category else str(row_index + 1)
+            lines = _wrap_text(
+                label,
+                max(20.0, group * scale - 4),
+                lambda line: draw.textlength(line, font=small),
+            )
+            for line_index, line in enumerate(lines[:2]):
+                draw.text(
+                    (
+                        (x1 + row_index * group + group / 2) * scale,
+                        (plot_bottom + 7 + line_index * 14) * scale,
+                    ),
+                    line,
+                    font=small,
+                    fill=MUTED,
+                    anchor="ma",
+                )
 
 
 class RendererRegistry:

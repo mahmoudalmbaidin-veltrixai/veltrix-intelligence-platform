@@ -74,20 +74,22 @@ async def execute_widget(
             )
         )
         if row:
-            widget = WidgetInput(
-                id=row.id,
-                page_id=row.page_id,
-                type=row.widget_type,
-                title=row.title,
-                description=row.description,
-                semantic_model_id=row.semantic_model_id,
-                query=row.query_definition,
-                config=row.visualization_config,
-                layout=row.layout,
-                filters=row.filters,
-                interactions=row.interactions,
-                content=row.content,
-                hidden=row.is_hidden,
+            widget = WidgetInput.model_validate(
+                {
+                    "id": row.id,
+                    "page_id": row.page_id,
+                    "type": row.widget_type,
+                    "title": row.title,
+                    "description": row.description,
+                    "semantic_model_id": row.semantic_model_id,
+                    "query": row.query_definition,
+                    "config": row.visualization_config,
+                    "layout": row.layout,
+                    "filters": row.filters,
+                    "interactions": row.interactions,
+                    "content": row.content,
+                    "hidden": row.is_hidden,
+                }
             )
     else:
         if not access["can_view"] or dashboard.published_version_id is None:

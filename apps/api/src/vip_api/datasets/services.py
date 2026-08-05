@@ -150,17 +150,17 @@ async def list_datasets(
     # Everyone else sees only datasets reachable through ownership or a non-expired
     # ACL allow (direct or group), minus lowest-level denies — filtered in SQL so
     # pagination and totals never leak hidden datasets (no N+1).
+    subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
+        db, org, context.user_id
+    )
+    allowed_ids, denied_ids = resource_access_service.collection_visibility_subqueries(
+        "dataset", subjects, now=datetime.now(UTC)
+    )
+    extra_filters.append(Dataset.id.notin_(denied_ids))
     if resource_access_service.role_level("dataset", context.permissions) is None:
-        subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
-            db, org, context.user_id
-        )
-        allowed_ids, denied_ids = resource_access_service.collection_visibility_subqueries(
-            "dataset", subjects, now=datetime.now(UTC)
-        )
         extra_filters.append(
             or_(Dataset.owner_user_id == context.user_id, Dataset.id.in_(allowed_ids))
         )
-        extra_filters.append(Dataset.id.notin_(denied_ids))
     items, total = await DatasetRepository(db, org, ws).list_scoped(
         page=page, page_size=page_size, search=search, status=status, extra_filters=extra_filters
     )

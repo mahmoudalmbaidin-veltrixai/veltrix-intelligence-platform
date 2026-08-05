@@ -94,15 +94,17 @@ async def notifications(
             "dataset_quality": "Datasets",
         }.get(job.job_type, "System")
         result.append(
-            NotificationEntry(
-                id=f"job:{job.id}:{job.row_version}",
-                severity=severity,
-                title=f"{job.name}: {job.status.replace('_', ' ')}",
-                body=job.progress_message
-                or f"{job.job_type.replace('_', ' ').title()} is {job.status}.",
-                category=category,
-                ts=job.updated_at,
-                resource=NotificationResource(label="Open job", to=f"/jobs/{job.id}"),
+            NotificationEntry.model_validate(
+                {
+                    "id": f"job:{job.id}:{job.row_version}",
+                    "severity": severity,
+                    "title": f"{job.name}: {job.status.replace('_', ' ')}",
+                    "body": job.progress_message
+                    or f"{job.job_type.replace('_', ' ').title()} is {job.status}.",
+                    "category": category,
+                    "ts": job.updated_at,
+                    "resource": NotificationResource(label="Open job", to=f"/jobs/{job.id}"),
+                }
             )
         )
     return result
@@ -123,17 +125,19 @@ async def activity(
         )
     ).all()
     return [
-        ActivityFeedEntry(
-            id=str(item.id),
-            domain=_ACTIVITY_DOMAINS.get(item.resource_type or "", "admin"),
-            actor="You" if item.actor_user_id == context.user_id else "Platform",
-            action=item.action.replace("_", " "),
-            target=(
-                f"{item.resource_type.replace('_', ' ').title()} {str(item.resource_id)[:8]}"
-                if item.resource_type and item.resource_id
-                else (item.resource_type or "workspace").replace("_", " ").title()
-            ),
-            ts=item.occurred_at,
+        ActivityFeedEntry.model_validate(
+            {
+                "id": str(item.id),
+                "domain": _ACTIVITY_DOMAINS.get(item.resource_type or "", "admin"),
+                "actor": "You" if item.actor_user_id == context.user_id else "Platform",
+                "action": item.action.replace("_", " "),
+                "target": (
+                    f"{item.resource_type.replace('_', ' ').title()} {str(item.resource_id)[:8]}"
+                    if item.resource_type and item.resource_id
+                    else (item.resource_type or "workspace").replace("_", " ").title()
+                ),
+                "ts": item.occurred_at,
+            }
         )
         for item in rows
     ]

@@ -48,6 +48,14 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = app_settings
 
+    # Application-factory callers (tests, workers, alternate deployments) must
+    # use the settings supplied to this app instance, not a process-global
+    # Settings cache constructed from unrelated environment state.
+    def configured_settings() -> Settings:
+        return app_settings
+
+    app.dependency_overrides[get_settings] = configured_settings
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.CORS_ALLOWED_ORIGINS,

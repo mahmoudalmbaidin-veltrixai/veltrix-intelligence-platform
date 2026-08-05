@@ -261,6 +261,17 @@ async def list_dashboards(
         Dashboard.workspace_id == ws,
         Dashboard.archived_at.is_(None),
     )
+    subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
+        db, org, context.user_id
+    )
+    allowed_ids, denied_ids = resource_access_service.collection_visibility_subqueries(
+        "dashboard", subjects, now=datetime.now(UTC)
+    )
+    statement = statement.where(Dashboard.id.notin_(denied_ids))
+    if resource_access_service.role_level("dashboard", context.permissions) is None:
+        statement = statement.where(
+            or_(Dashboard.owner_user_id == context.user_id, Dashboard.id.in_(allowed_ids))
+        )
     if search:
         statement = statement.where(Dashboard.name.ilike(f"%{search[:100]}%"))
     if status:
@@ -340,20 +351,22 @@ async def _editor_parts(
     by_page: dict[UUID, list[WidgetInput]] = {}
     for widget in widgets:
         by_page.setdefault(widget.page_id, []).append(
-            WidgetInput(
-                id=widget.id,
-                page_id=widget.page_id,
-                type=widget.widget_type,
-                title=widget.title,
-                description=widget.description,
-                semantic_model_id=widget.semantic_model_id,
-                query=widget.query_definition,
-                config=widget.visualization_config,
-                layout=widget.layout,
-                filters=widget.filters,
-                interactions=widget.interactions,
-                content=widget.content,
-                hidden=widget.is_hidden,
+            WidgetInput.model_validate(
+                {
+                    "id": widget.id,
+                    "page_id": widget.page_id,
+                    "type": widget.widget_type,
+                    "title": widget.title,
+                    "description": widget.description,
+                    "semantic_model_id": widget.semantic_model_id,
+                    "query": widget.query_definition,
+                    "config": widget.visualization_config,
+                    "layout": widget.layout,
+                    "filters": widget.filters,
+                    "interactions": widget.interactions,
+                    "content": widget.content,
+                    "hidden": widget.is_hidden,
+                }
             )
         )
     page_contracts = [
@@ -376,17 +389,19 @@ async def _editor_parts(
         )
     ).all()
     filter_contracts = [
-        DashboardFilterInput(
-            id=item.id,
-            key=item.filter_key,
-            label=item.label,
-            type=item.filter_type,
-            semantic_model_id=item.semantic_model_id,
-            dimension_key=item.dimension_key,
-            operator=item.operator,
-            default_value=item.default_value,
-            widget_ids=[UUID(value) for value in item.widget_ids],
-            position=item.position,
+        DashboardFilterInput.model_validate(
+            {
+                "id": item.id,
+                "key": item.filter_key,
+                "label": item.label,
+                "type": item.filter_type,
+                "semantic_model_id": item.semantic_model_id,
+                "dimension_key": item.dimension_key,
+                "operator": item.operator,
+                "default_value": item.default_value,
+                "widget_ids": [UUID(value) for value in item.widget_ids],
+                "position": item.position,
+            }
         )
         for item in filters
     ]

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { isNavigationFailure, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/shared/stores/auth'
 import { LocalStore } from '@/shared/lib/mock'
 import VipInput from '@/shared/ui/VipInput.vue'
@@ -26,6 +26,7 @@ const capsOn = ref(false)
 const submitting = ref(false)
 const attempted = ref(false)
 const shake = ref(false)
+const navigationError = ref('')
 
 const passwordField = ref<InstanceType<typeof VipInput>>()
 
@@ -46,6 +47,7 @@ const serverFieldError = (field: string) => auth.error?.fieldErrors?.find((f) =>
 const emailError = computed(() => emailClientError.value || serverFieldError('email'))
 const passwordError = computed(() => passwordClientError.value || serverFieldError('password'))
 const generalError = computed(() => {
+  if (navigationError.value) return navigationError.value
   if (!auth.error || auth.error.fieldErrors?.length) return ''
   return auth.error.kind === 'unauthorized' ? 'Invalid email or password.' : auth.error.friendlyMessage
 })
@@ -90,15 +92,22 @@ async function submit() {
     return
   }
   submitting.value = true
+  navigationError.value = ''
   const ok = await auth.login(email.value.trim(), password.value)
-  submitting.value = false
   if (ok) {
     if (remember.value) rememberStore.write({ email: email.value.trim() })
     else rememberStore.clear()
-    router.replace(auth.takeIntended())
+    try {
+      const failure = await router.replace(auth.takeIntended())
+      if (isNavigationFailure(failure)) throw failure
+    } catch {
+      navigationError.value = 'Your session is ready, but the application could not open. Refresh to continue safely.'
+      triggerShake()
+    }
   } else {
     triggerShake()
   }
+  submitting.value = false
 }
 </script>
 

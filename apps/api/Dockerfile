@@ -7,6 +7,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+RUN apk add --no-cache font-dejavu
+
 RUN addgroup --system vip && adduser --system --ingroup vip --home /app vip
 
 COPY pyproject.toml README.md requirements.runtime.lock ./

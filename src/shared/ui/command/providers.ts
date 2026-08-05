@@ -3,6 +3,8 @@
  * for a query. Mock providers back the searchable resource types today; a live
  * provider can be swapped in without changing the command palette.
  */
+import { config } from '@/shared/config/env'
+
 export interface SearchResult {
   id: string
   title: string
@@ -45,7 +47,7 @@ function mockProvider(
   }
 }
 
-export const SEARCH_PROVIDERS: SearchProvider[] = [
+const MOCK_SEARCH_PROVIDERS: SearchProvider[] = [
   mockProvider('conn', 'Connections', 'plug', '/connections', [
     ['cn_pg_prod', 'Production PostgreSQL', 'PostgreSQL · healthy'],
     ['cn_s3_lake', 'Data Lake (S3)', 'S3 · healthy'],
@@ -75,3 +77,8 @@ export const SEARCH_PROVIDERS: SearchProvider[] = [
     ['au_refresh', 'Dataset Refresh Notify', 'active'],
   ]),
 ]
+
+// Static demo records must never appear as real resources in live mode. Until
+// the production federated-search API ships, keep resource search hidden while
+// retaining permission-aware navigation and actions in the palette.
+export const SEARCH_PROVIDERS: SearchProvider[] = config.apiMode === 'mock' ? MOCK_SEARCH_PROVIDERS : []

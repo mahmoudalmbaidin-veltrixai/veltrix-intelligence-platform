@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { NAV_GROUPS, type NavItem } from '@/app/navigation'
+import { NAV_GROUPS, canExposeNavigationItem, type NavItem } from '@/app/navigation'
 import { usePlatformStore } from '@/shared/stores/platform'
 import { useUiStore } from '@/shared/stores/ui'
 import VipDrawer from '@/shared/ui/VipDrawer.vue'
@@ -13,10 +13,7 @@ const ui = useUiStore()
 const route = useRoute()
 
 function visible(item: NavItem): boolean {
-  if (item.permission && !platform.can(item.permission)) return false
-  if (item.entitlement && !platform.entitled(item.entitlement)) return false
-  if (item.featureFlag && !platform.flagEnabled(item.featureFlag)) return false
-  return true
+  return canExposeNavigationItem(item, platform)
 }
 const groups = computed(() =>
   NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter(visible) })).filter((g) => g.items.length),

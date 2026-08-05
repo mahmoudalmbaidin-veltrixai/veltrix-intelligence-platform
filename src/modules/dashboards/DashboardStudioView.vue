@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, shallowRef, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
+import { isNavigationFailure, useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { dashboardService, newDashboard } from './dashboards.service'
 import { useDashboardEditor } from './useDashboardEditor'
 import { useResizable } from '@/shared/composables/useResizable'
@@ -14,6 +14,8 @@ import type { QueryFilter } from '@/shared/types/semantic'
 import type { SemanticModel } from '@/shared/types/semantic'
 import { semanticStudioService } from '@/modules/semantic/semantic.service'
 import { relativeTime } from '@/shared/lib/format'
+import { clone } from '@/shared/lib/mock'
+import { invalidateQueries } from '@/shared/lib/query'
 import FieldsPanel from './FieldsPanel.vue'
 import DashboardGridCanvas from './DashboardGridCanvas.vue'
 import WidgetInspector from './WidgetInspector.vue'
@@ -43,6 +45,25 @@ const dashboardFilters = ref<QueryFilter[]>([])
 const fullscreen = ref(false)
 const shareOpen = ref(false)
 const conflict = ref(false)
+const navigatingAfterSave = ref(false)
+let saveInFlight: Promise<boolean> | null = null
+let timer: number | undefined
+
+type SavePhase = 'started' | 'joined' | 'persisted' | 'navigated' | 'failed' | 'finished'
+
+/**
+ * Non-sensitive lifecycle telemetry used by browser reliability tests and local
+ * diagnostics. Keeping this as a DOM event avoids production logging of the
+ * dashboard definition while still exposing ordering and timing evidence.
+ */
+function traceSave(phase: SavePhase, detail: Record<string, unknown> = {}) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent('vip:dashboard-save', {
+      detail: { phase, at: performance.now(), route: route.fullPath, ...detail },
+    }),
+  )
+}
 
 const left = useResizable({ key: 'dash.left', initial: 256, min: 200, max: 380 })
 const right = useResizable({ key: 'dash.right', initial: 320, min: 260, max: 460, invert: true })
@@ -135,42 +156,95 @@ async function load() {
   }
 }
 
-async function save() {
-  if (!editor.value || !canEdit.value) return
-  const isFirstSave = route.name === 'dashboard-new' || route.path === '/dashboards/new'
-  saving.value = true
-  try {
-    const saved = await dashboardService.save(editor.value.dashboard as Dashboard)
-    editor.value = useDashboardEditor(saved)
-    savedAt.value = saved.updatedAt
-    conflict.value = false
-    ui.pushToast({ kind: 'success', title: 'Dashboard saved' })
-    // First save from /dashboards/new: adopt the stable ID URL so the dashboard
-    // can be deep-linked and reloaded (QA VIP-FE-H004).
-    if (isFirstSave) await router.replace(`/dashboards/${saved.id}/edit`)
-  } catch (error) {
-    const apiError = ApiError.from(error)
-    if (apiError.code === 'DASHBOARD_VERSION_CONFLICT') {
-      conflict.value = true
-      window.clearTimeout(timer)
-    } else {
-      ui.pushToast({ kind: 'error', title: 'Dashboard was not saved', message: apiError.message })
-    }
-  } finally {
-    saving.value = false
+async function save(options: { notify?: boolean } = {}): Promise<boolean> {
+  if (!editor.value || !canEdit.value) return false
+  if (saveInFlight) {
+    traceSave('joined')
+    return saveInFlight
   }
+
+  const notify = options.notify ?? true
+  const sourceEditor = editor.value
+  const snapshot = clone(sourceEditor.dashboard as Dashboard)
+  const snapshotJson = JSON.stringify(snapshot)
+  const isFirstSave = route.name === 'dashboard-new' || route.path === '/dashboards/new'
+  window.clearTimeout(timer)
+  saving.value = true
+  traceSave('started', { isFirstSave, version: snapshot.version })
+
+  saveInFlight = (async () => {
+    try {
+      const saved = await dashboardService.save(snapshot)
+      const changedDuringSave = JSON.stringify(sourceEditor.dashboard) !== snapshotJson
+
+      // A slow response must never discard edits made while the request was in
+      // flight. When nothing changed, replace the editor with the canonical
+      // server aggregate. Otherwise only adopt server identity/version and keep
+      // the newer local definition dirty for the next save.
+      if (!changedDuringSave) {
+        editor.value = useDashboardEditor(saved)
+        dashboardFilters.value = [...saved.filters]
+      } else {
+        sourceEditor.dashboard.id = saved.id
+        sourceEditor.dashboard.version = saved.version
+        sourceEditor.dashboard.status = saved.status
+        sourceEditor.dashboard.updatedAt = saved.updatedAt
+      }
+
+      savedAt.value = saved.updatedAt
+      conflict.value = false
+      invalidateQueries('dashboards:')
+      traceSave('persisted', { id: saved.id, version: saved.version, changedDuringSave })
+
+      // The route-leave guard is intentionally bypassed only for the stable-ID
+      // transition immediately following a confirmed server save. Any edits
+      // made during the request remain dirty and are still protected afterward.
+      if (isFirstSave) {
+        navigatingAfterSave.value = true
+        try {
+          const failure = await router.replace(`/dashboards/${saved.id}/edit`)
+          if (isNavigationFailure(failure)) throw failure
+          traceSave('navigated', { id: saved.id })
+        } finally {
+          navigatingAfterSave.value = false
+        }
+      }
+
+      if (notify) ui.pushToast({ kind: 'success', title: 'Dashboard saved' })
+      return true
+    } catch (error) {
+      const apiError = ApiError.from(error)
+      traceSave('failed', { code: apiError.code, kind: apiError.kind })
+      if (apiError.code === 'DASHBOARD_VERSION_CONFLICT') {
+        conflict.value = true
+        window.clearTimeout(timer)
+      } else if (notify) {
+        ui.pushToast({ kind: 'error', title: 'Dashboard was not saved', message: apiError.message })
+      }
+      return false
+    } finally {
+      saving.value = false
+      saveInFlight = null
+      traceSave('finished')
+    }
+  })()
+
+  return saveInFlight
 }
 async function publish() {
   if (!editor.value) return
-  await save()
-  if (conflict.value || !editor.value) return
+  const saved = await save()
+  if (!saved || conflict.value || !editor.value) return
   const p = await dashboardService.publish(editor.value.dashboard as Dashboard)
   editor.value.dashboard.status = p.status
   editor.value.dashboard.version = p.version
   ui.pushToast({ kind: 'success', title: 'Dashboard published', message: `Version ${p.version} is live` })
 }
-async function openGovernance() {
-  if (editor.value?.dashboard.id !== 'new') shareOpen.value = true
+function openGovernance(event: MouseEvent) {
+  if (editor.value?.dashboard.id !== 'new') {
+    ;(event.currentTarget as HTMLElement).focus({ preventScroll: true })
+    shareOpen.value = true
+  }
 }
 
 async function reloadConflict() {
@@ -207,7 +281,6 @@ function updateDashboardFilters(filters: QueryFilter[]) {
 }
 
 /* autosave */
-let timer: number | undefined
 watch(
   () => editor.value?.dirty.value,
   (d) => {
@@ -218,11 +291,9 @@ watch(
       timer = window.setTimeout(async () => {
         if (!editor.value?.dirty.value) return
         try {
-          const saved = await dashboardService.save(editor.value.dashboard as Dashboard)
-          editor.value = useDashboardEditor(saved)
-          savedAt.value = saved.updatedAt
-        } catch (error) {
-          if (ApiError.from(error).code === 'DASHBOARD_VERSION_CONFLICT') conflict.value = true
+          await save({ notify: false })
+        } catch {
+          // save() owns normalized error/conflict handling.
         }
       }, 2500)
     }
@@ -292,7 +363,11 @@ function beforeUnload(e: BeforeUnloadEvent) {
     e.returnValue = ''
   }
 }
-onBeforeRouteLeave(() => (editor.value?.dirty.value ? window.confirm('You have unsaved changes. Leave anyway?') : true))
+onBeforeRouteLeave(() =>
+  navigatingAfterSave.value || !editor.value?.dirty.value
+    ? true
+    : window.confirm('You have unsaved changes. Leave anyway?'),
+)
 
 function renamePagePrompt(id: string, current: string) {
   if (mode.value !== 'edit' || !editor.value) return
@@ -312,9 +387,14 @@ onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload)
 })
 onBeforeUnmount(() => {
+  window.clearTimeout(timer)
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('beforeunload', beforeUnload)
 })
+
+// Exposes the real coordinator to component-level behavioral tests. This does
+// not add a global or DOM API and is unavailable outside the component instance.
+defineExpose({ save, publish, editor, dirty, conflict })
 </script>
 
 <template>
@@ -383,7 +463,7 @@ onBeforeUnmount(() => {
           <VipButton variant="ghost" size="sm" icon="undo" title="Undo" :disabled="!canUndo" @click="editor?.undo()" />
           <VipButton variant="ghost" size="sm" icon="redo" title="Redo" :disabled="!canRedo" @click="editor?.redo()" />
         </div>
-        <VipButton variant="secondary" size="sm" icon="save" :loading="saving" :disabled="!canEdit" @click="save"
+        <VipButton variant="secondary" size="sm" icon="save" :loading="saving" :disabled="!canEdit" @click="save()"
           >Save</VipButton
         >
         <VipButton

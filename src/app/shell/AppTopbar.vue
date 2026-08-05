@@ -25,6 +25,16 @@ const theme = useThemeStore()
 const route = useRoute()
 const router = useRouter()
 
+function openMobileNavigation(event: MouseEvent): void {
+  ;(event.currentTarget as HTMLElement).focus({ preventScroll: true })
+  ui.mobileNavOpen = true
+}
+
+function openNotifications(event: MouseEvent): void {
+  ;(event.currentTarget as HTMLElement).focus({ preventScroll: true })
+  ui.notificationDrawerOpen = true
+}
+
 const breadcrumb = computed(() => (route.meta.title as string) ?? '')
 const formatRole = (value: string) => value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
 const roleLabel = computed(() => {
@@ -162,7 +172,7 @@ async function onUserSelect(key: string) {
 <template>
   <header class="vip-topbar">
     <div class="vip-topbar__left">
-      <button class="vip-topbar__mobile" aria-label="Open navigation" @click="ui.mobileNavOpen = true">
+      <button class="vip-topbar__mobile" aria-label="Open navigation" @click="openMobileNavigation">
         <VipIcon name="menu" :size="18" />
       </button>
 
@@ -221,12 +231,7 @@ async function onUserSelect(key: string) {
         <VipIcon :name="theme.resolved() === 'dark' ? 'sun' : 'moon'" :size="17" />
       </button>
 
-      <button
-        class="vip-icon-btn"
-        title="Notifications"
-        aria-label="Notifications"
-        @click="ui.notificationDrawerOpen = true"
-      >
+      <button class="vip-icon-btn" title="Notifications" aria-label="Notifications" @click="openNotifications">
         <VipIcon name="bell" :size="17" />
         <span v-if="ui.unreadNotifications" class="vip-icon-btn__badge">{{ ui.unreadNotifications }}</span>
       </button>

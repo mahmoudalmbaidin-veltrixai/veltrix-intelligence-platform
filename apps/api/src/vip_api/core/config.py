@@ -341,4 +341,6 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return the immutable process-level settings instance."""
+    # DATABASE_URL and REDIS_URL are required from the process environment;
+    # pydantic-settings supplies them at runtime rather than call-site arguments.
     return Settings()

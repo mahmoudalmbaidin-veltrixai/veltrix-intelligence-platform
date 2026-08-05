@@ -145,7 +145,8 @@ const operatorFromApi: Record<string, QueryFilter['operator']> = {
   ends_with: 'ends',
 }
 
-function widgetFromApi(item: ApiWidget): DashboardWidget {
+export function widgetFromApi(item: ApiWidget): DashboardWidget {
+  const persistedFilters = item.filters.length ? item.filters : item.query.filters
   return {
     id: item.id!,
     type: item.type as WidgetType,
@@ -155,7 +156,7 @@ function widgetFromApi(item: ApiWidget): DashboardWidget {
       xAxis: item.query.dimensions,
       values: item.query.metrics.map((fieldId) => ({ fieldId, aggregation: 'sum' })),
     },
-    filters: item.filters.map((filter) => ({
+    filters: persistedFilters.map((filter) => ({
       fieldId: filter.field,
       operator: operatorFromApi[filter.operator] ?? (filter.operator as QueryFilter['operator']),
       value: filter.value as QueryFilter['value'],
@@ -163,26 +164,36 @@ function widgetFromApi(item: ApiWidget): DashboardWidget {
     sorts: item.query.order_by.map((sort) => ({ fieldId: sort.field, dir: sort.direction })),
     format: {
       title: item.title,
+      subtitle: item.config.subtitle as string | undefined,
       showTitle: true,
       showLegend: Boolean(item.config.show_legend ?? true),
       legendPosition: (item.config.legend_position as 'top' | 'right' | 'bottom' | 'left') ?? 'right',
       showDataLabels: Boolean(item.config.show_labels ?? false),
-      showGridlines: true,
+      showGridlines: Boolean(item.config.show_gridlines ?? true),
       decimals: Number(item.config.decimals ?? 0),
       numberStyle: (item.config.number_style as 'plain' | 'currency' | 'percent' | 'compact') ?? 'plain',
       currency: item.config.currency as string | undefined,
-      border: true,
-      padding: 12,
-      conditional: [],
+      background: item.config.background as string | undefined,
+      border: Boolean(item.config.border ?? true),
+      padding: Number(item.config.padding ?? 12),
+      conditional: (item.config.conditional as DashboardWidget['format']['conditional']) ?? [],
       colorScheme: item.config.color_scheme as string | undefined,
     },
     interactions: {
       crossFilter: Boolean(item.interactions.crossFilter ?? true),
       drillDown: Boolean(item.interactions.drillDown ?? false),
-      tooltip: true,
-      exportable: false,
+      drillThrough: item.interactions.drillThrough as string | undefined,
+      tooltip: Boolean(item.interactions.tooltip ?? true),
+      exportable: Boolean(item.interactions.exportable ?? true),
+      navigateTo: item.interactions.navigateTo as string | undefined,
     },
-    general: { name: item.title, description: item.description, visible: !item.hidden, locked: false },
+    general: {
+      name: item.title,
+      description: item.description,
+      visible: !item.hidden,
+      locked: Boolean(item.config.locked ?? false),
+      ariaLabel: item.config.aria_label as string | undefined,
+    },
     content: item.content ?? undefined,
   }
 }
@@ -219,7 +230,7 @@ function dashboardFromApi(
   }
 }
 
-function widgetToApi(widget: DashboardWidget): ApiWidget {
+export function widgetToApi(widget: DashboardWidget): ApiWidget {
   const dimensions = Array.from(
     new Set([...(widget.wells.xAxis ?? []), ...(widget.wells.category ?? []), ...(widget.wells.legend ?? [])]),
   )
@@ -247,12 +258,31 @@ function widgetToApi(widget: DashboardWidget): ApiWidget {
       ...(widget.format.currency ? { currency: widget.format.currency } : {}),
       show_legend: widget.format.showLegend,
       show_labels: widget.format.showDataLabels,
+      show_gridlines: widget.format.showGridlines,
       legend_position: widget.format.legendPosition,
+      ...(widget.format.subtitle ? { subtitle: widget.format.subtitle } : {}),
+      ...(widget.format.background ? { background: widget.format.background } : {}),
+      border: widget.format.border,
+      padding: widget.format.padding,
+      conditional: widget.format.conditional,
+      locked: widget.general.locked,
+      ...(widget.general.ariaLabel ? { aria_label: widget.general.ariaLabel } : {}),
       ...(widget.format.colorScheme ? { color_scheme: widget.format.colorScheme } : {}),
     },
     layout: widget.pos,
-    filters: [],
-    interactions: { crossFilter: widget.interactions.crossFilter, drillDown: widget.interactions.drillDown },
+    filters: widget.filters.map((item) => ({
+      field: item.fieldId,
+      operator: operatorToApi[item.operator] ?? item.operator,
+      value: item.value,
+    })),
+    interactions: {
+      crossFilter: widget.interactions.crossFilter,
+      drillDown: widget.interactions.drillDown,
+      ...(widget.interactions.drillThrough ? { drillThrough: widget.interactions.drillThrough } : {}),
+      tooltip: widget.interactions.tooltip,
+      exportable: widget.interactions.exportable,
+      ...(widget.interactions.navigateTo ? { navigateTo: widget.interactions.navigateTo } : {}),
+    },
     content: widget.content,
     hidden: !widget.general.visible,
   }

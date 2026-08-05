@@ -17,6 +17,8 @@ declare module 'vue-router' {
     permission?: Permission
     entitlement?: EntitlementKey
     featureFlag?: FeatureFlagKey
+    /** Preview-only route that must never resolve in live API mode. */
+    developmentMockOnly?: boolean
     navGroup?: string
     breadcrumb?: string
     keywords?: string[]

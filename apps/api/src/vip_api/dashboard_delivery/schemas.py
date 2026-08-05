@@ -81,7 +81,7 @@ class ScheduleCreate(StrictModel):
     cc: list[str] = Field(default_factory=list, max_length=100)
     bcc: list[str] = Field(default_factory=list, max_length=100)
     subject: str = Field(min_length=1, max_length=300)
-    format: Literal["pdf", "png", "csv"]
+    format: ExportFormat
     filters: dict[str, Scalar | list[Scalar]] = Field(default_factory=dict)
     schedule_type: ScheduleType
     schedule_expression: str | None = Field(default=None, max_length=120)

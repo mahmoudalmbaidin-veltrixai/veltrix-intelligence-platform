@@ -11,7 +11,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 WidgetType = Literal[
     "kpi",
+    "metric-comparison",
     "table",
+    "pivot",
     "bar",
     "stacked-bar",
     "column",
@@ -19,10 +21,15 @@ WidgetType = Literal[
     "area",
     "pie",
     "donut",
+    "scatter",
     "gauge",
+    "progress",
     "text",
+    "rich-text",
+    "image",
     "filter",
     "date-filter",
+    "map",
 ]
 FilterOperator = Literal[
     "equals",
@@ -121,7 +128,9 @@ class WidgetInput(StrictModel):
             raise ValueError("Executable content and SQL are not allowed")
         data_widgets = {
             "kpi",
+            "metric-comparison",
             "table",
+            "pivot",
             "bar",
             "stacked-bar",
             "column",
@@ -129,7 +138,10 @@ class WidgetInput(StrictModel):
             "area",
             "pie",
             "donut",
+            "scatter",
             "gauge",
+            "progress",
+            "map",
         }
         if self.type in data_widgets and (self.semantic_model_id is None or not self.query.metrics):
             raise ValueError("Data widgets require a semantic model and metric")
@@ -139,8 +151,16 @@ class WidgetInput(StrictModel):
             "currency",
             "show_legend",
             "show_labels",
+            "show_gridlines",
             "legend_position",
             "color_scheme",
+            "subtitle",
+            "background",
+            "border",
+            "padding",
+            "conditional",
+            "locked",
+            "aria_label",
             "min",
             "max",
             "target",

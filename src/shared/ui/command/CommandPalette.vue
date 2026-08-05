@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { useThemeStore } from '@/shared/stores/theme'
 import { useUiStore } from '@/shared/stores/ui'
 import { usePlatformStore } from '@/shared/stores/platform'
-import { NAV_GROUPS, QUICK_CREATE, type NavItem } from '@/app/navigation'
+import { NAV_GROUPS, QUICK_CREATE, canExposeNavigationItem, type NavItem } from '@/app/navigation'
+import { config } from '@/shared/config/env'
 import { SEARCH_PROVIDERS, type SearchResult } from './providers'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 
@@ -26,10 +27,7 @@ interface Cmd {
 }
 
 function allowed(item: NavItem): boolean {
-  if (item.permission && !platform.can(item.permission)) return false
-  if (item.entitlement && !platform.entitled(item.entitlement)) return false
-  if (item.featureFlag && !platform.flagEnabled(item.featureFlag)) return false
-  return true
+  return canExposeNavigationItem(item, platform)
 }
 
 const navCommands = computed<Cmd[]>(() =>
@@ -55,7 +53,17 @@ const createCommands = computed<Cmd[]>(() =>
   })),
 )
 const actionCommands = computed<Cmd[]>(() => [
-  { id: 'act-ai', title: 'Open AI Assistant', icon: 'bot', group: 'Actions', run: () => router.push('/ai/assistant') },
+  ...(config.apiMode === 'mock' && platform.entitled('ai_studio') && platform.flagEnabled('ai_studio')
+    ? [
+        {
+          id: 'act-ai',
+          title: 'Open AI Assistant',
+          icon: 'bot',
+          group: 'Actions',
+          run: () => router.push('/ai/assistant'),
+        },
+      ]
+    : []),
   {
     id: 'act-theme',
     title: 'Toggle theme',

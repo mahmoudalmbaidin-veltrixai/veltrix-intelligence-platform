@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { NAV_GROUPS, type NavGroup, type NavItem } from '@/app/navigation'
+import { NAV_GROUPS, canExposeNavigationItem, type NavGroup, type NavItem } from '@/app/navigation'
 import { usePlatformStore } from '@/shared/stores/platform'
 import { useUiStore } from '@/shared/stores/ui'
 import { announce } from '@/shared/composables/useAnnouncer'
@@ -19,11 +19,7 @@ const hovered = ref(false)
 let hoverTimer: ReturnType<typeof setTimeout> | undefined
 
 function visible(item: NavItem): boolean {
-  if (item.platformAdminOnly && !platform.isPlatformAdmin) return false
-  if (item.permission && !platform.can(item.permission)) return false
-  if (item.entitlement && !platform.entitled(item.entitlement)) return false
-  if (item.featureFlag && !platform.flagEnabled(item.featureFlag)) return false
-  return true
+  return canExposeNavigationItem(item, platform)
 }
 
 const groups = computed<NavGroup[]>(() =>

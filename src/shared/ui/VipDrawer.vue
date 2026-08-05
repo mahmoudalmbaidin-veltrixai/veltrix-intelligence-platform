@@ -22,6 +22,11 @@ const emit = defineEmits<{ close: [] }>()
 const panel = ref<HTMLElement>()
 let lastFocused: HTMLElement | null = null
 
+function restoreFocus() {
+  if (lastFocused?.isConnected) lastFocused.focus({ preventScroll: true })
+  lastFocused = null
+}
+
 // Swipe-to-dismiss: a horizontal drag toward the anchored edge closes the drawer.
 let touchStartX = 0
 let touchStartY = 0
@@ -72,8 +77,6 @@ watch(
       lastFocused = document.activeElement as HTMLElement
       await nextTick()
       panel.value?.querySelector<HTMLElement>('[data-autofocus], button, input, textarea, select, a[href]')?.focus()
-    } else {
-      lastFocused?.focus()
     }
   },
 )
@@ -84,7 +87,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <Transition name="vip-drawer">
+    <Transition name="vip-drawer" @after-leave="restoreFocus">
       <div v-if="open" class="vip-drawer__scrim" @click.self="emit('close')" @keydown="onKeydown">
         <aside
           ref="panel"

@@ -119,14 +119,15 @@ async def list_models(
     # Broad-role users see every model; everyone else sees only models reachable
     # through a non-expired ACL allow (direct or group) minus lowest-level denies
     # (semantic models have no owner column). Filtered in SQL — no N+1, no leak.
+    subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
+        db, org, context.user_id
+    )
+    allowed_ids, denied_ids = resource_access_service.collection_visibility_subqueries(
+        "semantic_model", subjects, now=datetime.now(UTC)
+    )
+    query = query.where(SemanticModel.id.notin_(denied_ids))
     if resource_access_service.role_level("semantic_model", context.permissions) is None:
-        subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
-            db, org, context.user_id
-        )
-        allowed_ids, denied_ids = resource_access_service.collection_visibility_subqueries(
-            "semantic_model", subjects, now=datetime.now(UTC)
-        )
-        query = query.where(SemanticModel.id.in_(allowed_ids), SemanticModel.id.notin_(denied_ids))
+        query = query.where(SemanticModel.id.in_(allowed_ids))
     rows = (await db.scalars(query.order_by(SemanticModel.name))).all()
     return [SemanticModelResponse.model_validate(row) for row in rows]
 

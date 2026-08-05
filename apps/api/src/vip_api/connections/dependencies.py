@@ -1,6 +1,5 @@
 """Dependency construction for secret providers and tester registries."""
 
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -9,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from vip_api.connections.crypto import EnvironmentEncryptionKeyProvider
 from vip_api.connections.secrets import DatabaseEncryptedSecretProvider
 from vip_api.connections.testers import ConnectionTesterRegistry
-from vip_api.core.config import get_settings
+from vip_api.core.config import Settings, get_settings
 from vip_api.core.errors import ApplicationError
 from vip_api.database.session import get_db_session
 from vip_api.governance.audit import record_audit
@@ -53,13 +52,15 @@ class RequireConnectionGovernance:
         return context
 
 
-def get_secret_provider() -> DatabaseEncryptedSecretProvider:
-    settings = get_settings()
+def get_secret_provider(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> DatabaseEncryptedSecretProvider:
     if settings.CONNECTION_SECRET_PROVIDER != "database_encrypted":  # noqa: S105
         raise RuntimeError("Unknown connection secret provider")
     return DatabaseEncryptedSecretProvider(EnvironmentEncryptionKeyProvider(settings))
 
 
-@lru_cache(maxsize=1)
-def get_tester_registry() -> ConnectionTesterRegistry:
-    return ConnectionTesterRegistry(get_settings())
+def get_tester_registry(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ConnectionTesterRegistry:
+    return ConnectionTesterRegistry(settings)

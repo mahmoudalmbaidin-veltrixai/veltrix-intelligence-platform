@@ -4,6 +4,7 @@
  * feature-flag aware so the shell hides what the current context can't use.
  */
 import type { EntitlementKey, FeatureFlagKey, Permission } from '@/shared/types/identity'
+import { config, type ApiMode } from '@/shared/config/env'
 
 export interface NavItem {
   label: string
@@ -20,12 +21,34 @@ export interface NavItem {
   adminOnly?: boolean
   /** Cross-tenant platform super-admin only. */
   platformAdminOnly?: boolean
+  /** Incomplete preview surface: available only in explicitly permitted development mock mode. */
+  developmentMockOnly?: boolean
 }
 
 export interface NavGroup {
   key: string
   label: string
   items: NavItem[]
+}
+
+export interface NavigationAccess {
+  isPlatformAdmin: boolean
+  can(permission: Permission): boolean
+  entitled(entitlement: EntitlementKey): boolean
+  flagEnabled(feature: FeatureFlagKey): boolean
+}
+
+export function canExposeNavigationItem(
+  item: NavItem,
+  access: NavigationAccess,
+  apiMode: ApiMode = config.apiMode,
+): boolean {
+  if (item.developmentMockOnly && apiMode !== 'mock') return false
+  if (item.platformAdminOnly && !access.isPlatformAdmin) return false
+  if (item.permission && !access.can(item.permission)) return false
+  if (item.entitlement && !access.entitled(item.entitlement)) return false
+  if (item.featureFlag && !access.flagEnabled(item.featureFlag)) return false
+  return true
 }
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -206,6 +229,7 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'ai.use',
         entitlement: 'ai_studio',
         featureFlag: 'ai_studio',
+        developmentMockOnly: true,
       },
       {
         label: 'AI Studio',
@@ -213,7 +237,9 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'brain',
         description: 'Configure models, prompts and AI capabilities.',
         permission: 'ai.configure',
+        entitlement: 'ai_studio',
         featureFlag: 'ai_studio',
+        developmentMockOnly: true,
       },
       {
         label: 'Knowledge Bases',
@@ -221,7 +247,9 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'book',
         description: 'Curate grounded content sources for AI answers.',
         permission: 'ai.configure',
+        entitlement: 'ai_studio',
         featureFlag: 'ai_studio',
+        developmentMockOnly: true,
       },
       {
         label: 'AI Agents',
@@ -231,6 +259,7 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'ai.configure',
         entitlement: 'ai_studio',
         featureFlag: 'ai_studio',
+        developmentMockOnly: true,
       },
       {
         label: 'Agent Runs',
@@ -240,6 +269,7 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'ai.configure',
         entitlement: 'ai_studio',
         featureFlag: 'ai_studio',
+        developmentMockOnly: true,
       },
     ],
   },
@@ -269,6 +299,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'check',
         description: 'Review and action pending approval requests.',
         permission: 'automation.read',
+        entitlement: 'automation',
       },
     ],
   },
@@ -447,6 +478,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'code',
         description: 'API keys, tokens and developer options.',
         permission: 'developer.read',
+        entitlement: 'developer_api',
       },
       {
         label: 'Security',
@@ -469,5 +501,11 @@ export const QUICK_CREATE: NavItem[] = [
     permission: 'report.create',
     entitlement: 'report_studio',
   },
-  { label: 'New Automation', to: '/automation/new', icon: 'workflow', permission: 'automation.write' },
+  {
+    label: 'New Automation',
+    to: '/automation/new',
+    icon: 'workflow',
+    permission: 'automation.write',
+    entitlement: 'automation',
+  },
 ]

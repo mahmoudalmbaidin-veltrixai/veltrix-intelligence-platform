@@ -280,10 +280,12 @@ async def process(
                 context,
                 dashboard.id,
                 widget_id,
-                WidgetDataRequest(
-                    dashboard_version=version.version_number,
-                    preview=False,
-                    filters=job.filters,
+                WidgetDataRequest.model_validate(
+                    {
+                        "dashboard_version": version.version_number,
+                        "preview": False,
+                        "filters": job.filters,
+                    }
                 ),
                 settings,
                 provider,
@@ -297,6 +299,7 @@ async def process(
             await db.commit()
         document = RenderDocument(
             dashboard_id=dashboard.id,
+            dashboard_version_id=version.id,
             dashboard_version=version.version_number,
             organization_id=job.organization_id,
             workspace_id=job.workspace_id,

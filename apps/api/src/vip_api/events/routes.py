@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from vip_api.auth.dependencies import AuthenticatedContext, get_current_session
 from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
 from vip_api.core.metrics import metrics
@@ -28,6 +29,7 @@ async def stream_events(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db_session)],
     context: Annotated[AuthorizationContext, Depends(require_permission("events.subscribe"))],
+    auth: Annotated[AuthenticatedContext, Depends(get_current_session)],
     last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
     cursor: Annotated[str | None, Query(max_length=80)] = None,
     types: Annotated[list[str] | None, Query()] = None,
@@ -49,10 +51,7 @@ async def stream_events(
     broker = RedisEventBroker(
         redis_client.client, settings.JOB_QUEUE_PREFIX, settings.JOB_EVENT_STREAM_MAXLEN
     )
-    rate_key = (
-        f"{settings.JOB_QUEUE_PREFIX}:rate:events:"
-        f"{context.organization_id}:{workspace_id}:{context.user_id}"
-    )
+    rate_key = _subscription_rate_key(settings, context, auth.session.id)
     subscription_count = int(await redis_client.client.incr(rate_key))
     if subscription_count == 1:
         await redis_client.client.expire(rate_key, 60)
@@ -113,3 +112,13 @@ async def stream_events(
 def _valid_event_id(value: str) -> bool:
     left, separator, right = value.partition("-")
     return bool(separator and left.isdigit() and right.isdigit() and len(value) <= 80)
+
+
+def _subscription_rate_key(
+    settings: Settings, context: AuthorizationContext, session_id: object
+) -> str:
+    """Scope reconnect abuse protection to one authenticated tenant session."""
+    return (
+        f"{settings.JOB_QUEUE_PREFIX}:rate:events:"
+        f"{context.organization_id}:{context.workspace_id}:{context.user_id}:{session_id}"
+    )
