@@ -1,7 +1,849 @@
 {
   "schema_version": 1,
-  "status": "pending",
+  "status": "complete",
   "freeze_base": "b6c85b313c29e161f5b1c23555e00f54b2352454",
-  "commits": [],
-  "files": []
+  "product_test_gate_sha": "1e286a20eb535633a3eb341a2e0d3e38693fa5ac",
+  "final_sha_resolution": "git rev-parse HEAD (exact value recorded in release-manager response)",
+  "commit_count": 5,
+  "commits": [
+    {
+      "sha": "eecf683c49e97635aae51e54e6e599a8db98f136",
+      "subject": "fix(platform): freeze production certification remediation"
+    },
+    {
+      "sha": "a12d9ede5b7a917343cab7dcdcc62cb63de5c0d8",
+      "subject": "test(certification): add deterministic release coverage"
+    },
+    {
+      "sha": "ab7db6feb8457aea5b1b4a3e11eacac34c2f1fbf",
+      "subject": "docs(qa): preserve certification evidence and freeze handoff"
+    },
+    {
+      "sha": "1e286a20eb535633a3eb341a2e0d3e38693fa5ac",
+      "subject": "test(certification): fix strict typing coverage"
+    },
+    {
+      "sha": "SELF",
+      "sha_resolution": "git rev-parse HEAD",
+      "subject": "docs(qa): record committed-state release gates"
+    }
+  ],
+  "file_count": 163,
+  "files": [
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "category": 3,
+      "category_name": "CI or build configuration"
+    },
+    {
+      "path": "apps/api/Dockerfile",
+      "category": 3,
+      "category_name": "CI or build configuration"
+    },
+    {
+      "path": "apps/api/README.md",
+      "category": 4,
+      "category_name": "Repository documentation suitable for commit"
+    },
+    {
+      "path": "apps/api/pyproject.toml",
+      "category": 3,
+      "category_name": "CI or build configuration"
+    },
+    {
+      "path": "apps/api/requirements.runtime.lock",
+      "category": 3,
+      "category_name": "CI or build configuration"
+    },
+    {
+      "path": "apps/api/scripts/__init__.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/scripts/build_api_operation_coverage.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/scripts/full-platform-qa-seed.ps1",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/scripts/render-dashboard-parity-evidence.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/scripts/reset-qa-bootstrap-password.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/scripts/resume-full-platform-qa-seed.ps1",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/scripts/sanitize-playwright-artifacts.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/scripts/show-full-platform-qa-credentials.ps1",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/src/vip_api/api/operation_coverage.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/connections/dependencies.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/connections/services.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/core/config.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboard_delivery/rendering.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboard_delivery/scheduler.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboard_delivery/schemas.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboard_delivery/services.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboard_delivery/worker.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboards/query.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboards/schemas.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/dashboards/services.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/datasets/services.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/events/routes.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/governance/role_assignment_service.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/home/routes.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/main.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/pipelines/services.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/src/vip_api/semantic/services.py",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "apps/api/tests/conftest.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/tests/integration/test_dashboard_lifecycle_integrity.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/tests/integration/test_production_api_contract_sweep.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/tests/integration/test_resource_authorization_domains.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/tests/unit/test_artifact_sanitizer.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/tests/unit/test_dashboard_delivery.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/tests/unit/test_dashboards.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/tests/unit/test_platform_jobs_files_events.py",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "apps/api/uv.lock",
+      "category": 3,
+      "category_name": "CI or build configuration"
+    },
+    {
+      "path": "docs/backend/PIPELINE_BACKEND.md",
+      "category": 4,
+      "category_name": "Repository documentation suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/00-executive-summary.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/01-preflight.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/02-independent-blocker-reproduction.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/03-root-cause-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/04-files-changed.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/05-firefox-auth-bootstrap-fix.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/06-dashboard-save-behavioral-tests.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/07-dashboard-parity-contract.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/08-all-widget-parity-matrix.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/09-arabic-unicode-export-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/10-ai-placeholder-disposition.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/11-authenticated-api-contract-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/12-browser-fixture-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/13-security-artifact-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/14-static-analysis-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/15-regression-results.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/16-remaining-risks.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/17-independent-recertification-handoff.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/api-operation-coverage.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/artifact-secret-scan.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/blocker-results.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/browser-repeat-results.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/changed-files.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.csv",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.pdf",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/all-20-widgets.png",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/evidence/dashboard-parity/evidence.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/final-certification-remediation/widget-parity-results.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/00-executive-summary.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/01-environment-preflight.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/02-existing-data-inventory.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/03-protected-data-register.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/04-safe-cleanup-plan.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/05-cleanup-execution-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/06-qa-user-persona-matrix.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/07-qa-data-catalog.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/08-module-test-matrix.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/09-api-test-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/10-frontend-browser-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/11-accessibility-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/12-security-negative-test-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/13-performance-review.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/14-defect-register.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/15-fixes-implemented.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/16-automated-test-coverage.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/17-full-regression-results.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/18-manual-uat-guide.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/19-qa-data-cleanup-manifest.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/20-final-certification.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/cleanup-candidates.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/defects.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/protected-records.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/qa-resource-manifest.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/qa-users.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/full-platform/test-results.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/independent-certification/01-independent-verification-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/independent-certification/02-verified-fix-matrix.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/independent-certification/03-regression-assessment.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/independent-certification/04-security-assessment.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/independent-certification/05-remaining-risks.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/independent-certification/06-release-recommendation.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/production-remediation/01-root-cause-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/production-remediation/02-files-changed.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/production-remediation/03-production-fix-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/production-remediation/04-regression-report.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/production-remediation/05-remaining-risks.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/production-remediation/06-final-production-readiness-assessment.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/00-executive-summary.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/01-file-classification.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/02-secret-and-artifact-review.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/03-remediation-diff-verification.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/04-commit-plan.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/05-commits-created.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/06-release-gate-results.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/07-independent-certification-handoff.md",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/artifact-secret-scan.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/changed-files.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/committed-files.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/excluded-artifacts.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/file-classification.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/release-gate-results.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "docs/qa/release-freeze/repository-secret-scan.json",
+      "category": 5,
+      "category_name": "QA certification report suitable for commit"
+    },
+    {
+      "path": "playwright.config.ts",
+      "category": 3,
+      "category_name": "CI or build configuration"
+    },
+    {
+      "path": "src/app/navigation.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "src/app/navigation.ts",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/app/router/index.ts",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/app/router/meta.ts",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/app/shell/AppSidebar.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/app/shell/AppTopbar.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/app/shell/MobileNav.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/modules/auth/LoginView.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/modules/dashboards/DashboardShareDialog.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/modules/dashboards/DashboardStudioView.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "src/modules/dashboards/DashboardStudioView.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/modules/dashboards/dashboards.service.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "src/modules/dashboards/dashboards.service.ts",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/modules/dashboards/delivery.service.ts",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/shared/lib/query.ts",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/shared/stores/auth.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "src/shared/stores/auth.ts",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/shared/ui/VipDialog.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/shared/ui/VipDrawer.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/shared/ui/command/CommandPalette.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/shared/ui/command/providers.ts",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/shared/viz/MapChart.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "src/shared/viz/MapChart.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "src/shared/viz/VisualRenderer.vue",
+      "category": 1,
+      "category_name": "Production application code"
+    },
+    {
+      "path": "tests/e2e/b8-5-pipeline-source.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/b9-1b-pipeline-dataset.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/connections.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/dashboard-save-reliability.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/fixtures.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/global-teardown.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/governance.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/personas.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/platform-admin.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/route-smoke.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/run-local-certification.ps1",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/semantic-personas.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    },
+    {
+      "path": "tests/e2e/tenant-isolation.spec.ts",
+      "category": 2,
+      "category_name": "Automated test code"
+    }
+  ]
 }

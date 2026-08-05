@@ -1,6 +1,44 @@
 {
   "schema_version": 1,
-  "status": "pending_committed_state_execution",
-  "first_run_failures": [],
-  "gates": []
+  "status": "passed",
+  "product_test_gate_sha": "1e286a20eb535633a3eb341a2e0d3e38693fa5ac",
+  "first_run_failures": [
+    {
+      "gate": "mypy src tests",
+      "result": "failed",
+      "details": "Five test annotation errors followed by an internal error at an untyped nested assignment.",
+      "resolution": "Added explicit test-only annotations/casts; no product behavior or assertion was weakened.",
+      "corrected_result": "0 errors across 221 files"
+    }
+  ],
+  "unreported_attempts": [
+    {
+      "gate_group": "frontend parallel first orchestration",
+      "reason": "Backend MyPy rejection aborted orchestration result collection; no frontend result from that attempt is claimed."
+    }
+  ],
+  "gates": [
+    { "name": "ruff", "passed": true },
+    { "name": "ruff_format", "passed": true, "files": 252 },
+    { "name": "mypy_src_tests", "passed": true, "files": 221, "errors": 0, "attempt": 2 },
+    { "name": "backend_unit", "passed": true, "passed_tests": 249, "deselected": 64 },
+    { "name": "backend_integration", "passed": true, "passed_tests": 64, "deselected": 249, "seconds": 89.73, "connect_timeout_seconds": 2.0, "attempt": 1 },
+    { "name": "frontend_eslint", "passed": true },
+    { "name": "frontend_typecheck", "passed": true },
+    { "name": "frontend_format", "passed": true },
+    { "name": "frontend_unit", "passed": true, "test_files": 49, "passed_tests": 303 },
+    { "name": "frontend_production_build", "passed": true, "transformed_modules": 538 },
+    { "name": "firefox_dashboard_save", "passed": true, "passed_tests": 1, "attempt": 1 },
+    { "name": "chromium_core_route_ai", "passed": true, "passed_tests": 3, "attempt": 1 },
+    { "name": "webkit_core_route_ai", "passed": true, "passed_tests": 3, "attempt": 1 },
+    { "name": "governed_postgresql_pipeline", "passed": true, "passed_tests": 1, "attempt": 1 },
+    { "name": "ai_flag_entitlement_unit", "passed": true, "passed_tests": 5 },
+    { "name": "alembic_current", "passed": true, "revision": "20260803_0019" },
+    { "name": "alembic_heads", "passed": true, "head_count": 1, "revision": "20260803_0019" },
+    { "name": "alembic_check", "passed": true, "pending_operations": 0 },
+    { "name": "api_operation_classification", "passed": true, "classified": 247, "operations": 247 },
+    { "name": "widget_parity_artifacts", "passed": true, "widget_count": 20, "hashes_verified": 4 },
+    { "name": "final_browser_artifact_secret_scan", "passed": true, "files_scanned": 3, "secret_values_checked": 39, "findings": 0 },
+    { "name": "repository_secret_pattern_audit", "passed": true, "files_scanned": 705, "high_risk_findings": 0 }
+  ]
 }

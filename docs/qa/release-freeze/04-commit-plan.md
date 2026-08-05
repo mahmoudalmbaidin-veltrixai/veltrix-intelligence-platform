@@ -19,6 +19,9 @@ commits:
    - release-freeze records;
    - selected sanitized parity evidence.
 
+The exact post-commit MyPy gate identified test annotation defects, so a fourth
+test-only corrective commit was required. A fifth documentation-only commit records the
+resulting clean gates and handoff. Neither additional commit changes product behavior.
+
 Raw generated artifacts and local state are excluded. No commit is empty, no existing
 history is rewritten, and no push or pull request is performed.
-

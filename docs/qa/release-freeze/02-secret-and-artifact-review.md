@@ -6,7 +6,7 @@
   `playwright-report/` using all 38 locally encrypted QA persona passwords plus a
   release canary. It scanned 3 retained files, required no redactions, found no
   credential values, and passed.
-- A repository-level pattern audit scanned 690 tracked and untracked source candidates.
+- The final repository-level pattern audit scanned all 705 tracked files.
   It found no private key, AWS key, GitHub token, generic API token, or reusable bearer
   credential.
 - Fifteen review candidates were all non-production fixtures: generated/masked CI test
@@ -37,6 +37,12 @@ fixture, or the running services is included in committed reports.
 - The existing `.gitignore` is narrowly sufficient; no ignore rule was broadened and
   no source, test, or certification-document path is hidden.
 
+The final post-browser artifact scan again checked all 38 current QA passwords plus one
+canary across the retained browser result/report files. It made zero redactions, found
+zero values, and passed. No external secret-scanner executable was installed, so the
+repository audit used explicit high-risk token/key patterns and was supplemented by
+exact-value scans of the encrypted QA credentials; this limitation is recorded in the
+machine report.
+
 Machine evidence is recorded in `artifact-secret-scan.json`,
 `repository-secret-scan.json`, and `excluded-artifacts.json` in this directory.
-
