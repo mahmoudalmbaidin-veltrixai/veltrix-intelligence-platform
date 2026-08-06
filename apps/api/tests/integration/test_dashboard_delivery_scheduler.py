@@ -8,9 +8,12 @@ creator access, and tenant isolation.
 from __future__ import annotations
 
 import asyncio
+import csv
 import hashlib
+import io
 import json
 import os
+import socket
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from email import policy
@@ -19,11 +22,16 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import delete, select
+from PIL import Image
+from sqlalchemy import delete, select, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.auth.models import User, UserStatus
+from vip_api.connections.crypto import EnvironmentEncryptionKeyProvider
 from vip_api.connections.models import Connection, ConnectionType
+from vip_api.connections.secrets import DatabaseEncryptedSecretProvider
+from vip_api.connections.seed import seed_connection_types
 from vip_api.core.config import Settings, get_settings
 from vip_api.dashboard_delivery.models import (
     DashboardDeliveryRun,
@@ -50,7 +58,12 @@ from vip_api.governance.services import get_role
 from vip_api.jobs.models import Job, JobResult
 from vip_api.jobs.queue import QueueMetrics
 from vip_api.jobs.worker import GenericJobWorker
-from vip_api.semantic.models import SemanticDimension, SemanticMetric, SemanticModel
+from vip_api.semantic.models import (
+    SemanticDimension,
+    SemanticMeasure,
+    SemanticMetric,
+    SemanticModel,
+)
 from vip_api.tenancy.models import (
     MembershipStatus,
     Organization,
@@ -85,6 +98,11 @@ ALL_WIDGET_TYPES = (
     "map",
 )
 DATA_WIDGET_TYPES = frozenset(ALL_WIDGET_TYPES[:14]) | {"map"}
+
+
+def _reportlab_pdf_utf16(value: str) -> bytes:
+    """Encode ASCII as ReportLab's escaped UTF-16BE PDF string representation."""
+    return b"".join(b"\\000" + bytes((character,)) for character in value.encode("ascii"))
 
 
 class _QueueStub:
@@ -409,11 +427,17 @@ async def test_concurrent_schedulers_claim_each_slot_once(settings: Settings) ->
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
+async def test_all_twenty_widgets_traverse_every_real_delivery_format(
     settings: Settings,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Certify one immutable dashboard through four real scheduled worker jobs.
+
+    The source table, encrypted PostgreSQL connection, semantic query, dashboard,
+    schedules, jobs, exports, stored files, and email messages are all persisted.
+    Renderer-only construction is deliberately absent from this lifecycle proof.
+    """
     artifact_root = tmp_path / "dashboard-artifacts"
     outbox_root = tmp_path / "email-outbox"
     file_root = tmp_path / "files"
@@ -423,6 +447,7 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
             "DASHBOARD_EMAIL_PROVIDER": "file",
             "DASHBOARD_EMAIL_OUTBOX_ROOT": str(outbox_root),
             "FILE_STORAGE_ROOT": str(file_root),
+            "CONNECTION_ALLOW_PRIVATE_NETWORKS": True,
         }
     )
     monkeypatch.setenv("APP_ENV", "test")
@@ -433,6 +458,7 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
     monkeypatch.setenv("DASHBOARD_EMAIL_PROVIDER", "file")
     monkeypatch.setenv("DASHBOARD_EMAIL_OUTBOX_ROOT", str(outbox_root))
     monkeypatch.setenv("FILE_STORAGE_ROOT", str(file_root))
+    monkeypatch.setenv("CONNECTION_ALLOW_PRIVATE_NETWORKS", "true")
     monkeypatch.setenv("CONNECTION_ENCRYPTION_KEY", "REREREREREREREREREREREREREREREREREREREREREQ=")
     monkeypatch.setenv("CONNECTION_ENCRYPTION_KEY_VERSION", "test-v1")
     get_settings.cache_clear()
@@ -441,10 +467,11 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
     worker: GenericJobWorker | None = None
     org_ids: list[UUID] = []
     user_ids: list[UUID] = []
-    connection_type_ids: list[UUID] = []
+    source_table: str | None = None
     try:
         async with database.session_factory() as db:
             await seed_system_governance(db)
+            await seed_connection_types(db)
             seed, schedule_id = await _seed(db, uuid4().hex[:8])
             org_ids.append(seed.org_id)
             user_ids.append(seed.user_id)
@@ -452,43 +479,84 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
             assert schedule is not None
 
             suffix = uuid4().hex[:8]
-            connection_type = ConnectionType(
-                key=f"lifecycle-pg-{suffix}",
-                name="Lifecycle PostgreSQL",
-                category="database",
-                configuration_schema={},
-                secret_schema={},
-                capabilities=["query"],
-                test_strategy="noop",
+            source_table = f"vip_delivery_lifecycle_{suffix}"
+            await db.execute(
+                text(
+                    f'CREATE TABLE "{source_table}" ('
+                    "category text NOT NULL, orders integer NOT NULL, "
+                    "latitude numeric NOT NULL, longitude numeric NOT NULL)"
+                )
             )
-            db.add(connection_type)
-            await db.flush()
-            connection_type_ids.append(connection_type.id)
+            await db.execute(
+                text(
+                    f'INSERT INTO "{source_table}" '  # noqa: S608 - generated hex identifier
+                    "(category, orders, latitude, longitude) VALUES "
+                    "('الرياض / Riyadh', 12, 24.7136, 46.6753), "
+                    "('جدة / Jeddah', 8, 21.4858, 39.1925), "
+                    "('الدمام / Dammam', 5, 26.4207, 50.0888)"
+                )
+            )
+            connection_type = await db.scalar(
+                select(ConnectionType).where(ConnectionType.key == "postgresql")
+            )
+            assert connection_type is not None
+            database_url = make_url(configured.database_url)
+            assert database_url.host in {"127.0.0.1", "localhost"}
+            assert database_url.username and database_url.password and database_url.database
+            query_host = os.getenv("VIP_TEST_QUERY_HOST") or socket.gethostbyname(
+                socket.gethostname()
+            )
+            assert not query_host.startswith("127.") and query_host != "::1", (
+                "Set VIP_TEST_QUERY_HOST to a non-loopback address that reaches the local "
+                "integration PostgreSQL port."
+            )
             connection = Connection(
                 organization_id=seed.org_id,
                 workspace_id=seed.ws_id,
                 connection_type_id=connection_type.id,
-                name="Lifecycle definition source",
-                normalized_name="lifecycle definition source",
-                configuration={},
+                name=f"Lifecycle PostgreSQL {suffix}",
+                normalized_name=f"lifecycle postgresql {suffix}",
+                configuration={
+                    "host": query_host,
+                    "port": int(database_url.port or 5432),
+                    "database": str(database_url.database),
+                    "username": str(database_url.username),
+                    "ssl_mode": "disable",
+                    "connect_timeout_seconds": 2,
+                },
                 connection_type_version=1,
                 status="active",
+                health_status="healthy",
             )
             db.add(connection)
             await db.flush()
+            secret_provider = DatabaseEncryptedSecretProvider(
+                EnvironmentEncryptionKeyProvider(configured)
+            )
+            secret = await secret_provider.store_secret(
+                db,
+                organization_id=seed.org_id,
+                workspace_id=seed.ws_id,
+                connection_id=connection.id,
+                credential_version=1,
+                credentials={"password": str(database_url.password)},
+                actor_user_id=seed.user_id,
+            )
+            connection.secret_id = secret.id
             dataset = Dataset(
                 organization_id=seed.org_id,
                 workspace_id=seed.ws_id,
                 connection_id=connection.id,
                 dataset_type="table",
                 source_schema="public",
-                source_name="lifecycle_definition",
-                source_key=f"public.lifecycle_definition_{suffix}",
-                qualified_name="public.lifecycle_definition",
+                source_name=source_table,
+                source_key=f"public.{source_table}",
+                qualified_name=f"public.{source_table}",
                 display_name="Lifecycle definition",
                 source_object_type="table",
                 status="active",
                 version=1,
+                owner_user_id=seed.user_id,
             )
             db.add(dataset)
             await db.flush()
@@ -503,7 +571,40 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
                 normalized_data_type="string",
                 is_nullable=False,
             )
-            db.add(category)
+            orders = DatasetField(
+                organization_id=seed.org_id,
+                workspace_id=seed.ws_id,
+                dataset_id=dataset.id,
+                source_name="orders",
+                display_name="Orders",
+                ordinal_position=1,
+                physical_data_type="integer",
+                normalized_data_type="integer",
+                is_nullable=False,
+            )
+            latitude = DatasetField(
+                organization_id=seed.org_id,
+                workspace_id=seed.ws_id,
+                dataset_id=dataset.id,
+                source_name="latitude",
+                display_name="Latitude",
+                ordinal_position=2,
+                physical_data_type="numeric",
+                normalized_data_type="decimal",
+                is_nullable=False,
+            )
+            longitude = DatasetField(
+                organization_id=seed.org_id,
+                workspace_id=seed.ws_id,
+                dataset_id=dataset.id,
+                source_name="longitude",
+                display_name="Longitude",
+                ordinal_position=3,
+                physical_data_type="numeric",
+                normalized_data_type="decimal",
+                is_nullable=False,
+            )
+            db.add_all((category, orders, latitude, longitude))
             await db.flush()
             semantic_model = SemanticModel(
                 organization_id=seed.org_id,
@@ -516,6 +617,19 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
                 created_by_user_id=seed.user_id,
             )
             db.add(semantic_model)
+            await db.flush()
+            measure = SemanticMeasure(
+                organization_id=seed.org_id,
+                workspace_id=seed.ws_id,
+                semantic_model_id=semantic_model.id,
+                dataset_id=dataset.id,
+                field_id=orders.id,
+                key="orders_measure",
+                name="Orders measure",
+                aggregation="sum",
+                data_type="integer",
+            )
+            db.add(measure)
             await db.flush()
             db.add_all(
                 (
@@ -530,13 +644,36 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
                         dimension_type="categorical",
                         data_type="string",
                     ),
+                    SemanticDimension(
+                        organization_id=seed.org_id,
+                        workspace_id=seed.ws_id,
+                        semantic_model_id=semantic_model.id,
+                        dataset_id=dataset.id,
+                        field_id=latitude.id,
+                        key="latitude",
+                        name="Latitude",
+                        dimension_type="categorical",
+                        data_type="decimal",
+                    ),
+                    SemanticDimension(
+                        organization_id=seed.org_id,
+                        workspace_id=seed.ws_id,
+                        semantic_model_id=semantic_model.id,
+                        dataset_id=dataset.id,
+                        field_id=longitude.id,
+                        key="longitude",
+                        name="Longitude",
+                        dimension_type="categorical",
+                        data_type="decimal",
+                    ),
                     SemanticMetric(
                         organization_id=seed.org_id,
                         workspace_id=seed.ws_id,
                         semantic_model_id=semantic_model.id,
                         key="orders",
                         name="Orders",
-                        metric_type="calculated",
+                        metric_type="measure",
+                        base_measure_id=measure.id,
                         status="published",
                     ),
                 )
@@ -558,39 +695,48 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
                 correlation_id="all-widget-real-lifecycle",
             )
             created = await create_dashboard(db, context, DashboardCreate(name="All 20 widgets"))
-            widgets = [
-                WidgetInput(
+            widgets = {
+                widget_type: WidgetInput(
                     type=widget_type,
-                    title=f"{widget_type} lifecycle",
+                    title=f"{widget_type} lifecycle دورة حياة",
                     semantic_model_id=(
                         semantic_model.id if widget_type in DATA_WIDGET_TYPES else None
                     ),
                     query={
                         "metrics": ["orders"] if widget_type in DATA_WIDGET_TYPES else [],
-                        "dimensions": ["category"] if widget_type in DATA_WIDGET_TYPES else [],
+                        "dimensions": (
+                            ["category", "latitude", "longitude"]
+                            if widget_type == "map"
+                            else ["category"]
+                            if widget_type in DATA_WIDGET_TYPES
+                            else []
+                        ),
                         "filters": [],
                     },
                     config={
                         "show_legend": True,
                         "legend_position": "bottom",
                         "axis": {
-                            "x": {"title": "Region axis"},
-                            "y": {"title": "Revenue axis"},
+                            "x": {"title": "Region / المنطقة"},
+                            "y": {"title": "Orders / الطلبات"},
                         },
+                        "number_style": "plain",
+                        "decimals": 0,
+                        "conditional": [{"when": "gt", "value": 9, "color": "#14B8A6"}],
                         "locked": index % 2 == 0,
-                        "aria_label": f"Accessible {widget_type}",
+                        "aria_label": f"Accessible {widget_type} عنصر",
                     },
-                    layout=GridLayout(x=0, y=index * 4, w=12, h=4),
-                    interactions={"exportable": True},
+                    layout=GridLayout(x=0, y=0, w=12, h=8),
+                    interactions={"exportable": True, "drill": {"field": "category"}},
                     content=(
-                        f"Definition for {widget_type}"
+                        f"Definition for {widget_type} - تعريف ثنائي الاتجاه 2026"
                         if widget_type not in DATA_WIDGET_TYPES
                         else None
                     ),
-                    hidden=widget_type in DATA_WIDGET_TYPES,
+                    hidden=False,
                 )
                 for index, widget_type in enumerate(ALL_WIDGET_TYPES)
-            ]
+            }
             saved = await save_editor(
                 db,
                 context,
@@ -600,11 +746,12 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
                     name="All 20 widgets",
                     pages=[
                         PageInput(
-                            key="all_widgets",
-                            name="All widgets",
-                            position=0,
-                            widgets=widgets,
+                            key=f"widget_{index + 1}",
+                            name=f"{widget_type} / عنصر {index + 1}",
+                            position=index,
+                            widgets=[widgets[widget_type]],
                         )
+                        for index, widget_type in enumerate(ALL_WIDGET_TYPES)
                     ],
                 ),
             )
@@ -617,74 +764,163 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
             assert published_view["version"] == published.version_number
             assert published_view["snapshot"] == version.snapshot
 
-            schedule.format = "json"
-            schedule.dashboard_id = created.id
-            schedule.dashboard_version_id = published.id
+            schedules: dict[str, UUID] = {}
+            for index, export_format in enumerate(("pdf", "png", "csv", "json")):
+                target = schedule
+                if index:
+                    target = DashboardDeliverySchedule(
+                        organization_id=seed.org_id,
+                        workspace_id=seed.ws_id,
+                        dashboard_id=created.id,
+                        dashboard_version_id=published.id,
+                        name=f"Lifecycle {export_format.upper()} {suffix}",
+                        recipients=["ops@vip.test"],
+                        cc=[],
+                        bcc=[],
+                        subject=f"Lifecycle {export_format.upper()}",
+                        format=export_format,
+                        filters={},
+                        schedule_type="daily",
+                        timezone="UTC",
+                        enabled=True,
+                        status="scheduled",
+                        max_retries=3,
+                        created_by_user_id=seed.user_id,
+                        next_run_at=NOW - timedelta(minutes=5),
+                    )
+                    db.add(target)
+                    await db.flush()
+                target.format = export_format
+                target.dashboard_id = created.id
+                target.dashboard_version_id = published.id
+                schedules[export_format] = target.id
             await db.commit()
 
         queue = _QueueStub()
-        assert await dispatch_due_deliveries(database, configured, queue, now=NOW) == 1
-        assert len(queue.enqueued) == 1
-        platform_job_id = queue.enqueued[0]
+        assert await dispatch_due_deliveries(database, configured, queue, now=NOW) == 4
+        assert len(queue.enqueued) == 4
 
         worker = GenericJobWorker(configured)
-        await worker._execute(platform_job_id)
+        for platform_job_id in queue.enqueued:
+            await worker._execute(platform_job_id)
 
+        observed: list[dict[str, object]] = []
         async with database.session_factory() as db:
-            schedule = await db.get(DashboardDeliverySchedule, schedule_id)
-            run = await db.scalar(
-                select(DashboardDeliveryRun).where(DashboardDeliveryRun.schedule_id == schedule_id)
-            )
-            job = await db.get(Job, platform_job_id)
-            result = await db.get(JobResult, platform_job_id)
-            assert schedule is not None and schedule.dashboard_version_id == published.id
-            assert run is not None and run.export_id is not None and run.status == "sent"
-            export = await db.get(DashboardExport, run.export_id)
-            assert export is not None and export.status == "completed"
-            assert export.dashboard_version_id == published.id
-            assert export.artifact_key and export.artifact_sha256
-            assert job is not None and job.status == "succeeded"
-            assert result is not None and result.result_file_id is not None
-            stored_file = await db.get(PlatformFile, result.result_file_id)
-            assert stored_file is not None and stored_file.status == "ready"
-            assert stored_file.metadata_json["dashboard_version_id"] == str(published.id)
+            for export_format, current_schedule_id in schedules.items():
+                current_schedule = await db.get(DashboardDeliverySchedule, current_schedule_id)
+                run = await db.scalar(
+                    select(DashboardDeliveryRun).where(
+                        DashboardDeliveryRun.schedule_id == current_schedule_id
+                    )
+                )
+                assert current_schedule is not None
+                assert current_schedule.dashboard_version_id == published.id
+                assert run is not None and run.export_id is not None and run.status == "sent"
+                export = await db.get(DashboardExport, run.export_id)
+                assert export is not None and export.status == "completed"
+                assert export.dashboard_version_id == published.id
+                assert export.format == export_format
+                assert export.artifact_key and export.artifact_sha256
+                assert export.platform_job_id is not None
+                job = await db.get(Job, export.platform_job_id)
+                result = await db.get(JobResult, export.platform_job_id)
+                assert job is not None and job.status == "succeeded"
+                assert result is not None and result.result_file_id is not None
+                stored_file = await db.get(PlatformFile, result.result_file_id)
+                assert stored_file is not None and stored_file.status == "ready"
+                assert stored_file.metadata_json["dashboard_version_id"] == str(published.id)
 
-        artifact = await FileArtifactStorage(configured).read(export.artifact_key)
-        artifact_hash = hashlib.sha256(artifact).hexdigest()
-        assert artifact_hash == export.artifact_sha256
-        payload = json.loads(artifact)
-        exported_types = [
-            widget["type"] for page in payload["definition"]["pages"] for widget in page["widgets"]
-        ]
-        assert exported_types == list(ALL_WIDGET_TYPES)
+                artifact = await FileArtifactStorage(configured).read(export.artifact_key)
+                artifact_hash = hashlib.sha256(artifact).hexdigest()
+                assert artifact_hash == export.artifact_sha256
 
-        email_path = outbox_root / f"{run.id}.eml"
-        assert email_path.is_file()
-        message = BytesParser(policy=policy.default).parsebytes(email_path.read_bytes())
-        attachment = next(message.iter_attachments())
-        attachment_bytes = attachment.get_payload(decode=True)
-        assert attachment_bytes == artifact
-        assert hashlib.sha256(attachment_bytes).hexdigest() == artifact_hash
+                if export_format == "json":
+                    assert str(published.id).encode() in artifact
+                    definition = json.loads(artifact)["definition"]
+                elif export_format == "csv":
+                    assert str(published.id).encode() in artifact
+                    rows = list(csv.reader(io.StringIO(artifact.decode("utf-8-sig"))))
+                    definition = json.loads(rows[1][1])
+                    assert any(row and row[0].startswith("Widget ") for row in rows)
+                elif export_format == "png":
+                    with Image.open(io.BytesIO(artifact)) as image:
+                        definition = json.loads(image.info["vip.dashboard.definition"])
+                        assert image.width > 0 and image.height > 0
+                else:
+                    assert artifact.startswith(b"%PDF-")
+                    assert _reportlab_pdf_utf16(str(published.id)) in artifact
+                    for widget_type in ALL_WIDGET_TYPES:
+                        assert _reportlab_pdf_utf16(widget_type) in artifact
+                    definition = version.snapshot | {
+                        "dashboard_version_id": str(published.id),
+                    }
+
+                exported_types = [
+                    widget["type"] for page in definition["pages"] for widget in page["widgets"]
+                ]
+                assert exported_types == list(ALL_WIDGET_TYPES)
+                assert all(
+                    not widget["hidden"]
+                    for page in definition["pages"]
+                    for widget in page["widgets"]
+                )
+
+                email_path = outbox_root / f"{run.id}.eml"
+                assert email_path.is_file()
+                message = BytesParser(policy=policy.default).parsebytes(email_path.read_bytes())
+                attachment = next(message.iter_attachments())
+                attachment_bytes = attachment.get_payload(decode=True)
+                assert attachment_bytes == artifact
+                email_hash = hashlib.sha256(attachment_bytes).hexdigest()
+                assert email_hash == artifact_hash
+                observed.append(
+                    {
+                        "format": export_format,
+                        "dashboard_id": str(created.id),
+                        "published_version_id": str(published.id),
+                        "schedule_id": str(current_schedule_id),
+                        "delivery_run_id": str(run.id),
+                        "platform_job_id": str(export.platform_job_id),
+                        "export_id": str(export.id),
+                        "stored_file_id": str(stored_file.id),
+                        "artifact_sha256": artifact_hash,
+                        "email_attachment_sha256": email_hash,
+                        "widget_count": 20,
+                        "visible_widget_count": 20,
+                        "queried_widget_count": len(DATA_WIDGET_TYPES),
+                        "result": "pass",
+                        "test_id": (
+                            "integration/test_dashboard_delivery_scheduler.py::"
+                            "test_all_twenty_widgets_traverse_every_real_delivery_format"
+                        ),
+                    }
+                )
+
+                evidence_path = os.getenv("VIP_WIDGET_LIFECYCLE_EVIDENCE_PATH")
+                if evidence_path:
+                    artifact_target = (
+                        Path(evidence_path).parent
+                        / "artifacts"
+                        / (f"all-20-widgets-lifecycle.{export_format}")
+                    )
+                    await asyncio.to_thread(
+                        artifact_target.parent.mkdir, parents=True, exist_ok=True
+                    )
+                    await asyncio.to_thread(artifact_target.write_bytes, artifact)
 
         evidence_path = os.getenv("VIP_WIDGET_LIFECYCLE_EVIDENCE_PATH")
         if evidence_path:
-            target = Path(evidence_path)
-            await asyncio.to_thread(target.parent.mkdir, parents=True, exist_ok=True)
+            evidence_target = Path(evidence_path)
+            await asyncio.to_thread(evidence_target.parent.mkdir, parents=True, exist_ok=True)
             evidence = (
                 json.dumps(
                     {
-                        "schema_version": 1,
+                        "schema_version": 2,
                         "widget_count": 20,
                         "widget_types": list(ALL_WIDGET_TYPES),
                         "dashboard_id": str(created.id),
-                        "dashboard_version_id": str(published.id),
-                        "schedule_id": str(schedule_id),
-                        "delivery_run_id": str(run.id),
-                        "export_id": str(export.id),
-                        "platform_job_id": str(platform_job_id),
-                        "stored_file_id": str(stored_file.id),
-                        "artifact_sha256": artifact_hash,
-                        "email_attachment_sha256": hashlib.sha256(attachment_bytes).hexdigest(),
+                        "published_version_id": str(published.id),
+                        "formats": observed,
                         "channels": [
                             "database_create",
                             "editor_save",
@@ -697,17 +933,21 @@ async def test_all_twenty_widgets_traverse_scheduler_worker_storage_and_email(
                             "file_record",
                             "email_attachment",
                         ],
-                        "result": "pass",
+                        "result": "pass" if len(observed) == 4 else "fail",
                     },
                     indent=2,
                     sort_keys=True,
                 )
                 + "\n"
             )
-            await asyncio.to_thread(target.write_text, evidence, encoding="utf-8")
+            await asyncio.to_thread(evidence_target.write_text, evidence, encoding="utf-8")
     finally:
         if worker is not None:
             await worker.redis.close()
             await worker.database.dispose()
         get_settings.cache_clear()
-        await _cleanup(database, org_ids, user_ids, connection_type_ids)
+        if source_table is not None:
+            async with database.session_factory() as db:
+                await db.execute(text(f'DROP TABLE IF EXISTS "{source_table}"'))
+                await db.commit()
+        await _cleanup(database, org_ids, user_ids)
