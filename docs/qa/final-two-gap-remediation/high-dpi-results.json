@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "project": "chrome-high-dpi",
+  "attempts": [
+    {
+      "attempt": 1,
+      "passed": 23,
+      "failed": 0,
+      "retries": 0,
+      "duration": "1.5m",
+      "result": "pass"
+    }
+  ],
+  "host": {
+    "docker_healthy": true,
+    "available_memory_gb": 24.3,
+    "total_memory_gb": 47.48,
+    "docker_cpus": 22,
+    "docker_memory_gb": 23.2,
+    "disk_healthy": true,
+    "browser_residue": false,
+    "playwright_chromium_build": 1228
+  },
+  "artifact_scan": {
+    "files_scanned": 1,
+    "redactions": 3,
+    "findings": 0
+  },
+  "result": "pass"
+}

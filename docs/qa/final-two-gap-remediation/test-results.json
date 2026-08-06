@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "starting_sha": "3f78daa9a29d879d9ca2413e1da14fd57da2bc75",
+  "first_attempts": {
+    "ruff": {"result": "pass"},
+    "ruff_format": {"result": "fail", "reason": "one new integration test required formatting"},
+    "mypy": {"result": "fail", "errors": 3, "reason": "new lifecycle test variable shadowing"},
+    "backend_unit": {"passed": 255, "failed": 0},
+    "frontend_lint": {"result": "pass"},
+    "frontend_typecheck": {"result": "pass"},
+    "frontend_format": {"result": "pass"},
+    "frontend_unit": {"passed": 303, "failed": 0},
+    "production_build": {"result": "pass"},
+    "integration_runs": [
+      {"passed": 66, "failed": 0, "duration_seconds": 114.92},
+      {"passed": 66, "failed": 0, "duration_seconds": 115.68},
+      {"passed": 66, "failed": 0, "duration_seconds": 110.70}
+    ],
+    "firefox_dashboard_runs": [
+      {"passed": 20, "failed": 0, "retries": 0, "duration": "3.1m"},
+      {"passed": 20, "failed": 0, "retries": 0, "duration": "3.1m"}
+    ],
+    "chromium_full": {"passed": 66, "failed": 0, "retries": 0, "duration": "3.8m"},
+    "firefox_full": {"passed": 66, "failed": 0, "retries": 0, "duration": "6.5m"},
+    "webkit_full": {"passed": 66, "failed": 0, "retries": 0, "duration": "5.2m"},
+    "high_dpi": {"passed": 23, "failed": 0, "retries": 0, "duration": "1.5m"},
+    "mobile": {"passed": 5, "failed": 0, "retries": 0, "duration": "24.9s"},
+    "governed_pipeline": {"passed": 10, "failed": 0, "retries": 0, "duration": "2.4m"},
+    "multiformat_lifecycle": {"formats_passed": 4, "formats_failed": 0},
+    "api_operations": {"classified": 247, "mapped": 247, "executed": 247, "passed": 247},
+    "dynamic_artifact_sanitizer": {"passed": 2, "failed": 0}
+  },
+  "retries_after_first_failure": {
+    "ruff_format": {"result": "pass", "files_checked": 253},
+    "mypy": {"result": "pass", "errors": 0},
+    "alembic_environment_setup": {"result": "pass", "head": "20260803_0019"}
+  },
+  "playwright_retries": 0,
+  "result": "pass"
+}

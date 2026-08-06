@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "categories": [
+    {
+      "category": "automated certification framework",
+      "commit": true,
+      "sensitive_risk": "none",
+      "files": ["apps/api/src/vip_api/api/operation_coverage.py"]
+    },
+    {
+      "category": "automated integration and unit tests",
+      "commit": true,
+      "sensitive_risk": "test-only generated credentials remain process scoped",
+      "files": [
+        "apps/api/tests/integration/test_dashboard_delivery_scheduler.py",
+        "apps/api/tests/integration/test_production_api_contract_sweep.py",
+        "apps/api/tests/unit/test_operation_coverage.py"
+      ]
+    },
+    {
+      "category": "sanitized QA reports and machine evidence",
+      "commit": true,
+      "sensitive_risk": "low; UUIDs and hashes only; scanned",
+      "root": "docs/qa/final-two-gap-remediation"
+    },
+    {
+      "category": "generated local artifacts",
+      "commit": false,
+      "sensitive_risk": "potential browser authentication material",
+      "files": ["test-results/", "playwright-report/", "tmp/", "dist/"]
+    }
+  ],
+  "unrelated_changes": [],
+  "unknown_files": [],
+  "migrations": []
+}

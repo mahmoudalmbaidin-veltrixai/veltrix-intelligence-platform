@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "starting_sha": "3f78daa9a29d879d9ca2413e1da14fd57da2bc75",
+  "migrations_added": 0,
+  "production_behavior_files_changed": 0,
+  "files": [
+    "apps/api/src/vip_api/api/operation_coverage.py",
+    "apps/api/tests/integration/test_dashboard_delivery_scheduler.py",
+    "apps/api/tests/integration/test_production_api_contract_sweep.py",
+    "apps/api/tests/unit/test_operation_coverage.py",
+    "docs/qa/final-two-gap-remediation/00-executive-summary.md",
+    "docs/qa/final-two-gap-remediation/01-multiformat-lifecycle-report.md",
+    "docs/qa/final-two-gap-remediation/02-operation-security-coverage-report.md",
+    "docs/qa/final-two-gap-remediation/03-high-dpi-first-attempt-report.md",
+    "docs/qa/final-two-gap-remediation/04-regression-results.md",
+    "docs/qa/final-two-gap-remediation/05-security-assessment.md",
+    "docs/qa/final-two-gap-remediation/06-changed-files.md",
+    "docs/qa/final-two-gap-remediation/07-independent-recertification-handoff.md",
+    "docs/qa/final-two-gap-remediation/multiformat-lifecycle-evidence.json",
+    "docs/qa/final-two-gap-remediation/api-operation-security-coverage.json",
+    "docs/qa/final-two-gap-remediation/high-dpi-results.json",
+    "docs/qa/final-two-gap-remediation/test-results.json",
+    "docs/qa/final-two-gap-remediation/changed-files.json",
+    "docs/qa/final-two-gap-remediation/file-classification.json",
+    "docs/qa/final-two-gap-remediation/artifact-secret-scan.json",
+    "docs/qa/final-two-gap-remediation/artifacts/all-20-widgets-lifecycle.pdf",
+    "docs/qa/final-two-gap-remediation/artifacts/all-20-widgets-lifecycle.png",
+    "docs/qa/final-two-gap-remediation/artifacts/all-20-widgets-lifecycle.csv",
+    "docs/qa/final-two-gap-remediation/artifacts/all-20-widgets-lifecycle.json"
+  ]
+}
