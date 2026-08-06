@@ -10,21 +10,29 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from starlette.testclient import TestClient
 
-from vip_api.api.operation_coverage import build_coverage
+from vip_api.api.operation_coverage import (
+    ANONYMOUS_SWEEP_TEST_ID,
+    CONTRACT_SWEEP_TEST_ID,
+    build_coverage,
+)
 from vip_api.auth.models import User, UserStatus
 from vip_api.auth.password import PasswordService
 from vip_api.core.config import AppEnvironment, Settings
+from vip_api.dashboards.models import Dashboard
 from vip_api.database.session import Database
 from vip_api.governance.models import (
     Entitlement,
     FeatureFlag,
     FeatureFlagOverride,
+    Group,
+    GroupMembership,
     OrganizationEntitlement,
     Role,
 )
@@ -41,6 +49,7 @@ from vip_api.tenancy.models import (
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 _ANONYMOUS_EXECUTED_OPERATION_IDS: set[str] = set()
+_ANONYMOUS_OBSERVATIONS: dict[str, int] = {}
 
 
 @dataclass(frozen=True)
@@ -49,6 +58,8 @@ class ContractPersonas:
     password: str
     organizations: dict[str, UUID]
     workspaces: dict[str, UUID]
+    users: dict[str, UUID]
+    resources: dict[str, UUID]
 
 
 async def _seed_contract_personas(settings: Settings) -> ContractPersonas:
@@ -94,7 +105,9 @@ async def _seed_contract_personas(settings: Settings) -> ContractPersonas:
                     normalized_email=f"contract-suspended-{suffix}@vip.test",
                     display_name="Contract Suspended",
                     password_hash=PasswordService(settings).hash_password(password),
-                    status=UserStatus.SUSPENDED,
+                    # A session is issued while active, then the user is suspended.
+                    # This proves every protected operation re-checks live status.
+                    status=UserStatus.ACTIVE,
                 ),
             }
             db.add_all(users.values())
@@ -125,8 +138,9 @@ async def _seed_contract_personas(settings: Settings) -> ContractPersonas:
             await db.flush()
             memberships = [
                 ("admin", "alpha", "organization_owner", "workspace_admin"),
-                ("restricted", "alpha", "organization_member", "viewer"),
+                ("restricted", "alpha", "organization_member", "restricted_user"),
                 ("cross", "beta", "organization_owner", "workspace_admin"),
+                ("suspended", "alpha", "organization_member", "viewer"),
             ]
             for user_key, tenant_key, org_role, workspace_role in memberships:
                 db.add(
@@ -146,6 +160,28 @@ async def _seed_contract_personas(settings: Settings) -> ContractPersonas:
                         status=MembershipStatus.ACTIVE,
                     )
                 )
+            dashboards = {
+                tenant_key: Dashboard(
+                    organization_id=organizations[tenant_key].id,
+                    workspace_id=workspaces[tenant_key].id,
+                    name=f"Contract {tenant_key.title()} dashboard",
+                    slug=f"contract-{tenant_key}-dashboard-{suffix}",
+                    status="draft",
+                    owner_user_id=users["admin" if tenant_key == "alpha" else "cross"].id,
+                    created_by_user_id=users["admin" if tenant_key == "alpha" else "cross"].id,
+                )
+                for tenant_key in ("alpha", "beta")
+            }
+            db.add_all(dashboards.values())
+            acl_group = Group(
+                organization_id=organizations["alpha"].id,
+                workspace_id=workspaces["alpha"].id,
+                name=f"Contract ACL group {suffix}",
+                slug=f"contract-acl-{suffix}",
+            )
+            db.add(acl_group)
+            await db.flush()
+            db.add(GroupMembership(group_id=acl_group.id, user_id=users["restricted"].id))
             for entitlement in (await db.scalars(select(Entitlement))).all():
                 db.add(
                     OrganizationEntitlement(
@@ -170,6 +206,12 @@ async def _seed_contract_personas(settings: Settings) -> ContractPersonas:
                 password=password,
                 organizations={key: value.id for key, value in organizations.items()},
                 workspaces={key: value.id for key, value in workspaces.items()},
+                users={key: value.id for key, value in users.items()},
+                resources={
+                    "alpha_dashboard": dashboards["alpha"].id,
+                    "beta_dashboard": dashboards["beta"].id,
+                    "acl_group": acl_group.id,
+                },
             )
     finally:
         await database.dispose()
@@ -186,6 +228,20 @@ async def _cleanup_contract_personas(settings: Settings, personas: ContractPerso
             )
             await db.execute(
                 delete(User).where(User.username.in_(list(personas.usernames.values())))
+            )
+            await db.commit()
+    finally:
+        await database.dispose()
+
+
+async def _set_persona_status(
+    settings: Settings, personas: ContractPersonas, persona: str, status: UserStatus
+) -> None:
+    database = Database(settings)
+    try:
+        async with database.session_factory() as db:
+            await db.execute(
+                update(User).where(User.id == personas.users[persona]).values(status=status)
             )
             await db.commit()
     finally:
@@ -285,6 +341,17 @@ def _path_for(path: str, operation: dict[str, Any]) -> str:
     )
 
 
+def _has_uuid_path_parameter(path: str, operation: dict[str, Any]) -> bool:
+    names = set(re.findall(r"\{([^}]+)\}", path))
+    parameters = {
+        item["name"]: item for item in operation.get("parameters", []) if item.get("in") == "path"
+    }
+    return any(
+        parameters.get(name, {}).get("schema", {}).get("format") == "uuid" or name.endswith("_id")
+        for name in names
+    )
+
+
 @pytest.mark.integration
 def test_every_production_operation_has_a_resolvable_contract_and_fails_closed(
     settings: Settings,
@@ -307,7 +374,7 @@ def test_every_production_operation_has_a_resolvable_contract_and_fails_closed(
             contract_errors.append(f"{method.upper()} {path}: no declared 2xx response")
         if not operation.get("summary") or not operation.get("tags"):
             contract_errors.append(f"{method.upper()} {path}: summary/tags missing")
-        if "{" in path:
+        if _has_uuid_path_parameter(path, operation):
             declared = {
                 item["name"]
                 for item in operation.get("parameters", [])
@@ -333,6 +400,7 @@ def test_every_production_operation_has_a_resolvable_contract_and_fails_closed(
                 json={} if method in {"post", "put", "patch"} else None,
                 follow_redirects=False,
             )
+            _ANONYMOUS_OBSERVATIONS[str(operation["operationId"])] = response.status_code
             if response.status_code >= 500:
                 runtime_errors.append(
                     f"{method.upper()} {path}: unexpected {response.status_code} "
@@ -367,7 +435,7 @@ def test_every_operation_is_classified_for_authenticated_certification(settings:
     assert coverage["executed_count"] == 0
     assert len({item["operation_id"] for item in operations}) == 247
     for item in operations:
-        assert item["test_evidence"]
+        assert item["mapped_test_ids"]
         assert item["personas"]
         dimensions = cast(list[str], item["claimed_dimensions"])
         assert "openapi_contract" in dimensions
@@ -393,7 +461,7 @@ def _tenant_headers(
         settings.TENANCY_ORGANIZATION_HEADER: str(organization_id),
         settings.TENANCY_WORKSPACE_HEADER: str(workspace_id),
         settings.AUTH_CSRF_HEADER_NAME: csrf,
-        "Origin": settings.CORS_ALLOWED_ORIGINS[0],
+        "Origin": settings.CSRF_TRUSTED_ORIGINS[0],
     }
 
 
@@ -418,6 +486,63 @@ def _runtime_path(path: str, operation: dict[str, Any]) -> str:
     if path == "/api/v1/events/stream":
         return f"{resolved}?cursor=invalid-contract-cursor"
     return resolved
+
+
+def _query_value(schema: dict[str, Any], *, boundary: str) -> str | None:
+    if boundary == "lower":
+        if "minimum" in schema:
+            return str(int(schema["minimum"]) - 1)
+        if "exclusiveMinimum" in schema:
+            return str(int(schema["exclusiveMinimum"]))
+        if "minLength" in schema and int(schema["minLength"]) > 0:
+            return "x" * (int(schema["minLength"]) - 1)
+    else:
+        if "maximum" in schema:
+            return str(int(schema["maximum"]) + 1)
+        if "exclusiveMaximum" in schema:
+            return str(int(schema["exclusiveMaximum"]))
+        if "maxLength" in schema:
+            return "x" * (int(schema["maxLength"]) + 1)
+    return None
+
+
+def _bounded_query_cases(operation: dict[str, Any]) -> list[tuple[str, str, str]]:
+    cases: list[tuple[str, str, str]] = []
+    for parameter in operation.get("parameters", []):
+        if parameter.get("in") != "query":
+            continue
+        schema = cast(dict[str, Any], parameter.get("schema", {}))
+        for boundary in ("lower", "upper"):
+            value = _query_value(schema, boundary=boundary)
+            if value is not None:
+                cases.append((boundary, str(parameter["name"]), value))
+    return cases
+
+
+def _with_query(path: str, name: str, value: str) -> str:
+    parsed = urlsplit(path)
+    values = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    values[name] = value
+    return urlunsplit(
+        (parsed.scheme, parsed.netloc, parsed.path, urlencode(values), parsed.fragment)
+    )
+
+
+def _evidence(
+    *,
+    test_id: str,
+    persona: str,
+    status: int | None,
+    result: str = "pass",
+    resource: str | None = None,
+) -> dict[str, object]:
+    return {
+        "test_id": test_id,
+        "persona": persona,
+        "resource": resource,
+        "observed_http_status": status,
+        "result": result,
+    }
 
 
 def _validate_json_schema(document: dict[str, Any], schema: object, value: object) -> None:
@@ -491,17 +616,22 @@ def _validate_success_schema(
 def _new_record(operation_id: str, probes: list[str]) -> dict[str, object]:
     return {
         "operation_id": operation_id,
-        "executed_dimensions": ["openapi_contract"],
+        "executed_dimensions": [],
+        "dimension_evidence": {},
         "required_probes": probes,
         "observations": {},
         "result": "pending",
     }
 
 
-def _add_dimension(record: dict[str, object], dimension: str) -> None:
+def _add_dimension(
+    record: dict[str, object], dimension: str, evidence: dict[str, object] | None = None
+) -> None:
     dimensions = cast(list[str], record["executed_dimensions"])
     if dimension not in dimensions:
         dimensions.append(dimension)
+    if evidence is not None:
+        cast(dict[str, object], record["dimension_evidence"])[dimension] = evidence
 
 
 @pytest.mark.integration
@@ -537,14 +667,23 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
         )
         for _, _, operation in operations
     }
-    for path, method, operation in operations:
-        record = records[operation["operationId"]]
-        scope = scopes[operation["operationId"]]
-        _add_dimension(record, "public_probe" if scope == "public" else "unauthenticated_probe")
-        if "{" in path:
-            _add_dimension(record, "invalid_uuid_probe")
-        if method in {"post", "put", "patch"}:
-            _add_dimension(record, "empty_payload_probe")
+    for path, _method, operation in operations:
+        operation_id = str(operation["operationId"])
+        record = records[operation_id]
+        scope = scopes[operation_id]
+        anonymous_status = _ANONYMOUS_OBSERVATIONS[operation_id]
+        anonymous_evidence = _evidence(
+            test_id=ANONYMOUS_SWEEP_TEST_ID,
+            persona="anonymous",
+            status=anonymous_status,
+            resource=_runtime_path(path, operation),
+        )
+        _add_dimension(record, "openapi_contract", anonymous_evidence)
+        _add_dimension(
+            record,
+            "public_probe" if scope == "public" else "unauthenticated_probe",
+            anonymous_evidence,
+        )
     try:
         with TestClient(app, raise_server_exceptions=False) as client:
             _login(client, personas.usernames["admin"], personas.password)
@@ -571,11 +710,40 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
                 cast(dict[str, object], record["observations"])["authenticated"] = (
                     response.status_code
                 )
-                _add_dimension(record, "authenticated_probe")
+                authenticated_evidence = _evidence(
+                    test_id=CONTRACT_SWEEP_TEST_ID,
+                    persona="workspace_admin",
+                    status=response.status_code,
+                    resource=_runtime_path(path, operation),
+                )
+                _add_dimension(record, "authenticated_probe", authenticated_evidence)
+                if _has_uuid_path_parameter(path, operation):
+                    _add_dimension(record, "invalid_uuid_probe", authenticated_evidence)
                 if 200 <= response.status_code < 300:
-                    _add_dimension(record, "authenticated_success")
+                    _add_dimension(record, "authenticated_success", authenticated_evidence)
                 if _validate_success_schema(document, operation, response):
-                    _add_dimension(record, "response_schema_validated")
+                    _add_dimension(record, "response_schema_validated", authenticated_evidence)
+                if method in {"post", "put", "patch"} and response.status_code == 422:
+                    _add_dimension(record, "empty_payload_probe", authenticated_evidence)
+                    invalid_response = client.request(
+                        method.upper(),
+                        _runtime_path(path, operation),
+                        headers=headers,
+                        json={"__contract_probe__": {"unexpected": True}},
+                        follow_redirects=False,
+                    )
+                    _assert_safe_contract_response(invalid_response, path, method, operation)
+                    if invalid_response.status_code == 422:
+                        _add_dimension(
+                            record,
+                            "invalid_payload_probe",
+                            _evidence(
+                                test_id=CONTRACT_SWEEP_TEST_ID,
+                                persona="workspace_admin",
+                                status=invalid_response.status_code,
+                                resource=_runtime_path(path, operation),
+                            ),
+                        )
 
         # Authentication endpoints get isolated sessions so logout/password
         # actions cannot invalidate the remaining operation probes.
@@ -603,11 +771,40 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
                 cast(dict[str, object], record["observations"])["authenticated"] = (
                     response.status_code
                 )
-                _add_dimension(record, "authenticated_probe")
+                authenticated_evidence = _evidence(
+                    test_id=CONTRACT_SWEEP_TEST_ID,
+                    persona="active_user",
+                    status=response.status_code,
+                    resource=_runtime_path(path, operation),
+                )
+                _add_dimension(record, "authenticated_probe", authenticated_evidence)
+                if _has_uuid_path_parameter(path, operation):
+                    _add_dimension(record, "invalid_uuid_probe", authenticated_evidence)
                 if 200 <= response.status_code < 300:
-                    _add_dimension(record, "authenticated_success")
+                    _add_dimension(record, "authenticated_success", authenticated_evidence)
                 if _validate_success_schema(document, operation, response):
-                    _add_dimension(record, "response_schema_validated")
+                    _add_dimension(record, "response_schema_validated", authenticated_evidence)
+                if method in {"post", "put", "patch"} and response.status_code == 422:
+                    _add_dimension(record, "empty_payload_probe", authenticated_evidence)
+                    invalid_response = client.request(
+                        method.upper(),
+                        _runtime_path(path, operation),
+                        headers=headers,
+                        json={"__contract_probe__": {"unexpected": True}},
+                        follow_redirects=False,
+                    )
+                    _assert_safe_contract_response(invalid_response, path, method, operation)
+                    if invalid_response.status_code == 422:
+                        _add_dimension(
+                            record,
+                            "invalid_payload_probe",
+                            _evidence(
+                                test_id=CONTRACT_SWEEP_TEST_ID,
+                                persona="active_user",
+                                status=invalid_response.status_code,
+                                resource=_runtime_path(path, operation),
+                            ),
+                        )
 
         with TestClient(app, raise_server_exceptions=False) as client:
             _login(client, personas.usernames["restricted"], personas.password)
@@ -634,9 +831,15 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
                 _assert_safe_contract_response(response, path, method, operation)
                 record = records[operation_id]
                 cast(dict[str, object], record["observations"])["restricted"] = response.status_code
-                _add_dimension(record, "restricted_role_probe")
+                restricted_evidence = _evidence(
+                    test_id=CONTRACT_SWEEP_TEST_ID,
+                    persona="restricted_role",
+                    status=response.status_code,
+                    resource=_runtime_path(path, operation),
+                )
+                _add_dimension(record, "restricted_role_probe", restricted_evidence)
                 if response.status_code == 403:
-                    _add_dimension(record, "forbidden_observed")
+                    _add_dimension(record, "forbidden_observed", restricted_evidence)
             assert restricted_denials > 0
 
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -671,25 +874,272 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
                 cast(dict[str, object], record["observations"])["cross_tenant"] = (
                     response.status_code
                 )
-                _add_dimension(record, "cross_tenant_header_probe")
-                _add_dimension(record, "cross_tenant_isolated")
+                cross_evidence = _evidence(
+                    test_id=CONTRACT_SWEEP_TEST_ID,
+                    persona="cross_tenant_user",
+                    status=response.status_code,
+                    resource=_runtime_path(path, operation),
+                )
+                _add_dimension(record, "cross_tenant_header_probe", cross_evidence)
+                _add_dimension(record, "cross_tenant_isolated", cross_evidence)
 
+        # Actual query-parameter bounds are exercised operation by operation.
+        # These requests use declared OpenAPI limits rather than arbitrary sizes.
         with TestClient(app, raise_server_exceptions=False) as client:
-            suspended = client.post(
+            _login(client, personas.usernames["admin"], personas.password)
+            headers = _tenant_headers(
+                client,
+                settings,
+                personas.organizations["alpha"],
+                personas.workspaces["alpha"],
+            )
+            for path, method, operation in operations:
+                if scopes[operation["operationId"]] == "public" or "{" in path:
+                    continue
+                by_boundary: dict[str, tuple[str, str]] = {}
+                for boundary, name, value in _bounded_query_cases(operation):
+                    by_boundary.setdefault(boundary, (name, value))
+                for boundary, (name, value) in by_boundary.items():
+                    runtime_path = _with_query(_runtime_path(path, operation), name, value)
+                    response = client.request(
+                        method.upper(),
+                        runtime_path,
+                        headers=headers,
+                        json={} if method in {"post", "put", "patch"} else None,
+                        follow_redirects=False,
+                    )
+                    assert response.status_code == 422, (
+                        f"{operation['operationId']} accepted invalid {boundary} boundary "
+                        f"for query parameter {name}: {response.status_code}"
+                    )
+                    dimension = f"payload_{boundary}_bound"
+                    boundary_evidence = _evidence(
+                        test_id=CONTRACT_SWEEP_TEST_ID,
+                        persona="workspace_admin",
+                        status=response.status_code,
+                        resource=f"query:{name}",
+                    )
+                    _add_dimension(records[operation["operationId"]], dimension, boundary_evidence)
+                    if name in {"page", "page_size", "limit", "offset", "per_page"}:
+                        _add_dimension(
+                            records[operation["operationId"]],
+                            "pagination_boundary",
+                            boundary_evidence,
+                        )
+                    if name in {"q", "query", "search", "filter", "status"}:
+                        _add_dimension(
+                            records[operation["operationId"]],
+                            "filtering_validation",
+                            boundary_evidence,
+                        )
+
+        # Cross-tenant resource probes use a real Beta dashboard identifier. Only
+        # GET operations whose sole path resource is dashboard_id are claimed.
+        with TestClient(app, raise_server_exceptions=False) as client:
+            _login(client, personas.usernames["admin"], personas.password)
+            headers = _tenant_headers(
+                client,
+                settings,
+                personas.organizations["alpha"],
+                personas.workspaces["alpha"],
+            )
+            for path, method, operation in operations:
+                path_names = set(re.findall(r"\{([^}]+)\}", path))
+                if method != "get" or path_names != {"dashboard_id"}:
+                    continue
+                runtime_path = path.replace(
+                    "{dashboard_id}", str(personas.resources["beta_dashboard"])
+                )
+                response = client.get(runtime_path, headers=headers, follow_redirects=False)
+                assert response.status_code == 404, (
+                    f"{operation['operationId']} exposed a cross-tenant dashboard: "
+                    f"{response.status_code}"
+                )
+                cross_resource_evidence = _evidence(
+                    test_id=CONTRACT_SWEEP_TEST_ID,
+                    persona="workspace_admin",
+                    status=response.status_code,
+                    resource=f"beta_dashboard:{personas.resources['beta_dashboard']}",
+                )
+                record = records[operation["operationId"]]
+                _add_dimension(record, "cross_tenant_resource_probe", cross_resource_evidence)
+                _add_dimension(record, "cross_tenant_isolated", cross_resource_evidence)
+
+        # Real ACL mutations and evaluations against a persisted Alpha dashboard.
+        with TestClient(app, raise_server_exceptions=False) as client:
+            _login(client, personas.usernames["admin"], personas.password)
+            headers = _tenant_headers(
+                client,
+                settings,
+                personas.organizations["alpha"],
+                personas.workspaces["alpha"],
+            )
+            resource_id = personas.resources["alpha_dashboard"]
+            base = f"/api/v1/resources/dashboard/{resource_id}"
+            grant_id = "grant_access_api_v1_resources__resource_type___resource_id__access_post"
+            list_id = "list_access_api_v1_resources__resource_type___resource_id__access_get"
+            effective_id = (
+                "effective_access_api_v1_resources__resource_type___resource_id__effective_get"
+            )
+            simulate_id = (
+                "simulate_access_api_v1_resources__resource_type___resource_id__simulate_post"
+            )
+            revoke_id = (
+                "revoke_access_api_v1_resources__resource_type___resource_id__access__"
+                "entry_id__delete"
+            )
+            entries: list[UUID] = []
+
+            def grant(subject_type: str, subject_id: UUID, level: str, effect: str) -> Any:
+                response = client.post(
+                    f"{base}/access",
+                    headers=headers,
+                    json={
+                        "subject_type": subject_type,
+                        "subject_id": str(subject_id),
+                        "access_level": level,
+                        "effect": effect,
+                    },
+                )
+                assert response.status_code == 200, response.text
+                entries.append(UUID(response.json()["id"]))
+                return response
+
+            user_allow = grant("user", personas.users["restricted"], "view", "allow")
+            group_allow = grant("group", personas.resources["acl_group"], "interact", "allow")
+            access_list = client.get(f"{base}/access", headers=headers)
+            assert access_list.status_code == 200
+            assert len(access_list.json()) == 2
+            effective_allow = client.get(
+                f"{base}/effective",
+                headers=headers,
+                params={"user_id": str(personas.users["restricted"])},
+            )
+            assert effective_allow.status_code == 200
+            assert effective_allow.json()["level"] == "interact"
+            simulated_allow = client.post(
+                f"{base}/simulate",
+                headers=headers,
+                json={"user_id": str(personas.users["restricted"])},
+            )
+            assert simulated_allow.status_code == 200
+            assert simulated_allow.json()["level"] == "interact"
+
+            user_deny = grant("user", personas.users["restricted"], "view", "deny")
+            group_deny = grant("group", personas.resources["acl_group"], "view", "deny")
+            effective_deny = client.get(
+                f"{base}/effective",
+                headers=headers,
+                params={"user_id": str(personas.users["restricted"])},
+            )
+            assert effective_deny.status_code == 200
+            assert effective_deny.json()["level"] is None
+            assert effective_deny.json()["reason"] == "EXPLICIT_DENY"
+            simulated_deny = client.post(
+                f"{base}/simulate",
+                headers=headers,
+                json={"user_id": str(personas.users["restricted"])},
+            )
+            assert simulated_deny.status_code == 200
+            assert simulated_deny.json()["level"] is None
+
+            acl_observations = {
+                "direct_acl_allow": user_allow.status_code,
+                "group_acl_allow": group_allow.status_code,
+                "direct_acl_deny": user_deny.status_code,
+                "group_acl_deny": group_deny.status_code,
+                "explicit_deny": effective_deny.status_code,
+            }
+            for operation_id in (grant_id, list_id, effective_id, simulate_id):
+                for dimension, status in acl_observations.items():
+                    _add_dimension(
+                        records[operation_id],
+                        dimension,
+                        _evidence(
+                            test_id=CONTRACT_SWEEP_TEST_ID,
+                            persona="workspace_admin evaluating restricted user",
+                            status=status,
+                            resource=f"dashboard:{resource_id}",
+                        ),
+                    )
+            for entry_id in entries:
+                revoked = client.delete(f"{base}/access/{entry_id}", headers=headers)
+                assert revoked.status_code == 204
+            _add_dimension(
+                records[revoke_id],
+                "direct_acl_allow",
+                _evidence(
+                    test_id=CONTRACT_SWEEP_TEST_ID,
+                    persona="workspace_admin",
+                    status=204,
+                    resource=f"dashboard:{resource_id}",
+                ),
+            )
+
+        # Issue the session first, then suspend the user in the database. Every
+        # protected operation must reject that still-present session directly.
+        with TestClient(app, raise_server_exceptions=False) as client:
+            active_login = client.post(
                 "/auth/login",
                 json={
                     "username": personas.usernames["suspended"],
                     "password": personas.password,
                 },
             )
-            assert suspended.status_code in {401, 403}
-            assert settings.AUTH_ACCESS_COOKIE_NAME not in suspended.cookies
+            assert active_login.status_code == 200
+            headers = _tenant_headers(
+                client,
+                settings,
+                personas.organizations["alpha"],
+                personas.workspaces["alpha"],
+            )
+            asyncio.run(_set_persona_status(settings, personas, "suspended", UserStatus.SUSPENDED))
+            for path, method, operation in operations:
+                operation_id = operation["operationId"]
+                if scopes[operation_id] == "public" or path == "/auth/logout":
+                    continue
+                response = client.request(
+                    method.upper(),
+                    _runtime_path(path, operation),
+                    headers=headers,
+                    json={} if method in {"post", "put", "patch"} else None,
+                    follow_redirects=False,
+                )
+                assert response.status_code in {401, 403}, (
+                    f"{operation_id} accepted a suspended user's existing session: "
+                    f"{response.status_code}"
+                )
+                suspended_evidence = _evidence(
+                    test_id=CONTRACT_SWEEP_TEST_ID,
+                    persona="suspended_user",
+                    status=response.status_code,
+                    resource=_runtime_path(path, operation),
+                )
+                record = records[operation_id]
+                _add_dimension(record, "suspended_user_probe", suspended_evidence)
+                _add_dimension(record, "suspended_user_rejected", suspended_evidence)
+
+        with TestClient(app, raise_server_exceptions=False) as client:
+            suspended_login = client.post(
+                "/auth/login",
+                json={
+                    "username": personas.usernames["suspended"],
+                    "password": personas.password,
+                },
+            )
+            assert suspended_login.status_code in {401, 403}
+            assert settings.AUTH_ACCESS_COOKIE_NAME not in suspended_login.cookies
 
         for record in records.values():
             required = set(cast(list[str], record.pop("required_probes")))
             executed = set(cast(list[str], record["executed_dimensions"]))
+            evidence_dimensions = set(cast(dict[str, object], record["dimension_evidence"]))
             assert required <= executed, (
                 f"{record['operation_id']} missing executed probes: {sorted(required - executed)}"
+            )
+            assert executed == evidence_dimensions, (
+                f"{record['operation_id']} has claimed dimensions without exact evidence: "
+                f"{sorted(executed - evidence_dimensions)}"
             )
             record["result"] = "pass"
         execution = {str(key): value for key, value in records.items()}
@@ -701,20 +1151,7 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
             target = Path(report_path)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(
-                json.dumps(
-                    {
-                        "schema_version": 1,
-                        "operation_count": 247,
-                        "executed_count": 247,
-                        "passed_count": 247,
-                        "operations": sorted(
-                            records.values(), key=lambda item: str(item["operation_id"])
-                        ),
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
-                + "\n",
+                json.dumps(verified, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
     finally:

@@ -5,16 +5,56 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
+SUPPORTED_DIMENSIONS = frozenset(
+    {
+        "openapi_contract",
+        "public_probe",
+        "unauthenticated_probe",
+        "authenticated_probe",
+        "authenticated_success",
+        "response_schema_validated",
+        "invalid_uuid_probe",
+        "invalid_payload_probe",
+        "empty_payload_probe",
+        "payload_lower_bound",
+        "payload_upper_bound",
+        "restricted_role_probe",
+        "forbidden_observed",
+        "direct_acl_allow",
+        "direct_acl_deny",
+        "group_acl_allow",
+        "group_acl_deny",
+        "explicit_deny",
+        "expired_access",
+        "suspended_user_probe",
+        "suspended_user_rejected",
+        "cross_tenant_header_probe",
+        "cross_tenant_resource_probe",
+        "cross_tenant_isolated",
+        "ownership_allow",
+        "ownership_denial",
+        "pagination_boundary",
+        "filtering_validation",
+        "sorting_validation",
+        "secret_non_disclosure",
+        "signed_url_validation",
+        "rate_limit_behavior",
+        "idempotency",
+        "safe_error_envelope",
+    }
+)
 PUBLIC_PATHS = {
     "/health",
+    "/ready",
     "/api/v1/version",
     "/auth/login",
     "/auth/password-reset/request",
     "/auth/password-reset/confirm",
 }
+SUSPENDED_EXEMPT_PATHS = {"/auth/logout"}
 TAG_TESTS = {
     "authentication": [
         "integration/test_authentication.py",
@@ -92,20 +132,94 @@ def _scope(tag: str, path: str) -> str:
     return "authenticated"
 
 
-def _probes(method: str, path: str, scope: str) -> list[str]:
-    """Return only probes the operation-wide integration sweep actually executes."""
+def _bounded_query_dimensions(operation: dict[str, Any]) -> set[str]:
+    dimensions: set[str] = set()
+    for parameter in operation.get("parameters", []):
+        if parameter.get("in") != "query":
+            continue
+        schema = parameter.get("schema", {})
+        if not isinstance(schema, dict):
+            continue
+        name = str(parameter.get("name", ""))
+        parameter_dimensions: set[str] = set()
+        if any(key in schema for key in ("minimum", "exclusiveMinimum", "minLength")):
+            parameter_dimensions.add("payload_lower_bound")
+        if any(key in schema for key in ("maximum", "exclusiveMaximum", "maxLength")):
+            parameter_dimensions.add("payload_upper_bound")
+        dimensions |= parameter_dimensions
+        if parameter_dimensions and name in {
+            "page",
+            "page_size",
+            "limit",
+            "offset",
+            "per_page",
+        }:
+            dimensions.add("pagination_boundary")
+        if "maxLength" in schema and name in {"q", "query", "search", "filter", "status"}:
+            dimensions.add("filtering_validation")
+    return dimensions
+
+
+def _acl_dimensions(operation_id: str) -> set[str]:
+    if operation_id.endswith("resources__resource_type___resource_id__access_post"):
+        return {
+            "direct_acl_allow",
+            "direct_acl_deny",
+            "group_acl_allow",
+            "group_acl_deny",
+            "explicit_deny",
+        }
+    if operation_id.startswith(("list_access_", "effective_access_", "simulate_access_")):
+        return {
+            "direct_acl_allow",
+            "direct_acl_deny",
+            "group_acl_allow",
+            "group_acl_deny",
+            "explicit_deny",
+        }
+    if operation_id.startswith("revoke_access_"):
+        return {"direct_acl_allow"}
+    return set()
+
+
+def _has_uuid_path_parameter(path: str, operation: dict[str, Any]) -> bool:
+    names = {part[1:-1] for part in path.split("/") if part.startswith("{")}
+    for parameter in operation.get("parameters", []):
+        name = str(parameter.get("name", ""))
+        schema = parameter.get("schema", {})
+        if (
+            parameter.get("in") == "path"
+            and name in names
+            and isinstance(schema, dict)
+            and (schema.get("format") == "uuid" or name.endswith("_id"))
+        ):
+            return True
+    return any(name.endswith("_id") for name in names)
+
+
+def _probes(method: str, path: str, scope: str, operation: dict[str, Any]) -> list[str]:
+    """Apply explicit, reviewable rules for operation-level evidence dimensions."""
     probes = ["openapi_contract"]
     if scope == "public":
         probes.append("public_probe")
     else:
         probes.extend(["unauthenticated_probe", "authenticated_probe"])
-    if "{" in path:
+        if path not in SUSPENDED_EXEMPT_PATHS:
+            probes.extend(["suspended_user_probe", "suspended_user_rejected"])
+    if _has_uuid_path_parameter(path, operation):
         probes.append("invalid_uuid_probe")
-    if method in {"post", "put", "patch"}:
-        probes.append("empty_payload_probe")
     if scope == "workspace":
-        probes.extend(["restricted_role_probe", "cross_tenant_header_probe"])
-    return probes
+        probes.extend(
+            ["restricted_role_probe", "cross_tenant_header_probe", "cross_tenant_isolated"]
+        )
+    if "{" not in path:
+        probes.extend(sorted(_bounded_query_dimensions(operation)))
+    probes.extend(sorted(_acl_dimensions(str(operation["operationId"]))))
+    if method == "get" and set(part for part in path.split("/") if part.startswith("{")) == {
+        "{dashboard_id}"
+    }:
+        probes.extend(["cross_tenant_resource_probe", "cross_tenant_isolated"])
+    return list(dict.fromkeys(probes))
 
 
 def _validate_evidence_test_id(test_id: str) -> None:
@@ -134,7 +248,7 @@ def build_coverage(
             operation = path_item[method]
             tag = str(operation["tags"][0])
             scope = _scope(tag, path)
-            probes = _probes(method, path, scope)
+            probes = _probes(method, path, scope, operation)
             result = execution.get(operation["operationId"]) if execution is not None else None
             raw_dimensions = result.get("executed_dimensions", []) if result is not None else []
             if not isinstance(raw_dimensions, list) or not all(
@@ -144,18 +258,8 @@ def build_coverage(
                     f"Execution evidence for {operation['operationId']} has invalid dimensions"
                 )
             executed_dimensions = raw_dimensions
-            unsupported = sorted(
-                set(executed_dimensions)
-                - set(probes)
-                - {
-                    "authenticated_success",
-                    "response_schema_validated",
-                    "forbidden_observed",
-                    "cross_tenant_isolated",
-                    "safe_error_envelope",
-                    "secret_non_disclosure_observed",
-                }
-            )
+            applicable_dimensions = list(dict.fromkeys([*probes, *executed_dimensions]))
+            unsupported = sorted(set(executed_dimensions) - SUPPORTED_DIMENSIONS)
             if unsupported:
                 raise ValueError(
                     "Execution evidence for "
@@ -168,6 +272,34 @@ def build_coverage(
                     f"Execution evidence for {operation['operationId']} "
                     f"is missing probes: {missing}"
                 )
+            raw_evidence = result.get("dimension_evidence", {}) if result is not None else {}
+            if not isinstance(raw_evidence, dict):
+                raise ValueError(
+                    f"Execution evidence for {operation['operationId']} has invalid evidence"
+                )
+            if result is not None and set(raw_evidence) != set(executed_dimensions):
+                missing_evidence = sorted(set(executed_dimensions) - set(raw_evidence))
+                extra_evidence = sorted(set(raw_evidence) - set(executed_dimensions))
+                raise ValueError(
+                    f"Execution evidence for {operation['operationId']} does not match claims; "
+                    f"missing={missing_evidence}, extra={extra_evidence}"
+                )
+            for dimension, item in raw_evidence.items():
+                if not isinstance(item, dict):
+                    raise ValueError(
+                        f"Evidence for {operation['operationId']}:{dimension} must be an object"
+                    )
+                test_id = item.get("test_id")
+                if not isinstance(test_id, str):
+                    raise ValueError(
+                        f"Evidence for {operation['operationId']}:{dimension} lacks a test ID"
+                    )
+                _validate_evidence_test_id(test_id)
+                if item.get("result") != "pass" or "observed_http_status" not in item:
+                    raise ValueError(
+                        f"Evidence for {operation['operationId']}:{dimension} is not passing "
+                        "observed evidence"
+                    )
             personas = {
                 "public": ["anonymous"],
                 "authenticated": ["active_user", "suspended_user"],
@@ -190,40 +322,23 @@ def build_coverage(
                     "action": _action(method, path),
                     "resource_bound": "{" in path,
                     "personas": personas,
-                    "claimed_dimensions": probes,
+                    "required_dimensions": probes,
+                    "applicable_dimensions": applicable_dimensions,
+                    "claimed_dimensions": executed_dimensions if result is not None else probes,
                     "executed_dimensions": executed_dimensions,
-                    "test_evidence": [
-                        {
-                            "test_id": ANONYMOUS_SWEEP_TEST_ID,
-                            "dimensions": [
-                                item
-                                for item in probes
-                                if item
-                                in {
-                                    "openapi_contract",
-                                    "public_probe",
-                                    "unauthenticated_probe",
-                                    "invalid_uuid_probe",
-                                    "empty_payload_probe",
-                                }
-                            ],
-                        },
-                        {
-                            "test_id": CONTRACT_SWEEP_TEST_ID,
-                            "dimensions": [
-                                item
-                                for item in (executed_dimensions if result is not None else probes)
-                                if item
-                                not in {
-                                    "openapi_contract",
-                                    "public_probe",
-                                    "unauthenticated_probe",
-                                    "invalid_uuid_probe",
-                                    "empty_payload_probe",
-                                }
-                            ],
-                        },
-                    ],
+                    "dimension_status": {
+                        dimension: (
+                            "passed"
+                            if dimension in executed_dimensions
+                            else "applicable_not_executed"
+                            if dimension in applicable_dimensions
+                            else "not_applicable"
+                        )
+                        for dimension in sorted(SUPPORTED_DIMENSIONS)
+                    },
+                    "test_evidence": raw_evidence,
+                    "dimension_evidence": raw_evidence,
+                    "mapped_test_ids": [ANONYMOUS_SWEEP_TEST_ID, CONTRACT_SWEEP_TEST_ID],
                     "related_domain_tests": sorted(set(TAG_TESTS[tag])),
                     "classification_status": "classified",
                     "test_mapping_status": "mapped",
@@ -240,14 +355,30 @@ def build_coverage(
         raise ValueError(
             "Execution evidence is incomplete; missing operation IDs: " + ", ".join(missing)
         )
+    dimension_counts = {
+        dimension: sum(
+            dimension in cast(list[str], item["executed_dimensions"]) for item in operations
+        )
+        for dimension in sorted(SUPPORTED_DIMENSIONS)
+    }
+    applicable_counts = {
+        dimension: sum(
+            dimension in cast(list[str], item["applicable_dimensions"]) for item in operations
+        )
+        for dimension in sorted(SUPPORTED_DIMENSIONS)
+    }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "path_count": len(document["paths"]),
         "operation_count": len(operations),
         "classified_count": len(operations),
         "test_mapped_count": len(operations),
         "executed_count": executed_count,
         "passed_count": passed_count,
+        "dimension_counts": dimension_counts,
+        "applicable_dimension_counts": applicable_counts,
+        "unsupported_claim_count": 0,
+        "claimed_dimensions_without_evidence": 0 if execution is not None else None,
         "operations": operations,
     }
 

@@ -30,7 +30,27 @@ def _complete_dimensions() -> list[str]:
         "invalid_uuid_probe",
         "restricted_role_probe",
         "cross_tenant_header_probe",
+        "cross_tenant_isolated",
+        "cross_tenant_resource_probe",
+        "suspended_user_probe",
+        "suspended_user_rejected",
     ]
+
+
+def _evidence(dimensions: list[str]) -> dict[str, dict[str, object]]:
+    return {
+        dimension: {
+            "test_id": (
+                "unit/test_operation_coverage.py::"
+                "test_complete_executable_evidence_is_reported_separately"
+            ),
+            "persona": "unit-test",
+            "resource": "dashboard",
+            "observed_http_status": 200,
+            "result": "pass",
+        }
+        for dimension in dimensions
+    }
 
 
 def test_classification_does_not_claim_execution() -> None:
@@ -51,6 +71,7 @@ def test_execution_evidence_must_cover_every_claimed_probe() -> None:
                 "read_dashboard": {
                     "operation_id": "read_dashboard",
                     "executed_dimensions": ["openapi_contract"],
+                    "dimension_evidence": _evidence(["openapi_contract"]),
                     "result": "pass",
                 }
             },
@@ -68,6 +89,9 @@ def test_execution_evidence_rejects_unproven_dimensions() -> None:
                         *_complete_dimensions(),
                         "payload_bounds_verified",
                     ],
+                    "dimension_evidence": _evidence(
+                        [*_complete_dimensions(), "payload_bounds_verified"]
+                    ),
                     "result": "pass",
                 }
             },
@@ -81,6 +105,7 @@ def test_complete_executable_evidence_is_reported_separately() -> None:
             "read_dashboard": {
                 "operation_id": "read_dashboard",
                 "executed_dimensions": _complete_dimensions(),
+                "dimension_evidence": _evidence(_complete_dimensions()),
                 "observations": {
                     "authenticated": 404,
                     "restricted": 403,
