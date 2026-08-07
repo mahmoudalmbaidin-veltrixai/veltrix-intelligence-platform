@@ -616,6 +616,8 @@ async def create_run(
     context: AuthorizationContext,
     pipeline_id: UUID,
     version_id: UUID | None = None,
+    *,
+    trigger: str = "manual",
 ) -> RunResponse:
     item = await _pipeline(db, context, pipeline_id, action_level="operator")
     selected = version_id or item.published_version_id
@@ -647,6 +649,7 @@ async def create_run(
         pipeline_version_id=version.id,
         requested_by_user_id=context.user_id,
         correlation_id=context.correlation_id,
+        trigger=trigger,
     )
     db.add(run)
     await db.flush()

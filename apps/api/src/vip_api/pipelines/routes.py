@@ -26,6 +26,13 @@ from vip_api.pipelines.formula import (
     referenced_functions,
 )
 from vip_api.pipelines.models import PipelineArtifact
+from vip_api.pipelines.schedule_services import (
+    create_schedule,
+    delete_schedule,
+    list_schedule_runs,
+    list_schedules,
+    update_schedule,
+)
 from vip_api.pipelines.schemas import (
     ArtifactResponse,
     DownloadLink,
@@ -35,6 +42,10 @@ from vip_api.pipelines.schemas import (
     PipelineCreate,
     PipelineEditor,
     PipelineEditorSave,
+    PipelineScheduleCreate,
+    PipelineScheduleResponse,
+    PipelineScheduleRunResponse,
+    PipelineScheduleUpdate,
     PublishRequest,
     RestoreRequest,
     RunCreate,
@@ -422,3 +433,76 @@ async def artifact_download(
     return FileResponse(
         path, media_type=artifact.content_type, filename=f"pipeline-result-{artifact.id}.{suffix}"
     )
+
+
+# --- Pipeline run schedules (post-Core P1) ---------------------------------
+# Resource-level authorization happens inside the service (viewer to read,
+# operator to mutate), mirroring the on-demand run endpoints.
+
+
+@router.get("/{pipeline_id}/schedules", response_model=list[PipelineScheduleResponse])
+async def schedules_index(
+    pipeline_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
+) -> list[PipelineScheduleResponse]:
+    return await list_schedules(db, context, pipeline_id)
+
+
+@router.post(
+    "/{pipeline_id}/schedules",
+    response_model=PipelineScheduleResponse,
+    status_code=201,
+    dependencies=[Depends(require_csrf)],
+)
+async def schedule_create(
+    pipeline_id: UUID,
+    payload: PipelineScheduleCreate,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
+) -> PipelineScheduleResponse:
+    return await create_schedule(db, context, pipeline_id, payload)
+
+
+@router.put(
+    "/{pipeline_id}/schedules/{schedule_id}",
+    response_model=PipelineScheduleResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def schedule_update(
+    pipeline_id: UUID,
+    schedule_id: UUID,
+    payload: PipelineScheduleUpdate,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
+) -> PipelineScheduleResponse:
+    return await update_schedule(db, context, pipeline_id, schedule_id, payload)
+
+
+@router.delete(
+    "/{pipeline_id}/schedules/{schedule_id}",
+    status_code=204,
+    dependencies=[Depends(require_csrf)],
+)
+async def schedule_delete(
+    pipeline_id: UUID,
+    schedule_id: UUID,
+    expected_version: Annotated[int, Query(ge=1)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
+) -> Response:
+    await delete_schedule(db, context, pipeline_id, schedule_id, expected_version)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/{pipeline_id}/schedules/{schedule_id}/runs",
+    response_model=list[PipelineScheduleRunResponse],
+)
+async def schedule_runs(
+    pipeline_id: UUID,
+    schedule_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(pipeline_capability)],
+) -> list[PipelineScheduleRunResponse]:
+    return await list_schedule_runs(db, context, pipeline_id, schedule_id)

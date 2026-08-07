@@ -163,6 +163,10 @@ class Settings(BaseSettings):
     DASHBOARD_DELIVERY_SCHEDULER_ENABLED: bool = True
     DASHBOARD_DELIVERY_SCHEDULER_POLL_SECONDS: float = Field(default=15.0, ge=1.0, le=300.0)
     DASHBOARD_DELIVERY_SCHEDULER_BATCH: int = Field(default=25, ge=1, le=500)
+    # Recurring pipeline-run scheduler (runs as a tick inside the generic job worker).
+    PIPELINE_SCHEDULER_ENABLED: bool = True
+    PIPELINE_SCHEDULER_POLL_SECONDS: float = Field(default=15.0, ge=1.0, le=300.0)
+    PIPELINE_SCHEDULER_BATCH: int = Field(default=25, ge=1, le=500)
     DASHBOARD_ARTIFACT_ROOT: str = "/data/vip-artifacts"
     DASHBOARD_DOWNLOAD_TOKEN_TTL_SECONDS: int = Field(default=300, ge=30, le=3600)
     DASHBOARD_DOWNLOAD_SIGNING_KEY: SecretStr | None = None

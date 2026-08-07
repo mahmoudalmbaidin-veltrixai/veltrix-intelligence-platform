@@ -131,6 +131,7 @@ class GenericJobWorker:
         self.stop = asyncio.Event()
         self.active: set[asyncio.Task[None]] = set()
         self._next_delivery_tick = 0.0
+        self._next_pipeline_schedule_tick = 0.0
 
     async def run(self) -> None:
         self._install_signals()
@@ -148,6 +149,7 @@ class GenericJobWorker:
                     self.active.add(task)
                 await self._heartbeat("running")
                 await self._maybe_dispatch_deliveries()
+                await self._maybe_dispatch_pipeline_schedules()
                 with suppress(TimeoutError):
                     await asyncio.wait_for(
                         self.stop.wait(), timeout=self.settings.JOB_WORKER_POLL_SECONDS
@@ -180,6 +182,27 @@ class GenericJobWorker:
             await dispatch_due_deliveries(self.database, self.settings, self.queue)
         except Exception:
             logger.exception("Dashboard delivery scheduler tick failed")
+
+    async def _maybe_dispatch_pipeline_schedules(self) -> None:
+        """Run the recurring pipeline-run scheduler tick on its own cadence.
+
+        Inline in the worker loop like the delivery tick; SKIP LOCKED claiming
+        makes concurrent workers safe and failures never break the job loop.
+        """
+        if not self.settings.PIPELINE_SCHEDULER_ENABLED:
+            return
+        loop_time = asyncio.get_running_loop().time()
+        if loop_time < self._next_pipeline_schedule_tick:
+            return
+        self._next_pipeline_schedule_tick = (
+            loop_time + self.settings.PIPELINE_SCHEDULER_POLL_SECONDS
+        )
+        from vip_api.pipelines.scheduler import dispatch_due_pipeline_schedules
+
+        try:
+            await dispatch_due_pipeline_schedules(self.database, self.settings)
+        except Exception:
+            logger.exception("Pipeline schedule scheduler tick failed")
 
     async def _next_job(self) -> UUID | None:
         for name in self.settings.JOB_WORKER_QUEUES:

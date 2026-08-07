@@ -352,3 +352,93 @@ class PipelineOutboxEvent(Base):
         DateTime(timezone=True), default=utc_now, nullable=False
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PipelineSchedule(Base):
+    """Recurring/one-time schedule that enqueues real pipeline runs.
+
+    Mirrors the dashboard delivery scheduler: the ``next_run_at`` + ``enabled``
+    due-index drives an atomic FOR-UPDATE-SKIP-LOCKED claim; each fire creates a
+    ``PipelineRun`` under the creator's rebuilt authorization context.
+    """
+
+    __tablename__ = "pipeline_schedules"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "workspace_id", "pipeline_id"],
+            ["pipelines.organization_id", "pipelines.workspace_id", "pipelines.id"],
+            ondelete="CASCADE",
+            name="fk_pipeline_schedules_pipeline_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["created_by_user_id"],
+            ["users.id"],
+            ondelete="RESTRICT",
+            name="fk_pipeline_schedules_creator",
+        ),
+        UniqueConstraint(
+            "organization_id", "workspace_id", "id", name="uq_pipeline_schedules_tenant_id"
+        ),
+        Index("ix_pipeline_schedules_due", "enabled", "next_run_at"),
+        Index(
+            "ix_pipeline_schedules_tenant_pipeline",
+            "organization_id",
+            "workspace_id",
+            "pipeline_id",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    workspace_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    pipeline_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    # Optional pinned version; when null the published version is used at dispatch.
+    pipeline_version_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    schedule_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    schedule_expression: Mapped[str | None] = mapped_column(String(120))
+    timezone: Mapped[str] = mapped_column(String(64), default="UTC", nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="scheduled", nullable=False)
+    row_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_by_user_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PipelineScheduleRun(Base):
+    """One auditable dispatch attempt of a :class:`PipelineSchedule`."""
+
+    __tablename__ = "pipeline_schedule_runs"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "workspace_id", "schedule_id"],
+            [
+                "pipeline_schedules.organization_id",
+                "pipeline_schedules.workspace_id",
+                "pipeline_schedules.id",
+            ],
+            ondelete="CASCADE",
+            name="fk_pipeline_schedule_runs_schedule_tenant",
+        ),
+        Index("ix_pipeline_schedule_runs_history", "schedule_id", "created_at"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    workspace_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    schedule_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    # The PipelineRun created by this dispatch (null when access was revoked).
+    run_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    status: Mapped[str] = mapped_column(String(24), default="queued", nullable=False)
+    attempt: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    safe_error_code: Mapped[str | None] = mapped_column(String(80))
+    safe_error_message: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

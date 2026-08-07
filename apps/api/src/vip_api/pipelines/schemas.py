@@ -198,3 +198,57 @@ class ListPage(StrictModel):
 class RunListPage(StrictModel):
     items: list[RunResponse]
     next_cursor: str | None = None
+
+
+class PipelineScheduleCreate(StrictModel):
+    name: str = Field(min_length=1, max_length=200)
+    # one_time uses run_at; daily/weekly/monthly are fixed intervals; cron uses expression.
+    schedule_type: str = Field(pattern=r"^(one_time|daily|weekly|monthly|cron)$")
+    schedule_expression: str | None = Field(default=None, max_length=120)
+    timezone: str = Field(default="UTC", min_length=1, max_length=64)
+    run_at: datetime | None = None
+    pipeline_version_id: UUID | None = None
+    enabled: bool = True
+
+
+class PipelineScheduleUpdate(StrictModel):
+    expected_version: int = Field(ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    schedule_type: str | None = Field(
+        default=None, pattern=r"^(one_time|daily|weekly|monthly|cron)$"
+    )
+    schedule_expression: str | None = Field(default=None, max_length=120)
+    timezone: str | None = Field(default=None, min_length=1, max_length=64)
+    run_at: datetime | None = None
+    pipeline_version_id: UUID | None = None
+    enabled: bool | None = None
+
+
+class PipelineScheduleResponse(StrictModel):
+    id: UUID
+    pipeline_id: UUID
+    pipeline_version_id: UUID | None
+    name: str
+    schedule_type: str
+    schedule_expression: str | None
+    timezone: str
+    enabled: bool
+    status: str
+    row_version: int
+    created_by_user_id: UUID
+    last_run_at: datetime | None
+    next_run_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PipelineScheduleRunResponse(StrictModel):
+    id: UUID
+    schedule_id: UUID
+    run_id: UUID | None
+    status: str
+    attempt: int
+    safe_error_code: str | None
+    safe_error_message: str | None
+    created_at: datetime
+    completed_at: datetime | None
