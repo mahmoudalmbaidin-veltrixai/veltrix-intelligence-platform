@@ -11,6 +11,7 @@ import {
   type Dataset,
   type DatasetActivityItem,
   type DatasetField,
+  type DatasetVersion,
   type QualityRule,
   type QualityRuleStatus,
 } from './datasets.service'
@@ -80,6 +81,10 @@ const activityItems = ref<DatasetActivityItem[]>([])
 const activityLoading = ref(false)
 const activityError = ref<string | null>(null)
 const activityTotal = ref(0)
+const versionItems = ref<DatasetVersion[]>([])
+const versionsLoading = ref(false)
+const versionsError = ref<string | null>(null)
+const restoreBusy = ref<string | null>(null)
 const certBusy = ref(false)
 const certNote = ref('')
 
@@ -136,9 +141,50 @@ async function loadActivity() {
   }
 }
 
+async function loadVersions() {
+  if (!datasetService.listVersions) {
+    versionsError.value = 'Version history is unavailable.'
+    return
+  }
+  versionsLoading.value = true
+  versionsError.value = null
+  try {
+    versionItems.value = await datasetService.listVersions(id.value)
+  } catch (error) {
+    versionsError.value = error instanceof ApiError ? error.message : 'Unable to load versions.'
+    versionItems.value = []
+  } finally {
+    versionsLoading.value = false
+  }
+}
+
+async function restoreVersion(version: DatasetVersion) {
+  if (!datasetService.restoreVersion || !dataset.value?.version || !canEdit.value) return
+  restoreBusy.value = version.id
+  try {
+    await datasetService.restoreVersion(id.value, version.id, dataset.value.version)
+    await refetchDataset()
+    await loadVersions()
+    ui.pushToast({
+      kind: 'success',
+      title: 'Version restored',
+      message: `Restored version ${version.versionNumber}.`,
+    })
+  } catch (error) {
+    ui.pushToast({
+      kind: 'error',
+      title: 'Restore failed',
+      message: error instanceof ApiError ? error.message : 'Unable to restore this version.',
+    })
+  } finally {
+    restoreBusy.value = null
+  }
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'access') void loadAccess()
   if (tab === 'activity') void loadActivity()
+  if (tab === 'versions') void loadVersions()
 })
 
 async function certifyDataset() {
@@ -588,13 +634,45 @@ const accessColumns: Column<ResourceEntry>[] = [
 
       <!-- VERSIONS — no history API exists -->
       <VipCard v-else-if="activeTab === 'versions'">
+        <h3 class="dd__card-title">Version history</h3>
+        <div v-if="versionsLoading" class="dd__loading"><VipSpinner label="Loading versions…" /></div>
         <VipEmptyState
-          icon="clock"
-          title="Version history unavailable"
-          description="Dataset Studio does not yet expose an immutable version-history API. The optimistic concurrency version on the dataset record is not a publish history."
+          v-else-if="versionsError"
+          icon="alertTriangle"
+          title="Versions unavailable"
+          :description="versionsError"
         >
-          <p class="dd__muted">Current concurrency version: {{ dataset.version ?? '—' }}</p>
+          <VipButton variant="secondary" size="sm" icon="refresh" @click="loadVersions">Retry</VipButton>
         </VipEmptyState>
+        <VipEmptyState
+          v-else-if="versionItems.length === 0"
+          icon="clock"
+          title="No versions yet"
+          description="Versions are captured when a dataset is registered, certified or restored."
+        />
+        <ul v-else class="dd__versions">
+          <li v-for="v in versionItems" :key="v.id" class="dd__version">
+            <div>
+              <div class="dd__version-meta">
+                <VipBadge tone="neutral" variant="soft" size="sm">v{{ v.versionNumber }}</VipBadge>
+                <VipBadge tone="info" variant="soft" size="sm">{{ v.versionType }}</VipBadge>
+                <span class="dd__muted">{{ new Date(v.createdAt).toLocaleString() }}</span>
+              </div>
+              <p class="dd__version-note">{{ v.changeSummary || '—' }}</p>
+            </div>
+            <VipButton
+              v-if="canEdit"
+              variant="secondary"
+              size="sm"
+              icon="history"
+              :loading="restoreBusy === v.id"
+              :disabled="restoreBusy !== null"
+              @click="restoreVersion(v)"
+            >
+              Restore
+            </VipButton>
+          </li>
+        </ul>
       </VipCard>
 
       <!-- ACTIVITY -->

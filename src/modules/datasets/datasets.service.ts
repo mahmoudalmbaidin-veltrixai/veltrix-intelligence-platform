@@ -68,6 +68,18 @@ export interface DatasetActivityPage {
   total: number
 }
 
+export interface DatasetVersion {
+  id: string
+  datasetId: string
+  versionNumber: number
+  versionType: string
+  changeSummary: string
+  createdByUserId: string | null
+  sourceVersionId: string | null
+  createdAt: string
+  snapshot: Record<string, unknown>
+}
+
 export type QualityDimension = 'completeness' | 'validity' | 'uniqueness' | 'freshness' | 'consistency'
 export type QualitySeverity = 'low' | 'medium' | 'high'
 export type QualityRuleStatus = 'passing' | 'failing' | 'warning' | 'unknown' | 'not_evaluated'
@@ -520,6 +532,10 @@ export interface DatasetService {
   certify?(id: string, version: number, note?: string): Promise<Dataset>
   revokeCertification?(id: string, version: number, note?: string): Promise<Dataset>
   getActivity?(id: string, opts?: { limit?: number; offset?: number }): Promise<DatasetActivityPage>
+  /** Immutable schema/metadata version snapshots (post-Core P2). */
+  listVersions?(id: string): Promise<DatasetVersion[]>
+  /** Restore a version (replays it forward as a new version). Requires edit. */
+  restoreVersion?(id: string, versionId: string, expectedVersion: number): Promise<Dataset>
   /** Soft-archive (POST /datasets/:id/archive). No restore/unarchive endpoint exists. */
   archive(id: string): Promise<void>
   /** Elevated delete (DELETE /datasets/:id) — backend soft-archives; no restore. */
@@ -623,6 +639,42 @@ const mockDatasetService: DatasetService = {
   async runQuality(): Promise<{ id: string; status: string }> {
     await latency()
     return { id: 'mock-quality-job', status: 'succeeded' }
+  },
+  async listVersions(id: string): Promise<DatasetVersion[]> {
+    await latency()
+    const ds = DATASETS.find((d) => d.id === id)
+    const name = ds?.name ?? 'Dataset'
+    const now = new Date().toISOString()
+    return [
+      {
+        id: `${id}-v2`,
+        datasetId: id,
+        versionNumber: 2,
+        versionType: 'certified',
+        changeSummary: 'Certified',
+        createdByUserId: null,
+        sourceVersionId: null,
+        createdAt: now,
+        snapshot: { dataset: { display_name: name }, fields: [] },
+      },
+      {
+        id: `${id}-v1`,
+        datasetId: id,
+        versionNumber: 1,
+        versionType: 'created',
+        changeSummary: 'Dataset registered',
+        createdByUserId: null,
+        sourceVersionId: null,
+        createdAt: now,
+        snapshot: { dataset: { display_name: name }, fields: [] },
+      },
+    ]
+  },
+  async restoreVersion(id: string): Promise<Dataset> {
+    await latency()
+    const ds = DATASETS.find((d) => d.id === id)
+    if (!ds) throw new Error('Dataset not found')
+    return ds
   },
   async archive(id: string): Promise<void> {
     await latency()
@@ -1087,6 +1139,38 @@ const apiDatasetService: DatasetService = {
       offset: page.offset,
       total: page.total,
     }
+  },
+  listVersions: async (id) => {
+    const rows = await apiClient.get<
+      Array<{
+        id: string
+        dataset_id: string
+        version_number: number
+        version_type: string
+        change_summary: string
+        created_by_user_id: string | null
+        source_version_id: string | null
+        created_at: string
+        snapshot: Record<string, unknown>
+      }>
+    >(`/datasets/${id}/versions`)
+    return rows.map((row) => ({
+      id: row.id,
+      datasetId: row.dataset_id,
+      versionNumber: row.version_number,
+      versionType: row.version_type,
+      changeSummary: row.change_summary,
+      createdByUserId: row.created_by_user_id,
+      sourceVersionId: row.source_version_id,
+      createdAt: row.created_at,
+      snapshot: row.snapshot ?? {},
+    }))
+  },
+  restoreVersion: async (id, versionId, expectedVersion) => {
+    const dataset = await apiClient.post<ApiDataset>(`/datasets/${id}/versions/${versionId}/restore`, {
+      expected_version: expectedVersion,
+    })
+    return mapDataset(dataset)
   },
   archive: (id) => apiClient.post<void>(`/datasets/${id}/archive`),
   remove: (id) => apiClient.delete<void>(`/datasets/${id}`),
