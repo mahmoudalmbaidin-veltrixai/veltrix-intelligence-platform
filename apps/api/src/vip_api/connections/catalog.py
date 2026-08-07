@@ -69,6 +69,65 @@ class RestApiCredentials(BaseModel):
     api_key: str | None = Field(default=None, min_length=1, max_length=8192)
 
 
+class MSSQLConfiguration(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    host: str = Field(min_length=1, max_length=253, pattern=r"^[A-Za-z0-9._:-]+$")
+    port: int = Field(default=1433, ge=1, le=65535)
+    database: str = Field(min_length=1, max_length=128, pattern=r"^[^/\\\x00]+$")
+    username: str = Field(min_length=1, max_length=128)
+    encrypt: Literal[True] = True
+    connect_timeout_seconds: int = Field(default=10, ge=1, le=30)
+
+
+class SnowflakeConfiguration(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    account: str = Field(min_length=1, max_length=255, pattern=r"^[A-Za-z0-9._-]+$")
+    username: str = Field(min_length=1, max_length=255)
+    warehouse: str = Field(min_length=1, max_length=255)
+    database: str = Field(min_length=1, max_length=255)
+    schema_name: str = Field(default="PUBLIC", min_length=1, max_length=255)
+    role: str | None = Field(default=None, max_length=255)
+    connect_timeout_seconds: int = Field(default=15, ge=1, le=30)
+
+
+class SnowflakeCredentials(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    password: str = Field(min_length=1, max_length=4096)
+
+
+class BigQueryConfiguration(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    project_id: str = Field(min_length=1, max_length=255, pattern=r"^[A-Za-z0-9._:-]+$")
+    location: str = Field(default="US", min_length=1, max_length=64, pattern=r"^[A-Za-z0-9-]+$")
+    dataset: str | None = Field(default=None, max_length=1024)
+    connect_timeout_seconds: int = Field(default=15, ge=1, le=30)
+
+
+class BigQueryCredentials(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # A Google service-account key JSON document, stored write-only + encrypted.
+    service_account_json: str = Field(min_length=2, max_length=32768)
+
+
+class S3Configuration(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    bucket: str = Field(min_length=3, max_length=255, pattern=r"^[a-z0-9.\-]+$")
+    region: str = Field(
+        default="us-east-1", min_length=1, max_length=64, pattern=r"^[A-Za-z0-9-]+$"
+    )
+    prefix: str = Field(default="", max_length=1024)
+    # Optional S3-compatible endpoint (e.g. MinIO); HTTPS + SSRF validated at test time.
+    endpoint_url: AnyHttpUrl | None = None
+    connect_timeout_seconds: int = Field(default=15, ge=1, le=30)
+
+
+class S3Credentials(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    access_key_id: str = Field(min_length=1, max_length=512)
+    secret_access_key: str = Field(min_length=1, max_length=1024)
+    session_token: str | None = Field(default=None, min_length=1, max_length=8192)
+
+
 @dataclass(frozen=True, slots=True)
 class ConnectionTypeDefinition:
     key: str
@@ -224,12 +283,16 @@ CONNECTION_TYPES: tuple[ConnectionTypeDefinition, ...] = (
         "database",
         subcategory="relational",
         vendor="Microsoft",
-        status="requires_driver",
+        status="beta",
+        config=MSSQLConfiguration,
+        secrets=PasswordCredentials,
+        strategy="mssql_ping",
+        capabilities=("test", "read"),
         deployment="hybrid",
-        auth_methods=("username_password", "azure_ad"),
+        auth_methods=("username_password",),
         requirements=_DB_REQ,
-        description="Microsoft SQL Server. Requires the SQL Server ODBC driver in the "
-        "connector runtime.",
+        description="Microsoft SQL Server (beta). Encrypted TLS connection with a "
+        "least-privilege SQL login; the pytds driver is provisioned in the connector runtime.",
     ),
     _definition(
         "oracle",
@@ -349,12 +412,16 @@ CONNECTION_TYPES: tuple[ConnectionTypeDefinition, ...] = (
         "warehouse",
         subcategory="cloud_dw",
         vendor="Snowflake",
-        status="planned",
+        status="beta",
+        config=SnowflakeConfiguration,
+        secrets=SnowflakeCredentials,
+        strategy="snowflake_ping",
         deployment="cloud",
-        auth_methods=("username_password", "key_pair", "oauth"),
-        capabilities=("test", "read", "metadata_discovery"),
+        auth_methods=("username_password",),
+        capabilities=("test", "read"),
         requirements=_WAREHOUSE_REQ,
-        description="Snowflake Data Cloud. Supports password, key-pair and OAuth auth.",
+        description="Snowflake Data Cloud (beta). Username/password auth over the "
+        "official Snowflake connector; key-pair and OAuth are planned.",
     ),
     _definition(
         "bigquery",
@@ -362,11 +429,16 @@ CONNECTION_TYPES: tuple[ConnectionTypeDefinition, ...] = (
         "warehouse",
         subcategory="cloud_dw",
         vendor="Google",
-        status="planned",
+        status="beta",
+        config=BigQueryConfiguration,
+        secrets=BigQueryCredentials,
+        strategy="bigquery_ping",
         deployment="cloud",
-        auth_methods=("service_account", "workload_identity", "oauth"),
+        auth_methods=("service_account",),
+        capabilities=("test", "read"),
         requirements=_WAREHOUSE_REQ,
-        description="Google BigQuery. Uses a service-account key or workload identity.",
+        description="Google BigQuery (beta). Authenticates with a service-account key "
+        "JSON (stored write-only, encrypted at rest).",
     ),
     _definition(
         "redshift",
@@ -459,13 +531,16 @@ CONNECTION_TYPES: tuple[ConnectionTypeDefinition, ...] = (
         "object_storage",
         subcategory="object_store",
         vendor="AWS",
-        status="planned",
+        status="beta",
+        config=S3Configuration,
+        secrets=S3Credentials,
+        strategy="s3_head",
         deployment="cloud",
-        auth_methods=("access_key", "role_arn", "session_token"),
-        capabilities=("test", "read", "file_discovery"),
+        auth_methods=("access_key", "session_token"),
+        capabilities=("test", "read"),
         requirements=_OBJECT_STORE_REQ,
-        description="Amazon S3 object storage. Discovers buckets, prefixes and files "
-        "(CSV, JSON, Parquet, ...).",
+        description="Amazon S3 (and S3-compatible) object storage (beta). Access-key or "
+        "temporary session-token auth; validates bucket reachability via head-bucket.",
     ),
     _definition(
         "minio",

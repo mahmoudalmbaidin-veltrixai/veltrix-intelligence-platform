@@ -38,6 +38,16 @@ dev = [
   "pytest-asyncio>=1.1,<2",
   "ruff>=0.12,<1",
 ]
+# Optional drivers for the beta connectors (mssql/snowflake/bigquery/s3). These
+# are lazily imported by connections/testers.py; when a driver is absent the
+# connection test degrades to a safe CONNECTION_DRIVER_UNAVAILABLE result rather
+# than crashing API startup. Install with: pip install -e '.[connectors]'.
+connectors = [
+  "python-tds>=1.15,<2",
+  "boto3>=1.34,<2",
+  "snowflake-connector-python>=3.12,<4",
+  "google-cloud-bigquery>=3.25,<4",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/vip_api"]

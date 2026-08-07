@@ -202,12 +202,242 @@ class RestApiTester:
         return TesterResult(False, "unhealthy", _latency(started), "CONNECTION_TEST_FAILED")
 
 
+class MSSQLTester:
+    """Real Microsoft SQL Server reachability + auth test via the pure-python
+    ``pytds`` TDS driver (lazily imported so a missing driver degrades safely)."""
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    async def test(
+        self, configuration: dict[str, object], credentials: dict[str, str]
+    ) -> TesterResult:
+        try:
+            import pytds  # type: ignore
+        except ImportError:
+            return TesterResult(False, "unhealthy", 0, "CONNECTION_DRIVER_UNAVAILABLE")
+        host = str(configuration["host"])
+        port = cast(int, configuration["port"])
+        await validate_host(host, port, self.settings)
+        timeout = self.settings.CONNECTION_TEST_TIMEOUT_SECONDS
+        started = time.perf_counter()
+
+        def _ping() -> None:
+            conn = pytds.connect(
+                server=host,
+                port=port,
+                database=str(configuration["database"]),
+                user=str(configuration["username"]),
+                password=credentials["password"],
+                login_timeout=timeout,
+                timeout=timeout,
+                cafile=None,
+                validate_host=False,
+            )
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+                    cursor.fetchone()
+            finally:
+                conn.close()
+
+        try:
+            await asyncio.wait_for(asyncio.to_thread(_ping), timeout=timeout + 2)
+            return TesterResult(True, "healthy", _latency(started))
+        except TimeoutError:
+            return TesterResult(False, "unhealthy", _latency(started), "CONNECTION_TIMEOUT")
+        except pytds.LoginError:
+            return TesterResult(
+                False, "unhealthy", _latency(started), "CONNECTION_AUTHENTICATION_FAILED"
+            )
+        except Exception:
+            return TesterResult(
+                False, "unhealthy", _latency(started), "CONNECTION_HOST_UNREACHABLE"
+            )
+
+
+class SnowflakeTester:
+    """Snowflake reachability + auth via the official connector (lazy import)."""
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    async def test(
+        self, configuration: dict[str, object], credentials: dict[str, str]
+    ) -> TesterResult:
+        try:
+            import snowflake.connector  # type: ignore
+            from snowflake.connector.errors import DatabaseError, ProgrammingError  # type: ignore
+        except ImportError:
+            return TesterResult(False, "unhealthy", 0, "CONNECTION_DRIVER_UNAVAILABLE")
+        account = str(configuration["account"])
+        # Snowflake reaches <account>.snowflakecomputing.com over HTTPS; SSRF-guard it.
+        await validate_host(f"{account}.snowflakecomputing.com", 443, self.settings)
+        timeout = self.settings.CONNECTION_TEST_TIMEOUT_SECONDS
+        started = time.perf_counter()
+
+        def _ping() -> None:
+            conn = snowflake.connector.connect(
+                account=account,
+                user=str(configuration["username"]),
+                password=credentials["password"],
+                warehouse=str(configuration["warehouse"]),
+                database=str(configuration["database"]),
+                schema=str(configuration.get("schema_name", "PUBLIC")),
+                role=configuration.get("role") or None,
+                login_timeout=timeout,
+                network_timeout=timeout,
+                client_session_keep_alive=False,
+            )
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+                cursor.close()
+            finally:
+                conn.close()
+
+        try:
+            await asyncio.wait_for(asyncio.to_thread(_ping), timeout=timeout + 2)
+            return TesterResult(True, "healthy", _latency(started))
+        except TimeoutError:
+            return TesterResult(False, "unhealthy", _latency(started), "CONNECTION_TIMEOUT")
+        except (DatabaseError, ProgrammingError) as error:
+            code = getattr(error, "errno", None)
+            auth = code in {250001, 390100, 390101} or "authentication" in str(error).lower()
+            return TesterResult(
+                False,
+                "unhealthy",
+                _latency(started),
+                "CONNECTION_AUTHENTICATION_FAILED" if auth else "CONNECTION_HOST_UNREACHABLE",
+            )
+        except Exception:
+            return TesterResult(
+                False, "unhealthy", _latency(started), "CONNECTION_HOST_UNREACHABLE"
+            )
+
+
+class BigQueryTester:
+    """Google BigQuery reachability + auth via a service-account key (lazy import)."""
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    async def test(
+        self, configuration: dict[str, object], credentials: dict[str, str]
+    ) -> TesterResult:
+        try:
+            import json as _json
+
+            from google.cloud import bigquery  # type: ignore
+            from google.oauth2 import service_account  # type: ignore
+        except ImportError:
+            return TesterResult(False, "unhealthy", 0, "CONNECTION_DRIVER_UNAVAILABLE")
+        try:
+            info = _json.loads(credentials["service_account_json"])
+        except (ValueError, KeyError):
+            return TesterResult(False, "unhealthy", 0, "CONNECTION_CONFIGURATION_INVALID")
+        timeout = self.settings.CONNECTION_TEST_TIMEOUT_SECONDS
+        started = time.perf_counter()
+
+        def _ping() -> None:
+            creds = service_account.Credentials.from_service_account_info(info)
+            client = bigquery.Client(
+                project=str(configuration["project_id"]),
+                credentials=creds,
+                location=str(configuration["location"]),
+            )
+            try:
+                job = client.query("SELECT 1", timeout=timeout)
+                list(job.result(timeout=timeout))
+            finally:
+                client.close()
+
+        try:
+            await asyncio.wait_for(asyncio.to_thread(_ping), timeout=timeout + 3)
+            return TesterResult(True, "healthy", _latency(started))
+        except TimeoutError:
+            return TesterResult(False, "unhealthy", _latency(started), "CONNECTION_TIMEOUT")
+        except Exception as error:  # google exceptions vary; map by message safely
+            text = str(error).lower()
+            if any(k in text for k in ("permission", "forbidden", "credential", "unauthorized")):
+                code = "CONNECTION_AUTHENTICATION_FAILED"
+            elif "not found" in text:
+                code = "CONNECTION_METADATA_UNAVAILABLE"
+            else:
+                code = "CONNECTION_HOST_UNREACHABLE"
+            return TesterResult(False, "unhealthy", _latency(started), code)
+
+
+class S3Tester:
+    """Amazon S3 (and S3-compatible) reachability + auth via boto3 (lazy import)."""
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    async def test(
+        self, configuration: dict[str, object], credentials: dict[str, str]
+    ) -> TesterResult:
+        try:
+            import boto3  # type: ignore
+            from botocore.config import Config  # type: ignore
+            from botocore.exceptions import ClientError  # type: ignore
+        except ImportError:
+            return TesterResult(False, "unhealthy", 0, "CONNECTION_DRIVER_UNAVAILABLE")
+        endpoint = configuration.get("endpoint_url")
+        if endpoint:
+            # A custom (S3-compatible) endpoint is user-supplied → SSRF-guard it.
+            await validate_url(str(endpoint), self.settings)
+        timeout = self.settings.CONNECTION_TEST_TIMEOUT_SECONDS
+        started = time.perf_counter()
+
+        def _ping() -> None:
+            client = boto3.client(
+                "s3",
+                region_name=str(configuration["region"]),
+                aws_access_key_id=credentials["access_key_id"],
+                aws_secret_access_key=credentials["secret_access_key"],
+                aws_session_token=credentials.get("session_token") or None,
+                endpoint_url=str(endpoint) if endpoint else None,
+                config=Config(
+                    connect_timeout=timeout,
+                    read_timeout=timeout,
+                    retries={"max_attempts": 1},
+                    signature_version="s3v4",
+                ),
+            )
+            client.head_bucket(Bucket=str(configuration["bucket"]))
+
+        try:
+            await asyncio.wait_for(asyncio.to_thread(_ping), timeout=timeout + 2)
+            return TesterResult(True, "healthy", _latency(started))
+        except TimeoutError:
+            return TesterResult(False, "unhealthy", _latency(started), "CONNECTION_TIMEOUT")
+        except ClientError as error:
+            status = int(error.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0) or 0)
+            if status in {401, 403}:
+                code = "CONNECTION_AUTHENTICATION_FAILED"
+            elif status == 404:
+                code = "CONNECTION_METADATA_UNAVAILABLE"
+            else:
+                code = "CONNECTION_HOST_UNREACHABLE"
+            return TesterResult(False, "unhealthy", _latency(started), code)
+        except Exception:
+            return TesterResult(
+                False, "unhealthy", _latency(started), "CONNECTION_HOST_UNREACHABLE"
+            )
+
+
 class ConnectionTesterRegistry:
     def __init__(self, settings: Settings) -> None:
         self._testers: dict[str, ConnectionTester] = {
             "postgresql": PostgreSQLTester(settings),
             "mysql": MySQLTester(settings),
             "rest_api": RestApiTester(settings),
+            "mssql": MSSQLTester(settings),
+            "snowflake": SnowflakeTester(settings),
+            "bigquery": BigQueryTester(settings),
+            "s3": S3Tester(settings),
         }
 
     def get(self, type_key: str) -> ConnectionTester:

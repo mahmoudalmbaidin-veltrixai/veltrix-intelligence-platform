@@ -65,10 +65,15 @@ def test_known_statuses_are_accurate() -> None:
     assert CONNECTION_TYPE_BY_KEY["postgresql"].implementation_status == "available"
     assert CONNECTION_TYPE_BY_KEY["rest_api"].implementation_status == "available"
     assert CONNECTION_TYPE_BY_KEY["mysql"].implementation_status == "beta"
-    # Connectors that genuinely require external setup are not marked available.
-    assert CONNECTION_TYPE_BY_KEY["snowflake"].implementation_status == "planned"
-    assert CONNECTION_TYPE_BY_KEY["mssql"].implementation_status == "requires_driver"
+    # The five post-Core connectors are wired and testable but classified beta
+    # (real drivers/endpoints are external; not battle-tested against prod).
+    for key in ("mssql", "snowflake", "bigquery", "s3"):
+        assert CONNECTION_TYPE_BY_KEY[key].implementation_status == "beta"
+        assert CONNECTION_TYPE_BY_KEY[key].enabled is True
+    # Connectors that genuinely require external setup remain gated off (not enabled).
+    assert CONNECTION_TYPE_BY_KEY["oracle"].enabled is False
     assert CONNECTION_TYPE_BY_KEY["sap_s4hana"].implementation_status == "requires_agent"
+    assert CONNECTION_TYPE_BY_KEY["sap_s4hana"].enabled is False
 
 
 def test_mysql_configuration_validation() -> None:
@@ -92,4 +97,47 @@ def test_unknown_and_planned_connectors_reject_configuration() -> None:
         validate_configuration("does_not_exist", {})
     # Planned connectors have no adapter and cannot accept a configuration.
     with pytest.raises(ValueError):
-        validate_configuration("snowflake", {"anything": "here"})
+        validate_configuration("oracle", {"anything": "here"})
+
+
+def test_new_connectors_validate_configuration_and_separate_secrets() -> None:
+    # mssql
+    cfg = validate_configuration(
+        "mssql",
+        {"host": "sql.internal", "port": 1433, "database": "sales", "username": "reader"},
+    )
+    assert cfg["port"] == 1433 and cfg["encrypt"] is True
+    assert validate_credentials("mssql", {"password": "s"}) == {"password": "s"}
+    # snowflake
+    cfg = validate_configuration(
+        "snowflake",
+        {
+            "account": "acme-eu",
+            "username": "svc",
+            "warehouse": "WH",
+            "database": "DB",
+            "schema_name": "PUBLIC",
+        },
+    )
+    assert cfg["account"] == "acme-eu"
+    # bigquery secret is the SA-key JSON (write-only)
+    cfg = validate_configuration("bigquery", {"project_id": "proj-1", "location": "US"})
+    assert cfg["project_id"] == "proj-1"
+    assert "service_account_json" in validate_credentials(
+        "bigquery", {"service_account_json": '{"type":"service_account"}'}
+    )
+    # s3
+    cfg = validate_configuration("s3", {"bucket": "my-bucket", "region": "eu-west-1"})
+    assert cfg["bucket"] == "my-bucket"
+    creds = validate_credentials("s3", {"access_key_id": "AKIA", "secret_access_key": "sk"})
+    assert creds["access_key_id"] == "AKIA"
+
+
+def test_new_connector_configs_reject_secrets_and_unknown_keys() -> None:
+    # A password must never be accepted in the (non-secret) configuration body.
+    for key, base in (
+        ("mssql", {"host": "h", "database": "d", "username": "u"}),
+        ("s3", {"bucket": "buck-et"}),
+    ):
+        with pytest.raises(ValueError):
+            validate_configuration(key, {**base, "password": "leak"})
