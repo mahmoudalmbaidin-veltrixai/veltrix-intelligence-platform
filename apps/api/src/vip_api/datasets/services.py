@@ -20,6 +20,7 @@ from vip_api.datasets.models import (
     DatasetQualityEvaluation,
     DatasetQualityResult,
     DatasetQualityRule,
+    DatasetVersion,
 )
 from vip_api.datasets.repositories import DatasetRepository
 from vip_api.datasets.schemas import (
@@ -31,6 +32,7 @@ from vip_api.datasets.schemas import (
     DatasetListResponse,
     DatasetResponse,
     DatasetUpdate,
+    DatasetVersionResponse,
     DiscoveryRequest,
     DiscoveryResult,
     LineageCreate,
@@ -240,6 +242,7 @@ async def create_dataset(
     )
     db.add(item)
     await db.flush()
+    await _capture_version(db, context, item, "created", change_summary="Dataset registered")
     await record_audit(
         db,
         "dataset.created",
@@ -324,6 +327,9 @@ async def certify_dataset(
     item.certification_note = (note or "").strip() or None
     item.version += 1
     item.updated_by_user_id = context.user_id
+    await _capture_version(
+        db, context, item, "certified", change_summary=item.certification_note or "Certified"
+    )
     await record_audit(
         db,
         "dataset.certified",
@@ -1057,3 +1063,214 @@ async def lineage_graph(
         truncated=truncated,
         max_depth=depth,
     )
+
+
+# --- Dataset versions (post-Core P2) ---------------------------------------
+
+_SNAPSHOT_META = (
+    "display_name",
+    "description",
+    "classification",
+    "business_domain",
+    "refresh_expectation",
+    "tags",
+    "source_schema",
+    "source_name",
+    "qualified_name",
+    "dataset_type",
+    "source_object_type",
+    "certification_status",
+    "certification_note",
+)
+# Dataset-level metadata fields a restore re-applies to the live row (fields are
+# managed by discovery and are captured for history but not rebuilt on restore).
+_RESTORABLE_META = (
+    "display_name",
+    "description",
+    "classification",
+    "business_domain",
+    "refresh_expectation",
+    "tags",
+)
+
+
+def _dataset_snapshot(dataset: Dataset, fields: list[DatasetField]) -> dict[str, object]:
+    return {
+        "dataset": {key: getattr(dataset, key) for key in _SNAPSHOT_META},
+        "fields": [
+            {
+                "source_name": f.source_name,
+                "display_name": f.display_name,
+                "description": f.description,
+                "ordinal_position": f.ordinal_position,
+                "physical_data_type": f.physical_data_type,
+                "normalized_data_type": f.normalized_data_type,
+                "is_nullable": f.is_nullable,
+                "is_primary_key": f.is_primary_key,
+                "classification": f.classification,
+            }
+            for f in fields
+        ],
+    }
+
+
+async def _capture_version(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    dataset: Dataset,
+    version_type: str,
+    *,
+    change_summary: str = "",
+    source_version_id: UUID | None = None,
+) -> DatasetVersion:
+    """Insert an immutable snapshot of the dataset's current schema + metadata."""
+    fields = list(
+        (
+            await db.scalars(
+                select(DatasetField)
+                .where(DatasetField.dataset_id == dataset.id)
+                .order_by(DatasetField.ordinal_position)
+            )
+        ).all()
+    )
+    highest = await db.scalar(
+        select(func.max(DatasetVersion.version_number)).where(
+            DatasetVersion.dataset_id == dataset.id
+        )
+    )
+    version = DatasetVersion(
+        organization_id=dataset.organization_id,
+        workspace_id=dataset.workspace_id,
+        dataset_id=dataset.id,
+        version_number=int(highest or 0) + 1,
+        version_type=version_type,
+        snapshot=_dataset_snapshot(dataset, fields),
+        change_summary=change_summary[:500],
+        created_by_user_id=context.user_id,
+        source_version_id=source_version_id,
+    )
+    db.add(version)
+    await db.flush()
+    return version
+
+
+async def list_dataset_versions(
+    db: AsyncSession, context: AuthorizationContext, dataset_id: UUID
+) -> list[DatasetVersionResponse]:
+    org, ws = _scope(context)
+    if await DatasetRepository(db, org, ws).get(dataset_id) is None:
+        raise ApplicationError(
+            code="NOT_FOUND", message="The requested resource was not found.", status_code=404
+        )
+    await _guard(db, context, dataset_id, "query")
+    rows = (
+        await db.scalars(
+            select(DatasetVersion)
+            .where(
+                DatasetVersion.organization_id == org,
+                DatasetVersion.workspace_id == ws,
+                DatasetVersion.dataset_id == dataset_id,
+            )
+            .order_by(DatasetVersion.version_number.desc())
+            .limit(100)
+        )
+    ).all()
+    return [DatasetVersionResponse.model_validate(row) for row in rows]
+
+
+async def get_dataset_version(
+    db: AsyncSession, context: AuthorizationContext, dataset_id: UUID, version_id: UUID
+) -> DatasetVersionResponse:
+    org, ws = _scope(context)
+    if await DatasetRepository(db, org, ws).get(dataset_id) is None:
+        raise ApplicationError(
+            code="NOT_FOUND", message="The requested resource was not found.", status_code=404
+        )
+    await _guard(db, context, dataset_id, "query")
+    version = await db.scalar(
+        select(DatasetVersion).where(
+            DatasetVersion.id == version_id,
+            DatasetVersion.dataset_id == dataset_id,
+            DatasetVersion.organization_id == org,
+            DatasetVersion.workspace_id == ws,
+        )
+    )
+    if version is None:
+        raise ApplicationError(
+            code="DATASET_VERSION_NOT_FOUND",
+            message="The requested version was not found.",
+            status_code=404,
+        )
+    return DatasetVersionResponse.model_validate(version)
+
+
+async def restore_dataset_version(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    dataset_id: UUID,
+    version_id: UUID,
+    expected_version: int,
+) -> DatasetResponse:
+    """Re-apply a snapshot's dataset-level metadata and record a new version.
+
+    Restore replays the snapshot forward (a new ``restored`` version) rather than
+    mutating history. Requires the ``edit`` capability. Column-level field rows
+    are captured in the snapshot for history but are owned by discovery, so a
+    restore re-applies the dataset's editable metadata, not the physical schema.
+    """
+    org, ws = _scope(context)
+    item = await DatasetRepository(db, org, ws).get(dataset_id)
+    if item is None:
+        raise ApplicationError(
+            code="NOT_FOUND", message="The requested resource was not found.", status_code=404
+        )
+    if item.version != expected_version:
+        raise ApplicationError(
+            code="VERSION_CONFLICT",
+            message="The resource was changed by another request.",
+            status_code=409,
+        )
+    await _guard(db, context, dataset_id, "edit")
+    version = await db.scalar(
+        select(DatasetVersion).where(
+            DatasetVersion.id == version_id,
+            DatasetVersion.dataset_id == dataset_id,
+            DatasetVersion.organization_id == org,
+            DatasetVersion.workspace_id == ws,
+        )
+    )
+    if version is None:
+        raise ApplicationError(
+            code="DATASET_VERSION_NOT_FOUND",
+            message="The requested version was not found.",
+            status_code=404,
+        )
+    snapshot_meta = (
+        version.snapshot.get("dataset", {}) if isinstance(version.snapshot, dict) else {}
+    )
+    if isinstance(snapshot_meta, dict):
+        for key in _RESTORABLE_META:
+            if key in snapshot_meta:
+                setattr(item, key, snapshot_meta[key])
+    item.version += 1
+    item.updated_by_user_id = context.user_id
+    await _capture_version(
+        db,
+        context,
+        item,
+        "restored",
+        change_summary=f"Restored version {version.version_number}",
+        source_version_id=version.id,
+    )
+    await record_audit(
+        db,
+        "dataset.version.restored",
+        actor_user_id=context.user_id,
+        organization_id=org,
+        workspace_id=ws,
+        resource_type="dataset",
+        resource_id=item.id,
+        metadata={"restored_from": version.version_number, "version_id": str(version.id)},
+    )
+    await db.commit()
+    return DatasetResponse.model_validate(item)

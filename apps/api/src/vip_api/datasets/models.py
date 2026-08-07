@@ -299,3 +299,47 @@ class DatasetLineageEdge(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+
+
+class DatasetVersion(Base):
+    """Immutable schema/metadata snapshot of a dataset.
+
+    Captured on create, certification and restore. Mirrors the dashboard/pipeline
+    version pattern: restore replays a snapshot forward as a new version rather
+    than mutating history.
+    """
+
+    __tablename__ = "dataset_versions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "workspace_id", "dataset_id"],
+            ["datasets.organization_id", "datasets.workspace_id", "datasets.id"],
+            ondelete="CASCADE",
+            name="fk_dataset_versions_dataset_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["created_by_user_id"],
+            ["users.id"],
+            ondelete="SET NULL",
+            name="fk_dataset_versions_creator",
+        ),
+        UniqueConstraint("dataset_id", "version_number", name="uq_dataset_versions_number"),
+        UniqueConstraint(
+            "organization_id", "workspace_id", "id", name="uq_dataset_versions_tenant_id"
+        ),
+        Index("ix_dataset_versions_history", "dataset_id", "version_number"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    workspace_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    dataset_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    # created | certified | restored | updated
+    version_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    change_summary: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    created_by_user_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    source_version_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )

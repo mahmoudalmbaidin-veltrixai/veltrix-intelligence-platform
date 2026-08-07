@@ -29,6 +29,8 @@ from vip_api.datasets.schemas import (
     DatasetResponse,
     DatasetRevokeCertificationRequest,
     DatasetUpdate,
+    DatasetVersionResponse,
+    DatasetVersionRestore,
     DiscoveryRequest,
     DiscoveryResult,
     FileCsvIngestRequest,
@@ -52,8 +54,10 @@ from vip_api.datasets.services import (
     delete_quality_rule,
     discover,
     get_dataset,
+    get_dataset_version,
     lineage_graph,
     list_dataset_activity,
+    list_dataset_versions,
     list_datasets,
     list_fields,
     list_quality_evaluations,
@@ -61,6 +65,7 @@ from vip_api.datasets.services import (
     list_quality_rules,
     quality_summary,
     require_dataset_access,
+    restore_dataset_version,
     revoke_dataset_certification,
     update_dataset,
     update_field,
@@ -486,3 +491,44 @@ async def lineage_delete(
 ) -> Response:
     await delete_lineage(db, context, dataset_id, edge_id)
     return Response(status_code=204)
+
+
+# --- Dataset versions (post-Core P2) ---------------------------------------
+# Resource-level authorization is enforced inside the service: list/get require
+# query, restore requires edit.
+
+
+@router.get("/{dataset_id}/versions", response_model=list[DatasetVersionResponse])
+async def dataset_versions_index(
+    dataset_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
+) -> list[DatasetVersionResponse]:
+    return await list_dataset_versions(db, context, dataset_id)
+
+
+@router.get("/{dataset_id}/versions/{version_id}", response_model=DatasetVersionResponse)
+async def dataset_version_detail(
+    dataset_id: UUID,
+    version_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
+) -> DatasetVersionResponse:
+    return await get_dataset_version(db, context, dataset_id, version_id)
+
+
+@router.post(
+    "/{dataset_id}/versions/{version_id}/restore",
+    response_model=DatasetResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def dataset_version_restore(
+    dataset_id: UUID,
+    version_id: UUID,
+    payload: DatasetVersionRestore,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(dataset_capability)],
+) -> DatasetResponse:
+    return await restore_dataset_version(
+        db, context, dataset_id, version_id, payload.expected_version
+    )

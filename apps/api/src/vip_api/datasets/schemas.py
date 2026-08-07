@@ -358,3 +358,21 @@ class LineageGraph(BaseModel):
     edges: list[LineageEdgeResponse]
     truncated: bool
     max_depth: int
+
+
+class DatasetVersionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    dataset_id: UUID
+    version_number: int
+    version_type: str
+    change_summary: str
+    created_by_user_id: UUID | None
+    source_version_id: UUID | None
+    created_at: datetime
+    snapshot: dict[str, object]
+
+
+class DatasetVersionRestore(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=1)
