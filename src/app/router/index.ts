@@ -181,6 +181,19 @@ const routes: RouteRecordRaw[] = [
     // entitlement and let the backend authorize the specific pipeline.
     meta: { title: 'Pipeline Runs', layout: 'app', requiresAuth: true, entitlement: 'pipeline_studio' },
   },
+  {
+    path: '/pipelines/:id/schedules',
+    name: 'pipeline-schedules',
+    component: () => import('@/modules/pipelines/PipelineSchedulesView.vue'),
+    // Per-resource: operator-level access is enforced by the backend; the
+    // entitlement gates the capability.
+    meta: {
+      title: 'Pipeline Schedules',
+      layout: 'app',
+      requiresAuth: true,
+      entitlement: 'pipeline_studio',
+    },
+  },
 
   // Datasets / semantic / quality / lineage
   {

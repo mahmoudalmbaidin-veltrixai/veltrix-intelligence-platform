@@ -101,6 +101,9 @@ function tone(s: string) {
   <div>
     <VipPageHeader title="Pipeline runs" description="Execution history, status and diagnostics.">
       <template #actions>
+        <VipButton variant="tertiary" icon="calendar" @click="router.push(`/pipelines/${id}/schedules`)"
+          >Schedules</VipButton
+        >
         <VipButton variant="tertiary" icon="chevronLeft" @click="router.push(`/pipelines/${id}`)"
           >Open in studio</VipButton
         >

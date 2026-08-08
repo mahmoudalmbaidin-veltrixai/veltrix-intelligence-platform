@@ -286,6 +286,59 @@ function mapArtifact(dto: ArtifactDto): PipelineArtifact {
   }
 }
 
+export interface PipelineSchedule {
+  id: string
+  pipelineId: string
+  name: string
+  scheduleType: string
+  scheduleExpression: string | null
+  timezone: string
+  enabled: boolean
+  status: string
+  rowVersion: number
+  lastRunAt: string | null
+  nextRunAt: string | null
+}
+
+export interface PipelineScheduleInput {
+  name: string
+  scheduleType: 'one_time' | 'daily' | 'weekly' | 'monthly' | 'cron'
+  scheduleExpression?: string | null
+  timezone?: string
+  runAt?: string | null
+  enabled?: boolean
+}
+
+interface PipelineScheduleDto {
+  id: string
+  pipeline_id: string
+  name: string
+  schedule_type: string
+  schedule_expression: string | null
+  timezone: string
+  enabled: boolean
+  status: string
+  row_version: number
+  last_run_at: string | null
+  next_run_at: string | null
+}
+
+function mapSchedule(dto: PipelineScheduleDto): PipelineSchedule {
+  return {
+    id: dto.id,
+    pipelineId: dto.pipeline_id,
+    name: dto.name,
+    scheduleType: dto.schedule_type,
+    scheduleExpression: dto.schedule_expression,
+    timezone: dto.timezone,
+    enabled: dto.enabled,
+    status: dto.status,
+    rowVersion: dto.row_version,
+    lastRunAt: dto.last_run_at,
+    nextRunAt: dto.next_run_at,
+  }
+}
+
 export const pipelineService = {
   async list(): Promise<PipelineListItem[]> {
     const page = await apiClient.get<{ items: SummaryDto[] }>('/api/v1/pipelines')
@@ -380,6 +433,52 @@ export const pipelineService = {
   // archive endpoint and no restore/unarchive endpoint.
   async remove(id: string, expectedVersion: number): Promise<void> {
     await apiClient.delete(`/api/v1/pipelines/${id}?expected_version=${expectedVersion}`)
+  },
+  // --- Run schedules (post-Core P1) ---
+  async listSchedules(pipelineId: string): Promise<PipelineSchedule[]> {
+    const rows = await apiClient.get<PipelineScheduleDto[]>(`/api/v1/pipelines/${pipelineId}/schedules`)
+    return rows.map(mapSchedule)
+  },
+  async createSchedule(pipelineId: string, input: PipelineScheduleInput): Promise<PipelineSchedule> {
+    return mapSchedule(
+      await apiClient.post<PipelineScheduleDto>(`/api/v1/pipelines/${pipelineId}/schedules`, {
+        name: input.name,
+        schedule_type: input.scheduleType,
+        schedule_expression: input.scheduleExpression ?? null,
+        timezone: input.timezone ?? 'UTC',
+        run_at: input.runAt ?? null,
+        enabled: input.enabled ?? true,
+      }),
+    )
+  },
+  async updateSchedule(
+    pipelineId: string,
+    scheduleId: string,
+    input: Partial<PipelineScheduleInput> & { expectedVersion: number },
+  ): Promise<PipelineSchedule> {
+    return mapSchedule(
+      await apiClient.put<PipelineScheduleDto>(`/api/v1/pipelines/${pipelineId}/schedules/${scheduleId}`, {
+        expected_version: input.expectedVersion,
+        name: input.name,
+        schedule_type: input.scheduleType,
+        schedule_expression: input.scheduleExpression,
+        timezone: input.timezone,
+        run_at: input.runAt,
+        enabled: input.enabled,
+      }),
+    )
+  },
+  /** Pause/resume by toggling `enabled` (the same mechanism as delivery schedules). */
+  async toggleSchedule(pipelineId: string, schedule: PipelineSchedule, enabled: boolean): Promise<PipelineSchedule> {
+    return this.updateSchedule(pipelineId, schedule.id, {
+      expectedVersion: schedule.rowVersion,
+      enabled,
+    })
+  },
+  async deleteSchedule(pipelineId: string, scheduleId: string, expectedVersion: number): Promise<void> {
+    await apiClient.delete(
+      `/api/v1/pipelines/${pipelineId}/schedules/${scheduleId}?expected_version=${expectedVersion}`,
+    )
   },
 }
 
