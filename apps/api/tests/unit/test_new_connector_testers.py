@@ -68,7 +68,11 @@ def test_all_new_connectors_registered(settings: Settings) -> None:
 )
 @pytest.mark.asyncio
 async def test_tester_degrades_when_driver_missing(
-    settings: Settings, key: str, module: str, config: dict, creds: dict
+    settings: Settings,
+    key: str,
+    module: str,
+    config: dict[str, object],
+    creds: dict[str, str],
 ) -> None:
     if _driver_present(module):
         pytest.skip(f"{module} installed; degradation path not exercised in this env")

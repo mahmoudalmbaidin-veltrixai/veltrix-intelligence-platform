@@ -361,9 +361,10 @@ def test_every_production_operation_has_a_resolvable_contract_and_fails_closed(
     operations = list(_operations(document))
 
     # Pin the enterprise surface against accidental disappearance while allowing
-    # additive API growth. The certified baseline exposes 192 paths / 247 ops.
-    assert len(document["paths"]) >= 192
-    assert len(operations) >= 247
+    # additive API growth. The certified baseline exposes 198 paths / 255 ops
+    # (post-Core P1/P2: +6 pipeline-schedule & dataset-version paths, +8 ops).
+    assert len(document["paths"]) >= 198
+    assert len(operations) >= 255
     assert len({operation["operationId"] for _, _, operation in operations}) == len(operations)
     _walk_refs(document, document)
 
@@ -429,11 +430,11 @@ def test_every_operation_is_classified_for_authenticated_certification(settings:
     document = create_application(settings).openapi()
     coverage = build_coverage(document)
     operations = cast(list[dict[str, object]], coverage["operations"])
-    assert coverage["operation_count"] == 247
-    assert coverage["classified_count"] == 247
-    assert coverage["test_mapped_count"] == 247
+    assert coverage["operation_count"] == 255
+    assert coverage["classified_count"] == 255
+    assert coverage["test_mapped_count"] == 255
     assert coverage["executed_count"] == 0
-    assert len({item["operation_id"] for item in operations}) == 247
+    assert len({item["operation_id"] for item in operations}) == 255
     for item in operations:
         assert item["mapped_test_ids"]
         assert item["personas"]
@@ -1144,8 +1145,8 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
             record["result"] = "pass"
         execution = {str(key): value for key, value in records.items()}
         verified = build_coverage(document, execution)
-        assert verified["executed_count"] == 247
-        assert verified["passed_count"] == 247
+        assert verified["executed_count"] == 255
+        assert verified["passed_count"] == 255
         report_path = os.getenv("VIP_API_OPERATION_EVIDENCE_PATH")
         if report_path:
             target = Path(report_path)
