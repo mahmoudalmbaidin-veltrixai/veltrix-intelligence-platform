@@ -721,7 +721,9 @@ CONNECTION_TYPES: tuple[ConnectionTypeDefinition, ...] = (
         "api",
         subcategory="http",
         vendor="Generic",
-        status="available",
+        # Beta per capability matrix 01b (PARTIAL_NON_BLOCKING): market as beta
+        # only until customer-validated. SSRF/TLS guards are production-grade.
+        status="beta",
         config=RestApiConfiguration,
         secrets=RestApiCredentials,
         strategy="rest_head",

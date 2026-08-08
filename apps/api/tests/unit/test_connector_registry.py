@@ -63,11 +63,12 @@ def test_only_usable_connectors_expose_a_real_schema() -> None:
 
 def test_known_statuses_are_accurate() -> None:
     assert CONNECTION_TYPE_BY_KEY["postgresql"].implementation_status == "available"
-    assert CONNECTION_TYPE_BY_KEY["rest_api"].implementation_status == "available"
     assert CONNECTION_TYPE_BY_KEY["mysql"].implementation_status == "beta"
     # The five post-Core connectors are wired and testable but classified beta
     # (real drivers/endpoints are external; not battle-tested against prod).
-    for key in ("mssql", "snowflake", "bigquery", "s3"):
+    # rest_api included per capability matrix 01b: market as beta only until
+    # customer-validated, even though its SSRF/TLS guards are production-grade.
+    for key in ("mssql", "snowflake", "bigquery", "s3", "rest_api"):
         assert CONNECTION_TYPE_BY_KEY[key].implementation_status == "beta"
         assert CONNECTION_TYPE_BY_KEY[key].enabled is True
     # Connectors that genuinely require external setup remain gated off (not enabled).
