@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { relativeTime, formatNumber } from '@/shared/lib/format'
@@ -27,7 +27,13 @@ const router = useRouter()
 const platform = usePlatformStore()
 const ui = useUiStore()
 
-const { data, isLoading, refetch } = useQuery('datasets:list', () => datasetService.list())
+const data = ref<Dataset[]>([])
+const isLoading = ref(false)
+const listError = ref('')
+const page = ref(1)
+const pageSize = 50
+const total = ref(0)
+let listRequest = 0
 const { data: connections } = useQuery('datasets:connections', async () => (await connectionService.list(1, 100)).items)
 const canDiscover = computed(() => platform.can('dataset.discover'))
 const discoverOpen = ref(false)
@@ -192,6 +198,52 @@ const search = ref('')
 const statusFilter = ref<'all' | DatasetStatus>('all')
 const certifiedOnly = ref(false)
 
+async function refetch(): Promise<void> {
+  const request = ++listRequest
+  isLoading.value = true
+  listError.value = ''
+  try {
+    const status =
+      statusFilter.value === 'all'
+        ? undefined
+        : statusFilter.value === 'building'
+          ? 'inactive'
+          : statusFilter.value === 'deprecated'
+            ? 'archived'
+            : statusFilter.value
+    const result = await datasetService.listPage({
+      page: page.value,
+      pageSize,
+      search: search.value,
+      status,
+    })
+    if (request !== listRequest) return
+    data.value = result.items
+    total.value = result.total
+  } catch (cause) {
+    if (request !== listRequest) return
+    listError.value = safeErrorText(cause)
+  } finally {
+    if (request === listRequest) isLoading.value = false
+  }
+}
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(search, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    if (page.value !== 1) page.value = 1
+    else void refetch()
+  }, 300)
+})
+watch(statusFilter, () => {
+  if (page.value !== 1) page.value = 1
+  else void refetch()
+})
+watch(page, () => void refetch())
+onMounted(() => void refetch())
+onBeforeUnmount(() => clearTimeout(searchTimer))
+
 const statusOptions: { value: string; label: string }[] = [
   { value: 'all', label: 'All statuses' },
   { value: 'active', label: 'Active' },
@@ -200,17 +252,9 @@ const statusOptions: { value: string; label: string }[] = [
 ]
 
 const rows = computed<Dataset[]>(() => {
-  const q = search.value.trim().toLowerCase()
   return (data.value ?? []).filter((d) => {
-    const matchesSearch =
-      !q ||
-      d.name.toLowerCase().includes(q) ||
-      d.description.toLowerCase().includes(q) ||
-      d.owner.toLowerCase().includes(q) ||
-      d.tags.some((t) => t.toLowerCase().includes(q))
-    const matchesStatus = statusFilter.value === 'all' || d.status === statusFilter.value
     const matchesCertified = !certifiedOnly.value || d.certified
-    return matchesSearch && matchesStatus && matchesCertified
+    return matchesCertified
   })
 })
 
@@ -334,12 +378,12 @@ async function confirmLifecycle() {
     <VipCard :padded="false">
       <div class="dl__toolbar">
         <div class="dl__search">
-          <VipInput v-model="search" icon="search" size="sm" placeholder="Search datasets, owners or tags" />
+          <VipInput v-model="search" icon="search" size="sm" placeholder="Search dataset name or source" />
         </div>
         <div class="dl__filters">
           <VipSelect v-model="statusFilter" :options="statusOptions" aria-label="Dataset status" size="sm" />
           <VipCheckbox v-model="certifiedOnly" label="Certified only" />
-          <span class="dl__count">{{ rows.length }} of {{ data?.length ?? 0 }}</span>
+          <span class="dl__count">{{ rows.length }} of {{ total }}</span>
         </div>
       </div>
 
@@ -401,6 +445,14 @@ async function confirmLifecycle() {
           </div>
         </template>
       </VipTable>
+      <div v-if="listError" class="dl__list-error" role="alert">
+        {{ listError }} <button @click="refetch">Retry</button>
+      </div>
+      <div class="dl__paging" aria-label="Dataset pages">
+        <VipButton size="xs" :disabled="page === 1 || isLoading" @click="page--">Previous</VipButton>
+        <span>Page {{ page }} of {{ Math.max(1, Math.ceil(total / pageSize)) }}</span>
+        <VipButton size="xs" :disabled="page * pageSize >= total || isLoading" @click="page++">Next</VipButton>
+      </div>
     </VipCard>
 
     <VipConfirmDialog
@@ -517,6 +569,27 @@ async function confirmLifecycle() {
   font-size: var(--vip-fs-sm);
   color: var(--vip-text-muted);
   white-space: nowrap;
+}
+.dl__paging,
+.dl__list-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--vip-sp-4) var(--vip-sp-6);
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+  border-top: 1px solid var(--vip-border-subtle);
+}
+.dl__list-error {
+  justify-content: flex-start;
+  gap: var(--vip-sp-2);
+  color: var(--vip-danger-text);
+}
+.dl__list-error button {
+  color: inherit;
+  text-decoration: underline;
+  background: none;
+  border: 0;
 }
 .dl__name {
   display: flex;

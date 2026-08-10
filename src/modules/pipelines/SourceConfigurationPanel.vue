@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   datasetService,
   type Dataset,
@@ -37,21 +37,16 @@ const description = ref('')
 const file = ref<File | null>(null)
 const existingFileId = ref('')
 const datasetPage = ref(1)
+const datasetPageSize = 20
+const datasetTotal = ref(0)
+const datasetLoading = ref(false)
+const datasetError = ref('')
 const loading = ref(false)
 const error = ref('')
 const message = ref('')
 
-const visibleDatasets = computed(() => {
-  const query = search.value.trim().toLowerCase()
-  return query
-    ? datasets.value.filter((item) => `${item.name} ${item.source}`.toLowerCase().includes(query))
-    : datasets.value
-})
 const datasetOptions = computed(() =>
-  [
-    ...(selectedId.value ? datasets.value.filter((item) => item.id === selectedId.value) : []),
-    ...visibleDatasets.value.slice((datasetPage.value - 1) * 20, datasetPage.value * 20),
-  ]
+  [...(selectedId.value ? datasets.value.filter((item) => item.id === selectedId.value) : []), ...datasets.value]
     .filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index)
     .map((item) => ({ value: item.id, label: `${item.name} — ${item.source}` })),
 )
@@ -76,12 +71,39 @@ function dataType(value: string): DataType {
   return 'string'
 }
 
+let datasetRequest = 0
 async function refreshDatasets() {
-  datasets.value = await datasetService.list()
+  const request = ++datasetRequest
+  datasetLoading.value = true
+  datasetError.value = ''
+  try {
+    const result = await datasetService.listPage({
+      page: datasetPage.value,
+      pageSize: datasetPageSize,
+      search: search.value,
+    })
+    if (request !== datasetRequest) return
+    datasets.value = result.items
+    datasetTotal.value = result.total
+  } catch (cause) {
+    if (request !== datasetRequest) return
+    datasetError.value = cause instanceof Error ? cause.message : 'Datasets could not be loaded.'
+  } finally {
+    if (request === datasetRequest) datasetLoading.value = false
+  }
 }
 
 async function refreshFiles() {
   uploadedFiles.value = (await platformInfrastructure.files({ limit: 100 })).items
+}
+
+async function ensureConnections() {
+  if (connections.value.length) return
+  connections.value = (await connectionService.list(1, 100)).items
+}
+
+async function ensureFiles() {
+  await Promise.all([ensureConnections(), refreshFiles()])
 }
 
 async function selectDataset(id: string) {
@@ -192,21 +214,28 @@ async function registerFile(fileId: string) {
 watch(sourceType, () => {
   error.value = ''
   message.value = ''
+  if (sourceType.value === 'connection') void ensureConnections()
+  if (sourceType.value === 'file') void ensureFiles()
 })
+let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(search, () => {
-  datasetPage.value = 1
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    if (datasetPage.value !== 1) datasetPage.value = 1
+    else void refreshDatasets()
+  }, 300)
 })
+watch(datasetPage, () => void refreshDatasets())
+onBeforeUnmount(() => clearTimeout(searchTimer))
 
 onMounted(async () => {
-  loading.value = true
-  try {
-    const [connectionResult] = await Promise.all([connectionService.list(1, 100), refreshDatasets(), refreshFiles()])
-    connections.value = connectionResult.items
-    if (selectedId.value) await selectDataset(selectedId.value)
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Source options could not be loaded.'
-  } finally {
-    loading.value = false
+  await refreshDatasets()
+  if (selectedId.value) {
+    if (!datasets.value.some((item) => item.id === selectedId.value)) {
+      const selected = await datasetService.get(selectedId.value)
+      if (selected) datasets.value = [selected, ...datasets.value]
+    }
+    await selectDataset(selectedId.value)
   }
 })
 </script>
@@ -278,7 +307,7 @@ onMounted(async () => {
     <template v-if="sourceType === 'dataset'">
       <div class="source__heading">
         <span>Governed datasets</span>
-        <VipButton size="xs" variant="tertiary" icon="refresh" :loading="loading" @click="refreshDatasets"
+        <VipButton size="xs" variant="tertiary" icon="refresh" :loading="datasetLoading" @click="refreshDatasets"
           >Refresh</VipButton
         >
       </div>
@@ -292,8 +321,8 @@ onMounted(async () => {
       />
       <div class="source__paging">
         <VipButton size="xs" :disabled="datasetPage === 1" @click="datasetPage--">Previous</VipButton>
-        <span>Page {{ datasetPage }}</span>
-        <VipButton size="xs" :disabled="datasetPage * 20 >= visibleDatasets.length" @click="datasetPage++"
+        <span>Page {{ datasetPage }} of {{ Math.max(1, Math.ceil(datasetTotal / datasetPageSize)) }}</span>
+        <VipButton size="xs" :disabled="datasetPage * datasetPageSize >= datasetTotal" @click="datasetPage++"
           >Next</VipButton
         >
       </div>
@@ -309,8 +338,13 @@ onMounted(async () => {
       </div>
     </template>
 
-    <div v-if="loading" class="source__state"><VipSpinner :size="18" label="Loading source…" /></div>
-    <p v-if="error" class="source__error" role="alert">{{ error }} <button @click="refreshDatasets">Retry</button></p>
+    <div v-if="loading || datasetLoading" class="source__state">
+      <VipSpinner :size="18" label="Loading source…" />
+    </div>
+    <p v-if="datasetError" class="source__error" role="alert">
+      {{ datasetError }} <button @click="refreshDatasets">Retry</button>
+    </p>
+    <p v-if="error" class="source__error" role="alert">{{ error }}</p>
     <p v-if="message" class="source__success" role="status">{{ message }}</p>
 
     <template v-if="fields.length">

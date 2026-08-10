@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from vip_api.datasets.models import Dataset, DatasetField
+from vip_api.datasets.models import Dataset, DatasetField, DatasetQualityEvaluation
 
 
 class DatasetRepository:
@@ -34,7 +34,7 @@ class DatasetRepository:
         search: str | None,
         status: str | None,
         extra_filters: Sequence[Any] = (),
-    ) -> tuple[list[Dataset], int]:
+    ) -> tuple[list[tuple[Dataset, int | None]], int]:
         # ``extra_filters`` carry the per-user resource-visibility predicate so the
         # ACL filter is applied to BOTH the count and the paginated page — hidden
         # datasets never leak through pagination or the reported total.
@@ -54,17 +54,47 @@ class DatasetRepository:
         total = int(
             await self.db.scalar(select(func.count()).select_from(Dataset).where(*filters)) or 0
         )
-        items = list(
-            (
-                await self.db.scalars(
-                    select(Dataset)
-                    .where(*filters)
-                    .order_by(Dataset.display_name, Dataset.id)
-                    .offset((page - 1) * page_size)
-                    .limit(page_size)
+        # Project the latest completed quality score in the same bounded page
+        # query.  The row-number subquery is tenant/workspace qualified and the
+        # outer join is applied only after the normal visibility predicates, so
+        # it neither adds per-item queries nor changes collection authorization.
+        ranked_quality = (
+            select(
+                DatasetQualityEvaluation.dataset_id.label("dataset_id"),
+                DatasetQualityEvaluation.score.label("score"),
+                func.row_number()
+                .over(
+                    partition_by=DatasetQualityEvaluation.dataset_id,
+                    order_by=DatasetQualityEvaluation.created_at.desc(),
                 )
-            ).all()
+                .label("quality_rank"),
+            )
+            .where(
+                DatasetQualityEvaluation.organization_id == self.organization_id,
+                DatasetQualityEvaluation.workspace_id == self.workspace_id,
+                DatasetQualityEvaluation.completed_at.is_not(None),
+            )
+            .subquery()
         )
+        latest_quality = (
+            select(ranked_quality.c.dataset_id, ranked_quality.c.score)
+            .where(ranked_quality.c.quality_rank == 1)
+            .subquery()
+        )
+        rows = (
+            await self.db.execute(
+                select(Dataset, latest_quality.c.score)
+                .outerjoin(latest_quality, latest_quality.c.dataset_id == Dataset.id)
+                .where(*filters)
+                .order_by(Dataset.display_name, Dataset.id)
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+        ).all()
+        items = [
+            (cast(Dataset, dataset), cast(int | None, quality_score))
+            for dataset, quality_score in rows
+        ]
         return items, total
 
     async def fields(self, dataset_id: UUID) -> list[DatasetField]:

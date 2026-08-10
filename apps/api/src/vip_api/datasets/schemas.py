@@ -130,6 +130,9 @@ class DatasetResponse(BaseModel):
     status: str
     discovery_status: str
     quality_status: str
+    # Lightweight list projection populated from the latest completed quality
+    # evaluation. Detailed quality rules/results remain lazy detail resources.
+    quality_score: int | None = None
     classification: str
     owner_user_id: UUID | None
     steward_user_id: UUID | None

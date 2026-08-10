@@ -49,6 +49,20 @@ export interface Dataset {
   access?: ResourceEffectiveAccess
 }
 
+export interface DatasetPage {
+  items: Dataset[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface DatasetListOptions {
+  page?: number
+  pageSize?: number
+  search?: string
+  status?: 'active' | 'inactive' | 'archived'
+}
+
 export interface DatasetActivityItem {
   id: string
   occurredAt: string
@@ -495,6 +509,7 @@ let createdRules: QualityRule[] = []
 
 export interface DatasetService {
   list(search?: string): Promise<Dataset[]>
+  listPage(options?: DatasetListOptions): Promise<DatasetPage>
   discover(input: {
     connectionId: string
     schemas: string[]
@@ -554,6 +569,13 @@ const mockDatasetService: DatasetService = {
         d.owner.toLowerCase().includes(q) ||
         d.tags.some((t) => t.toLowerCase().includes(q)),
     )
+  },
+  async listPage(options = {}): Promise<DatasetPage> {
+    const matches = await this.list(options.search)
+    const page = options.page ?? 1
+    const pageSize = options.pageSize ?? 50
+    const start = (page - 1) * pageSize
+    return { items: matches.slice(start, start + pageSize), total: matches.length, page, pageSize }
   },
   async discover(): Promise<{ discovered: number; persisted: number; warnings: string[] }> {
     await latency()
@@ -708,6 +730,7 @@ interface ApiDataset {
   row_count_estimate: number | null
   last_discovered_at: string | null
   quality_status: string
+  quality_score?: number | null
   classification: string
   version: number
   access?: ResourceEffectiveAccessDto | null
@@ -716,6 +739,8 @@ interface ApiDataset {
 interface ApiDatasetList {
   items: ApiDataset[]
   total: number
+  page: number
+  page_size: number
 }
 
 interface ApiQualityRule {
@@ -800,7 +825,7 @@ interface ApiDatasetProfile {
   refreshed_at: string
 }
 
-function mapDataset(item: ApiDataset, qualityScore: number | null = null): Dataset {
+function mapDataset(item: ApiDataset, qualityScore: number | null = item.quality_score ?? null): Dataset {
   return {
     id: item.id,
     name: item.display_name,
@@ -829,17 +854,25 @@ function mapDataset(item: ApiDataset, qualityScore: number | null = null): Datas
   }
 }
 
+async function liveDatasetPage(options: DatasetListOptions = {}): Promise<DatasetPage> {
+  const response = await apiClient.get<ApiDatasetList>('/datasets', {
+    query: {
+      page: options.page ?? 1,
+      page_size: options.pageSize ?? 100,
+      search: options.search?.trim() || undefined,
+      status: options.status,
+    },
+  })
+  return {
+    items: response.items.map((item) => mapDataset(item)),
+    total: response.total,
+    page: response.page,
+    pageSize: response.page_size,
+  }
+}
+
 async function liveDatasets(search?: string): Promise<Dataset[]> {
-  const response = await apiClient.get<ApiDatasetList>('/datasets', { query: { search, page_size: 100 } })
-  const summaries = await Promise.all(
-    response.items.map((item) =>
-      apiClient.get<ApiQualitySummary>(`/datasets/${item.id}/quality`).catch(() => ({
-        status: 'unknown',
-        score: null,
-      })),
-    ),
-  )
-  return response.items.map((item, index) => mapDataset(item, summaries[index]?.score ?? null))
+  return (await liveDatasetPage({ search, pageSize: 100 })).items
 }
 
 function mapQualityRule(rule: ApiQualityRule, dataset: Pick<Dataset, 'id' | 'name'>): QualityRule {
@@ -928,6 +961,7 @@ async function liveIncidents(): Promise<QualityIncident[]> {
 
 const apiDatasetService: DatasetService = {
   list: liveDatasets,
+  listPage: liveDatasetPage,
   discover: async (input) => {
     const result = await apiClient.post<{
       discovered_count: number

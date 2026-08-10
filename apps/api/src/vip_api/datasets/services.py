@@ -166,8 +166,13 @@ async def list_datasets(
     items, total = await DatasetRepository(db, org, ws).list_scoped(
         page=page, page_size=page_size, search=search, status=status, extra_filters=extra_filters
     )
+    responses: list[DatasetResponse] = []
+    for item, quality_score in items:
+        response = DatasetResponse.model_validate(item)
+        response.quality_score = quality_score
+        responses.append(response)
     return DatasetListResponse(
-        items=[DatasetResponse.model_validate(item) for item in items],
+        items=responses,
         page=page,
         page_size=page_size,
         total=total,
