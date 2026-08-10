@@ -1,0 +1,27 @@
+{
+    "measured_at":  "2026-08-10T11:51:38.5053708Z",
+    "organization_id":  "17a4e171-ced9-40cf-883d-e42ff2dc4267",
+    "workspace_id":  "b26c56a6-b743-4ce4-ae20-4da17cdb6e36",
+    "measurements":  [
+                         {
+                             "requested_page_size":  10,
+                             "returned_items":  10,
+                             "total_visible":  165,
+                             "list_http_requests":  1,
+                             "quality_http_requests_in_current_frontend":  10,
+                             "total_dataset_hydration_requests_in_current_frontend":  11,
+                             "backend_list_ms":  1932.86,
+                             "payload_bytes":  8797
+                         },
+                         {
+                             "requested_page_size":  100,
+                             "returned_items":  100,
+                             "total_visible":  165,
+                             "list_http_requests":  1,
+                             "quality_http_requests_in_current_frontend":  100,
+                             "total_dataset_hydration_requests_in_current_frontend":  101,
+                             "backend_list_ms":  525.43,
+                             "payload_bytes":  85193
+                         }
+                     ]
+}

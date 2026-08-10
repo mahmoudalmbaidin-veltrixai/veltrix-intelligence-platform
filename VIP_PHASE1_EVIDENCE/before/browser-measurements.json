@@ -1,0 +1,961 @@
+{
+  "measured_at": "2026-08-10T11:52:15.080Z",
+  "dataset_listing": {
+    "duration_ms": 13223,
+    "request_count": 106,
+    "dataset_list_requests": 1,
+    "quality_requests": 100,
+    "pipeline_post_requests": 0,
+    "pipeline_put_requests": 0,
+    "failed_requests": [
+      {
+        "url": "http://localhost:8000/api/v1/home/summary",
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://localhost:8000/api/v1/events/stream",
+        "error": "net::ERR_ABORTED"
+      }
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/api/v1/organizations"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/organizations/17a4e171-ced9-40cf-883d-e42ff2dc4267/workspaces"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/authorization/context"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/events/stream"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets?page_size=100"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/connections?page=1&page_size=100"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/8b786218-8af1-4a86-abcf-f241feff5784/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/877dc829-dca9-49b3-96f4-2bb3e8f8d3e5/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/68ad2b7a-a9b8-45d3-b335-2d3a816526ef/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/bafa1078-9785-4678-bd37-f306bcee7ea9/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7e9ab730-d5bc-4106-9ed8-46a63dd9e0c2/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/53197489-d499-45b9-9239-0682af04ffad/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/443f506e-42fe-46bb-8381-24032f636c9b/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/c8967199-2e0e-4e8c-971c-d2c3035fb5b2/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/e29334c1-1a3e-4b47-bc3b-c1e83e396d5f/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/3715264d-6a88-467e-b25a-f3ae06da0146/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/42c9eaf0-ac3c-4d95-bddb-f09b3c1fb031/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/43ded424-1176-4f31-b197-7e6774f7d327/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d799ad3c-7b61-456b-8b53-5e7b52cca368/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/cc5ec173-f733-45f6-a6a2-ebc9ef7c83a2/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7a38c801-f89a-4273-9d0e-80fe6aa80641/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/9ddb4b05-da23-4e92-9d3f-6e01b1bcbe58/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/15187a43-3bee-480c-a8e2-4309b6991a4d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/ef3bc936-32f3-434a-bca9-a8d79368a772/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d3cb0e61-cb0b-4736-8a43-64f8ff58146e/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7f0b733a-a017-4558-b425-4b8b8619807a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/e83d6e6f-957a-4698-b160-9f6f2ec3ae72/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/e076dadc-a282-4f6b-a617-e3611e87302d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/c20ea768-190e-4db3-b676-cfdb5ab47e4e/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/1d76ffb7-a429-4a16-83b3-68e1670ea39d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/eec5fabe-df3f-4036-b24c-d79e25b94177/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/1be6febf-4636-42d8-947b-6dc47885ac73/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/01492241-6780-4b9d-85d8-3eaa63933a31/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/434ecd8d-c199-41e9-adc4-98c5d8734c9c/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/2e2ef9e4-b2be-4323-8697-adecdab68314/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/6d988bec-8c8a-4fda-90cb-a7d3e2ba12a7/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/beb0c097-cdad-4c50-b2cc-892622e5be56/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/818d3151-9da7-44ad-afc6-438e7db59389/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/0c4e15cb-4cce-470d-aa50-452267b4256d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/532edc35-b93a-4a08-ae4d-69ab695ad7a0/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/f8b277a3-547c-46eb-9b39-7644a2cb603f/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/dfb76250-5fd6-4147-a18c-dd07176050a2/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/f31b4db5-f886-47b6-87f4-f4b6cfac8524/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/5fbd2fd7-986c-4971-b876-b1271c168d92/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7db909a1-49ef-4826-a490-9d85edf2400b/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/bebbbfdb-eae0-4d12-8f8f-bca08a9664ee/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/662f908b-9514-4ec5-b409-02a68c906081/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/037ae496-747e-4f71-8fc3-a748f58610d8/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/0e291291-56b1-4e3e-b41d-4472fad6867a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/87fe170e-e7df-4127-b9e9-fddaccbd3cf5/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/ec252f64-d771-4fdb-a0ea-a74128660eba/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/30605576-2773-438e-b948-1dfe98c6d2b4/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/385d3265-d674-4ffa-87fe-49a506769ebd/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/8ca2ef64-9ecb-40e9-a988-d8ac89727bd6/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/bd99d61c-a34e-44b0-87a4-3e4663c87b0c/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/9a9ad3f4-a2f8-4361-84c1-363ac310e70f/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/45506e32-c5e8-4e37-9198-840964c71523/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/73cd819a-68db-434e-ae32-5d0af238b594/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/b84de78b-5de0-4e4a-82a2-4451d4dd793e/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/681fec96-1ad4-42f2-aad7-72821d9e199b/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7ebc5d2d-4226-4798-bc3a-a4916721988a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/6bbbfb95-3f1e-41cd-95ae-41ccb9117437/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/2bfbf11b-419b-43de-87d1-3634a9d8dc81/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/77a5fd06-ff08-44f0-b416-65fb71ba2694/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/f84185a4-3d44-4056-8ccd-73ea1ca5ba5f/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d2d5255b-ad4f-4ac7-9c41-24bc7bebb4bf/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/a3720d06-319c-45f2-835d-f5aaea8feda7/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/0a0b6b74-9545-4cb6-9fd2-e59ab08ad674/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/3fd192f6-55f4-4f8a-8298-886e3e0be35f/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7d9b3344-4982-4193-aa2f-2509aabfe726/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7d5c0a46-a701-424f-96f7-614f8053b22d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/8ce1f46e-f9a4-4ae2-94a1-2adbc4505229/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/26ede7ab-97fa-42c8-9492-78b02a8b1fed/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/f1fe32b2-bbe6-47fa-b666-9e94de919f8d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/a3bd88b7-3965-4b30-8c75-e4901a90c403/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/e68ab5c7-e787-4a3e-a7f1-022ac78a91f7/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/67b87a07-3cef-4018-b00f-a511da7fb736/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/f9a51110-6499-4af6-967e-ba8cd724da1d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/1971c45f-6abe-4a51-9006-7a38f949e28b/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/79aa0cd1-2252-49b2-a44c-13a9413d4bd9/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d3bf43db-9480-49e0-a2bf-8b6a5a3afcf4/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/eb6b94d8-5ce7-4072-8ef4-15dcd1f1efd5/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/59221571-0645-4ef6-94fb-4c016910fb30/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d001481f-169e-4961-9a52-3aec688aa174/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/a2d20085-9dc1-47ec-8445-9ed9a7f2b88e/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/482c7ddd-1d8e-4f93-add8-479f49327745/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/4c81e911-51cd-4e3e-b8d4-db9916a28952/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/83d5a530-ef4c-4392-92de-b79aa523d507/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/2b9ad196-023c-4949-a223-241e65f9439d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/0d0dab71-2fcd-4e21-a21b-fb299793740e/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/cace0650-168a-497a-9b0c-889da1ed9c95/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/28465f4d-28e1-4902-9065-75663f757346/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/96398882-2a83-4eac-8baa-492a2de5ef65/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/daa192f8-da37-4a14-9b1e-9f87af5f20ff/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/b6127018-c8a6-4837-8365-de81c45490de/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d713bb24-8b3f-4602-ac9e-8a056d8c3046/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/6a381c13-fc61-4cad-a851-4275f289939a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/32c9f96b-56fe-4e7a-8f31-f08390abc0d3/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/39402fd9-d678-40a2-8e61-0bf023681017/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7a474fa3-949c-47f7-9a81-46cc9925fb6b/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/bcfa57ec-eec1-4b94-8b0b-01b7fe895586/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/edb92897-140d-4463-bd12-82d43ef54ca9/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/5c283af5-653b-4b01-926b-ced3825ce61a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/4ae22d1f-0bef-4fc4-b8cd-0a48e20034cf/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/a46d63e9-27ad-4568-b52e-347bebda042a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/fdc10ef4-e7a4-4472-b402-a37a62c0555d/quality"
+      }
+    ],
+    "settled": true
+  },
+  "pipeline_source_selector": {
+    "duration_ms": 6839,
+    "request_count": 107,
+    "dataset_list_requests": 1,
+    "quality_requests": 100,
+    "pipeline_post_requests": 0,
+    "pipeline_put_requests": 0,
+    "failed_requests": [
+      {
+        "url": "http://localhost:8000/api/v1/events/stream",
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://localhost:8000/api/v1/events/stream",
+        "error": "net::ERR_ABORTED"
+      }
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/api/v1/organizations"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/organizations/17a4e171-ced9-40cf-883d-e42ff2dc4267/workspaces"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/authorization/context"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/events/stream"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/connections?page=1&page_size=100"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets?page_size=100"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/files?limit=100"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/8b786218-8af1-4a86-abcf-f241feff5784/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/877dc829-dca9-49b3-96f4-2bb3e8f8d3e5/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/68ad2b7a-a9b8-45d3-b335-2d3a816526ef/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/bafa1078-9785-4678-bd37-f306bcee7ea9/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7e9ab730-d5bc-4106-9ed8-46a63dd9e0c2/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/53197489-d499-45b9-9239-0682af04ffad/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/443f506e-42fe-46bb-8381-24032f636c9b/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/c8967199-2e0e-4e8c-971c-d2c3035fb5b2/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/e29334c1-1a3e-4b47-bc3b-c1e83e396d5f/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/3715264d-6a88-467e-b25a-f3ae06da0146/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/42c9eaf0-ac3c-4d95-bddb-f09b3c1fb031/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/43ded424-1176-4f31-b197-7e6774f7d327/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d799ad3c-7b61-456b-8b53-5e7b52cca368/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/cc5ec173-f733-45f6-a6a2-ebc9ef7c83a2/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7a38c801-f89a-4273-9d0e-80fe6aa80641/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/9ddb4b05-da23-4e92-9d3f-6e01b1bcbe58/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/15187a43-3bee-480c-a8e2-4309b6991a4d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/ef3bc936-32f3-434a-bca9-a8d79368a772/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d3cb0e61-cb0b-4736-8a43-64f8ff58146e/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7f0b733a-a017-4558-b425-4b8b8619807a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/e83d6e6f-957a-4698-b160-9f6f2ec3ae72/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/e076dadc-a282-4f6b-a617-e3611e87302d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/c20ea768-190e-4db3-b676-cfdb5ab47e4e/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/1d76ffb7-a429-4a16-83b3-68e1670ea39d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/eec5fabe-df3f-4036-b24c-d79e25b94177/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/1be6febf-4636-42d8-947b-6dc47885ac73/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/01492241-6780-4b9d-85d8-3eaa63933a31/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/434ecd8d-c199-41e9-adc4-98c5d8734c9c/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/2e2ef9e4-b2be-4323-8697-adecdab68314/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/6d988bec-8c8a-4fda-90cb-a7d3e2ba12a7/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/beb0c097-cdad-4c50-b2cc-892622e5be56/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/818d3151-9da7-44ad-afc6-438e7db59389/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/0c4e15cb-4cce-470d-aa50-452267b4256d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/532edc35-b93a-4a08-ae4d-69ab695ad7a0/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/f8b277a3-547c-46eb-9b39-7644a2cb603f/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/dfb76250-5fd6-4147-a18c-dd07176050a2/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/f31b4db5-f886-47b6-87f4-f4b6cfac8524/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/5fbd2fd7-986c-4971-b876-b1271c168d92/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7db909a1-49ef-4826-a490-9d85edf2400b/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/bebbbfdb-eae0-4d12-8f8f-bca08a9664ee/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/662f908b-9514-4ec5-b409-02a68c906081/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/037ae496-747e-4f71-8fc3-a748f58610d8/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/0e291291-56b1-4e3e-b41d-4472fad6867a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/87fe170e-e7df-4127-b9e9-fddaccbd3cf5/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/ec252f64-d771-4fdb-a0ea-a74128660eba/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/30605576-2773-438e-b948-1dfe98c6d2b4/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/385d3265-d674-4ffa-87fe-49a506769ebd/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/8ca2ef64-9ecb-40e9-a988-d8ac89727bd6/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/bd99d61c-a34e-44b0-87a4-3e4663c87b0c/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/9a9ad3f4-a2f8-4361-84c1-363ac310e70f/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/45506e32-c5e8-4e37-9198-840964c71523/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/73cd819a-68db-434e-ae32-5d0af238b594/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/b84de78b-5de0-4e4a-82a2-4451d4dd793e/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/681fec96-1ad4-42f2-aad7-72821d9e199b/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7ebc5d2d-4226-4798-bc3a-a4916721988a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/6bbbfb95-3f1e-41cd-95ae-41ccb9117437/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/2bfbf11b-419b-43de-87d1-3634a9d8dc81/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/77a5fd06-ff08-44f0-b416-65fb71ba2694/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/f84185a4-3d44-4056-8ccd-73ea1ca5ba5f/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d2d5255b-ad4f-4ac7-9c41-24bc7bebb4bf/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/a3720d06-319c-45f2-835d-f5aaea8feda7/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/0a0b6b74-9545-4cb6-9fd2-e59ab08ad674/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/3fd192f6-55f4-4f8a-8298-886e3e0be35f/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7d9b3344-4982-4193-aa2f-2509aabfe726/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7d5c0a46-a701-424f-96f7-614f8053b22d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/8ce1f46e-f9a4-4ae2-94a1-2adbc4505229/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/26ede7ab-97fa-42c8-9492-78b02a8b1fed/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/f1fe32b2-bbe6-47fa-b666-9e94de919f8d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/a3bd88b7-3965-4b30-8c75-e4901a90c403/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/e68ab5c7-e787-4a3e-a7f1-022ac78a91f7/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/67b87a07-3cef-4018-b00f-a511da7fb736/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/f9a51110-6499-4af6-967e-ba8cd724da1d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/1971c45f-6abe-4a51-9006-7a38f949e28b/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/79aa0cd1-2252-49b2-a44c-13a9413d4bd9/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d3bf43db-9480-49e0-a2bf-8b6a5a3afcf4/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/eb6b94d8-5ce7-4072-8ef4-15dcd1f1efd5/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/59221571-0645-4ef6-94fb-4c016910fb30/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d001481f-169e-4961-9a52-3aec688aa174/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/a2d20085-9dc1-47ec-8445-9ed9a7f2b88e/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/482c7ddd-1d8e-4f93-add8-479f49327745/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/4c81e911-51cd-4e3e-b8d4-db9916a28952/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/83d5a530-ef4c-4392-92de-b79aa523d507/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/2b9ad196-023c-4949-a223-241e65f9439d/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/0d0dab71-2fcd-4e21-a21b-fb299793740e/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/cace0650-168a-497a-9b0c-889da1ed9c95/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/28465f4d-28e1-4902-9065-75663f757346/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/96398882-2a83-4eac-8baa-492a2de5ef65/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/daa192f8-da37-4a14-9b1e-9f87af5f20ff/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/b6127018-c8a6-4837-8365-de81c45490de/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/d713bb24-8b3f-4602-ac9e-8a056d8c3046/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/6a381c13-fc61-4cad-a851-4275f289939a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/32c9f96b-56fe-4e7a-8f31-f08390abc0d3/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/39402fd9-d678-40a2-8e61-0bf023681017/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/7a474fa3-949c-47f7-9a81-46cc9925fb6b/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/bcfa57ec-eec1-4b94-8b0b-01b7fe895586/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/edb92897-140d-4463-bd12-82d43ef54ca9/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/5c283af5-653b-4b01-926b-ced3825ce61a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/4ae22d1f-0bef-4fc4-b8cd-0a48e20034cf/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/a46d63e9-27ad-4568-b52e-347bebda042a/quality"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/datasets/fdc10ef4-e7a4-4472-b402-a37a62c0555d/quality"
+      }
+    ],
+    "ready": true
+  },
+  "first_save": {
+    "duration_ms": 2220,
+    "request_count": 9,
+    "dataset_list_requests": 0,
+    "quality_requests": 0,
+    "pipeline_post_requests": 1,
+    "pipeline_put_requests": 1,
+    "failed_requests": [
+      {
+        "url": "http://localhost:8000/api/v1/resource-types",
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://localhost:8000/api/v1/events/stream",
+        "error": "net::ERR_ABORTED"
+      }
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/api/v1/pipelines"
+      },
+      {
+        "method": "PUT",
+        "url": "/api/v1/pipelines/2e93a11e-dcde-4c76-9c4e-c9a139d53f61"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/resource-types"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/organizations"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/organizations/17a4e171-ced9-40cf-883d-e42ff2dc4267/workspaces"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/authorization/context"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/events/stream"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/pipelines/2e93a11e-dcde-4c76-9c4e-c9a139d53f61"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/resource-types"
+      }
+    ],
+    "completed": true,
+    "pipeline_id_created": true,
+    "graph_persisted_after_reload": true
+  },
+  "console_errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "page_errors": []
+}

@@ -1,0 +1,526 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="71" time="212.405" timestamp="2026-08-10T15:28:45.359109+03:00" hostname="SHK-1196"><testcase classname="tests.integration.test_authentication" name="test_login_me_refresh_logout_flow" time="1.753" /><testcase classname="tests.integration.test_authentication" name="test_invalid_credentials_are_generic_and_lockout_expires" time="2.940" /><testcase classname="tests.integration.test_authentication" name="test_login_counters_and_inactive_account" time="2.454" /><testcase classname="tests.integration.test_authentication" name="test_missing_expired_revoked_and_disabled_sessions" time="2.690" /><testcase classname="tests.integration.test_authentication" name="test_csrf_and_refresh_replay" time="2.100" /><testcase classname="tests.integration.test_authentication" name="test_expired_and_revoked_refresh_and_logout_csrf" time="4.685" /><testcase classname="tests.integration.test_authentication" name="test_concurrent_refresh_is_serialized" time="1.907" /><testcase classname="tests.integration.test_authentication" name="test_session_revocation_cleanup_and_password_reset" time="1.364" /><testcase classname="tests.integration.test_b5_database" name="test_b5_tables_and_read_only_transaction_are_operational" time="0.078" /><testcase classname="tests.integration.test_connections" name="test_connection_secret_safety_governance_testing_and_tenant_isolation" time="1.165" /><testcase classname="tests.integration.test_custom_roles" name="test_custom_role_lifecycle_and_enforcement" time="0.771" /><testcase classname="tests.integration.test_custom_roles" name="test_custom_role_tenant_isolation" time="1.148" /><testcase classname="tests.integration.test_dashboard_delivery_scheduler" name="test_due_schedule_dispatches_and_dedupes" time="2.362" /><testcase classname="tests.integration.test_dashboard_delivery_scheduler" name="test_paused_and_future_schedules_are_not_claimed" time="1.148" /><testcase classname="tests.integration.test_dashboard_delivery_scheduler" name="test_one_time_schedule_completes_after_dispatch" time="2.065" /><testcase classname="tests.integration.test_dashboard_delivery_scheduler" name="test_revoked_creator_access_fails_the_run" time="1.791" /><testcase classname="tests.integration.test_dashboard_delivery_scheduler" name="test_concurrent_schedulers_claim_each_slot_once" time="2.164" /><testcase classname="tests.integration.test_dashboard_delivery_scheduler" name="test_all_twenty_widgets_traverse_every_real_delivery_format" time="23.979" /><testcase classname="tests.integration.test_dashboard_lifecycle_integrity" name="test_dashboard_lifecycle_widget_and_version_integrity" time="0.923" /><testcase classname="tests.integration.test_dashboard_lifecycle_integrity" name="test_all_widget_types_traverse_real_publish_and_export_contract" time="2.996" /><testcase classname="tests.integration.test_dashboard_persistence" name="test_dashboard_tables_persist_and_queries_are_tenant_qualified" time="1.196" /><testcase classname="tests.integration.test_dataset_certification" name="test_dataset_certify_requires_certify_not_edit" time="0.942" /><testcase classname="tests.integration.test_dataset_versions" name="test_dataset_versions_list_restore_and_acl" time="0.635" /><testcase classname="tests.integration.test_governance" name="test_governance_personas_denials_quota_and_tenant_isolation" time="0.344" /><testcase classname="tests.integration.test_migrations" name="test_alembic_clean_upgrade_and_current_head" time="8.404" /><testcase classname="tests.integration.test_new_connectors" name="test_new_connector_create_test_and_secret_safety" time="1.596" /><testcase classname="tests.integration.test_password_recovery" name="test_reset_request_is_non_disclosing" time="1.365" /><testcase classname="tests.integration.test_password_recovery" name="test_suspended_user_reset_is_non_disclosing" time="1.086" /><testcase classname="tests.integration.test_password_recovery" name="test_reset_confirm_rotates_password_and_revokes_sessions" time="1.742" /><testcase classname="tests.integration.test_password_recovery" name="test_reset_confirm_rejects_invalid_and_expired_tokens" time="1.219" /><testcase classname="tests.integration.test_password_recovery" name="test_reset_confirm_enforces_password_policy" time="1.097" /><testcase classname="tests.integration.test_password_recovery" name="test_change_password_requires_current_and_revokes_sessions" time="2.154" /><testcase classname="tests.integration.test_password_recovery" name="test_must_change_password_blocks_business_routes_until_changed" time="1.004" /><testcase classname="tests.integration.test_password_recovery" name="test_reset_request_is_rate_limited" time="0.389" /><testcase classname="tests.integration.test_pipeline_acl_elevation" name="test_pipeline_acl_grant_elevation_and_collection_filter" time="0.655" /><testcase classname="tests.integration.test_pipeline_acl_operator_run" name="test_acl_operator_can_run_retry_cancel_without_broad_execute" time="1.326" /><testcase classname="tests.integration.test_pipeline_action_matrix" name="test_pipeline_action_matrix" time="2.785" /><testcase classname="tests.integration.test_pipeline_persistence" name="test_pipeline_tables_tenant_isolation_and_conflict" time="0.993" /><testcase classname="tests.integration.test_pipeline_republish" name="test_pipeline_can_be_published_repeatedly" time="3.145" /><testcase classname="tests.integration.test_pipeline_republish" name="test_invalid_pipeline_cannot_be_published" time="0.947" /><testcase classname="tests.integration.test_pipeline_scheduler" name="test_due_schedule_dispatches_real_run_and_dedupes" time="1.804" /><testcase classname="tests.integration.test_pipeline_scheduler" name="test_paused_and_future_schedules_are_not_claimed" time="1.240" /><testcase classname="tests.integration.test_pipeline_scheduler" name="test_revoked_creator_access_fails_the_scheduled_run" time="1.172" /><testcase classname="tests.integration.test_pipeline_schema_validation" name="test_select_rename_validation_against_real_dataset_fields" time="0.213" /><testcase classname="tests.integration.test_pipeline_sharing_authorization" name="test_pipeline_sharing_requires_owner_or_admin" time="0.327" /><testcase classname="tests.integration.test_platform_infrastructure" name="test_job_persistence_and_tenant_isolation" time="0.529" /><testcase classname="tests.integration.test_platform_infrastructure" name="test_redis_priority_queue_round_trip" time="0.017" /><testcase classname="tests.integration.test_production_api_contract_sweep" name="test_every_production_operation_has_a_resolvable_contract_and_fails_closed" time="7.498" /><testcase classname="tests.integration.test_production_api_contract_sweep" name="test_every_operation_is_classified_for_authenticated_certification" time="1.842"><failure message="assert 256 == 255">settings = Settings(APP_NAME='VIP API', APP_ENV=&lt;AppEnvironment.TEST: 'test'&gt;, APP_VERSION='0.1.0', DEBUG=False, LOG_LEVEL='INFO'...S=30.0, DEFENDER_COMMAND='MpCmdRun.exe', FILE_UPLOAD_RATE_LIMIT_PER_MINUTE=30, FILE_DOWNLOAD_RATE_LIMIT_PER_MINUTE=120)
+
+    @pytest.mark.integration
+    def test_every_operation_is_classified_for_authenticated_certification(settings: Settings) -&gt; None:
+        document = create_application(settings).openapi()
+        coverage = build_coverage(document)
+        operations = cast(list[dict[str, object]], coverage["operations"])
+&gt;       assert coverage["operation_count"] == 255
+E       assert 256 == 255
+
+tests\integration\test_production_api_contract_sweep.py:433: AssertionError</failure></testcase><testcase classname="tests.integration.test_production_api_contract_sweep" name="test_authenticated_personas_exercise_every_protected_operation" time="54.973"><failure message="assert 256 == 255">settings = Settings(APP_NAME='VIP API', APP_ENV=&lt;AppEnvironment.TEST: 'test'&gt;, APP_VERSION='0.1.0', DEBUG=False, LOG_LEVEL='INFO'...S=30.0, DEFENDER_COMMAND='MpCmdRun.exe', FILE_UPLOAD_RATE_LIMIT_PER_MINUTE=30, FILE_DOWNLOAD_RATE_LIMIT_PER_MINUTE=120)
+
+    @pytest.mark.integration
+    def test_authenticated_personas_exercise_every_protected_operation(settings: Settings) -&gt; None:
+        """Use real cookie sessions and real tenant memberships for the surface sweep.
+    
+        Domain integration files in the generated map provide happy-path resources.
+        This test guarantees the operation-wide layer reaches authenticated tenancy
+        and authorization dependencies instead of stopping at anonymous rejection.
+        """
+        personas = asyncio.run(_seed_contract_personas(settings))
+        app = create_application(settings)
+        document = app.openapi()
+        coverage = build_coverage(document)
+        scopes = {
+            str(item["operation_id"]): str(item["authentication_level"])
+            for item in cast(list[dict[str, object]], coverage["operations"])
+        }
+        operations = list(_operations(document))
+        operation_ids = {str(operation["operationId"]) for _, _, operation in operations}
+        assert operation_ids == _ANONYMOUS_EXECUTED_OPERATION_IDS, (
+            "Anonymous contract execution evidence is absent. Run the complete contract-sweep "
+            "module so classification, anonymous probes, and authenticated probes share one run."
+        )
+        coverage_by_id = {
+            str(item["operation_id"]): item
+            for item in cast(list[dict[str, object]], coverage["operations"])
+        }
+        records = {
+            operation["operationId"]: _new_record(
+                operation["operationId"],
+                cast(list[str], coverage_by_id[operation["operationId"]]["claimed_dimensions"]),
+            )
+            for _, _, operation in operations
+        }
+        for path, _method, operation in operations:
+            operation_id = str(operation["operationId"])
+            record = records[operation_id]
+            scope = scopes[operation_id]
+            anonymous_status = _ANONYMOUS_OBSERVATIONS[operation_id]
+            anonymous_evidence = _evidence(
+                test_id=ANONYMOUS_SWEEP_TEST_ID,
+                persona="anonymous",
+                status=anonymous_status,
+                resource=_runtime_path(path, operation),
+            )
+            _add_dimension(record, "openapi_contract", anonymous_evidence)
+            _add_dimension(
+                record,
+                "public_probe" if scope == "public" else "unauthenticated_probe",
+                anonymous_evidence,
+            )
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                _login(client, personas.usernames["admin"], personas.password)
+                headers = _tenant_headers(
+                    client,
+                    settings,
+                    personas.organizations["alpha"],
+                    personas.workspaces["alpha"],
+                )
+                for path, method, operation in operations:
+                    operation_id = operation["operationId"]
+                    if scopes[operation_id] == "public" or path.startswith("/auth/"):
+                        continue
+                    response = client.request(
+                        method.upper(),
+                        _runtime_path(path, operation),
+                        headers=headers,
+                        json={} if method in {"post", "put", "patch"} else None,
+                        follow_redirects=False,
+                    )
+                    assert response.status_code != 401
+                    _assert_safe_contract_response(response, path, method, operation)
+                    record = records[operation_id]
+                    cast(dict[str, object], record["observations"])["authenticated"] = (
+                        response.status_code
+                    )
+                    authenticated_evidence = _evidence(
+                        test_id=CONTRACT_SWEEP_TEST_ID,
+                        persona="workspace_admin",
+                        status=response.status_code,
+                        resource=_runtime_path(path, operation),
+                    )
+                    _add_dimension(record, "authenticated_probe", authenticated_evidence)
+                    if _has_uuid_path_parameter(path, operation):
+                        _add_dimension(record, "invalid_uuid_probe", authenticated_evidence)
+                    if 200 &lt;= response.status_code &lt; 300:
+                        _add_dimension(record, "authenticated_success", authenticated_evidence)
+                    if _validate_success_schema(document, operation, response):
+                        _add_dimension(record, "response_schema_validated", authenticated_evidence)
+                    if method in {"post", "put", "patch"} and response.status_code == 422:
+                        _add_dimension(record, "empty_payload_probe", authenticated_evidence)
+                        invalid_response = client.request(
+                            method.upper(),
+                            _runtime_path(path, operation),
+                            headers=headers,
+                            json={"__contract_probe__": {"unexpected": True}},
+                            follow_redirects=False,
+                        )
+                        _assert_safe_contract_response(invalid_response, path, method, operation)
+                        if invalid_response.status_code == 422:
+                            _add_dimension(
+                                record,
+                                "invalid_payload_probe",
+                                _evidence(
+                                    test_id=CONTRACT_SWEEP_TEST_ID,
+                                    persona="workspace_admin",
+                                    status=invalid_response.status_code,
+                                    resource=_runtime_path(path, operation),
+                                ),
+                            )
+    
+            # Authentication endpoints get isolated sessions so logout/password
+            # actions cannot invalidate the remaining operation probes.
+            for path, method, operation in operations:
+                operation_id = operation["operationId"]
+                if scopes[operation_id] == "public" or not path.startswith("/auth/"):
+                    continue
+                with TestClient(app, raise_server_exceptions=False) as client:
+                    _login(client, personas.usernames["admin"], personas.password)
+                    headers = _tenant_headers(
+                        client,
+                        settings,
+                        personas.organizations["alpha"],
+                        personas.workspaces["alpha"],
+                    )
+                    response = client.request(
+                        method.upper(),
+                        _runtime_path(path, operation),
+                        headers=headers,
+                        json={} if method in {"post", "put", "patch"} else None,
+                        follow_redirects=False,
+                    )
+                    _assert_safe_contract_response(response, path, method, operation)
+                    record = records[operation_id]
+                    cast(dict[str, object], record["observations"])["authenticated"] = (
+                        response.status_code
+                    )
+                    authenticated_evidence = _evidence(
+                        test_id=CONTRACT_SWEEP_TEST_ID,
+                        persona="active_user",
+                        status=response.status_code,
+                        resource=_runtime_path(path, operation),
+                    )
+                    _add_dimension(record, "authenticated_probe", authenticated_evidence)
+                    if _has_uuid_path_parameter(path, operation):
+                        _add_dimension(record, "invalid_uuid_probe", authenticated_evidence)
+                    if 200 &lt;= response.status_code &lt; 300:
+                        _add_dimension(record, "authenticated_success", authenticated_evidence)
+                    if _validate_success_schema(document, operation, response):
+                        _add_dimension(record, "response_schema_validated", authenticated_evidence)
+                    if method in {"post", "put", "patch"} and response.status_code == 422:
+                        _add_dimension(record, "empty_payload_probe", authenticated_evidence)
+                        invalid_response = client.request(
+                            method.upper(),
+                            _runtime_path(path, operation),
+                            headers=headers,
+                            json={"__contract_probe__": {"unexpected": True}},
+                            follow_redirects=False,
+                        )
+                        _assert_safe_contract_response(invalid_response, path, method, operation)
+                        if invalid_response.status_code == 422:
+                            _add_dimension(
+                                record,
+                                "invalid_payload_probe",
+                                _evidence(
+                                    test_id=CONTRACT_SWEEP_TEST_ID,
+                                    persona="active_user",
+                                    status=invalid_response.status_code,
+                                    resource=_runtime_path(path, operation),
+                                ),
+                            )
+    
+            with TestClient(app, raise_server_exceptions=False) as client:
+                _login(client, personas.usernames["restricted"], personas.password)
+                headers = _tenant_headers(
+                    client,
+                    settings,
+                    personas.organizations["alpha"],
+                    personas.workspaces["alpha"],
+                )
+                restricted_denials = 0
+                for path, method, operation in operations:
+                    operation_id = operation["operationId"]
+                    if scopes[operation_id] != "workspace":
+                        continue
+                    response = client.request(
+                        method.upper(),
+                        _runtime_path(path, operation),
+                        headers=headers,
+                        json={} if method in {"post", "put", "patch"} else None,
+                        follow_redirects=False,
+                    )
+                    assert response.status_code != 401
+                    restricted_denials += response.status_code == 403
+                    _assert_safe_contract_response(response, path, method, operation)
+                    record = records[operation_id]
+                    cast(dict[str, object], record["observations"])["restricted"] = response.status_code
+                    restricted_evidence = _evidence(
+                        test_id=CONTRACT_SWEEP_TEST_ID,
+                        persona="restricted_role",
+                        status=response.status_code,
+                        resource=_runtime_path(path, operation),
+                    )
+                    _add_dimension(record, "restricted_role_probe", restricted_evidence)
+                    if response.status_code == 403:
+                        _add_dimension(record, "forbidden_observed", restricted_evidence)
+                assert restricted_denials &gt; 0
+    
+            with TestClient(app, raise_server_exceptions=False) as client:
+                _login(client, personas.usernames["cross"], personas.password)
+                manipulated_headers = _tenant_headers(
+                    client,
+                    settings,
+                    personas.organizations["alpha"],
+                    personas.workspaces["alpha"],
+                )
+                for path, method, operation in operations:
+                    operation_id = operation["operationId"]
+                    if scopes[operation_id] != "workspace":
+                        continue
+                    response = client.request(
+                        method.upper(),
+                        _runtime_path(path, operation),
+                        headers=manipulated_headers,
+                        json={} if method in {"post", "put", "patch"} else None,
+                        follow_redirects=False,
+                    )
+                    if response.status_code &lt; 300:
+                        # Tenant-neutral discovery endpoints may return the caller's
+                        # own Beta resources, but a forged Alpha header must never
+                        # disclose Alpha's organization or workspace identifiers.
+                        assert str(personas.organizations["alpha"]) not in response.text
+                        assert str(personas.workspaces["alpha"]) not in response.text
+                    elif "{" in path:
+                        assert response.status_code in {403, 404, 422}
+                    _assert_safe_contract_response(response, path, method, operation)
+                    record = records[operation_id]
+                    cast(dict[str, object], record["observations"])["cross_tenant"] = (
+                        response.status_code
+                    )
+                    cross_evidence = _evidence(
+                        test_id=CONTRACT_SWEEP_TEST_ID,
+                        persona="cross_tenant_user",
+                        status=response.status_code,
+                        resource=_runtime_path(path, operation),
+                    )
+                    _add_dimension(record, "cross_tenant_header_probe", cross_evidence)
+                    _add_dimension(record, "cross_tenant_isolated", cross_evidence)
+    
+            # Actual query-parameter bounds are exercised operation by operation.
+            # These requests use declared OpenAPI limits rather than arbitrary sizes.
+            with TestClient(app, raise_server_exceptions=False) as client:
+                _login(client, personas.usernames["admin"], personas.password)
+                headers = _tenant_headers(
+                    client,
+                    settings,
+                    personas.organizations["alpha"],
+                    personas.workspaces["alpha"],
+                )
+                for path, method, operation in operations:
+                    if scopes[operation["operationId"]] == "public" or "{" in path:
+                        continue
+                    by_boundary: dict[str, tuple[str, str]] = {}
+                    for boundary, name, value in _bounded_query_cases(operation):
+                        by_boundary.setdefault(boundary, (name, value))
+                    for boundary, (name, value) in by_boundary.items():
+                        runtime_path = _with_query(_runtime_path(path, operation), name, value)
+                        response = client.request(
+                            method.upper(),
+                            runtime_path,
+                            headers=headers,
+                            json={} if method in {"post", "put", "patch"} else None,
+                            follow_redirects=False,
+                        )
+                        assert response.status_code == 422, (
+                            f"{operation['operationId']} accepted invalid {boundary} boundary "
+                            f"for query parameter {name}: {response.status_code}"
+                        )
+                        dimension = f"payload_{boundary}_bound"
+                        boundary_evidence = _evidence(
+                            test_id=CONTRACT_SWEEP_TEST_ID,
+                            persona="workspace_admin",
+                            status=response.status_code,
+                            resource=f"query:{name}",
+                        )
+                        _add_dimension(records[operation["operationId"]], dimension, boundary_evidence)
+                        if name in {"page", "page_size", "limit", "offset", "per_page"}:
+                            _add_dimension(
+                                records[operation["operationId"]],
+                                "pagination_boundary",
+                                boundary_evidence,
+                            )
+                        if name in {"q", "query", "search", "filter", "status"}:
+                            _add_dimension(
+                                records[operation["operationId"]],
+                                "filtering_validation",
+                                boundary_evidence,
+                            )
+    
+            # Cross-tenant resource probes use a real Beta dashboard identifier. Only
+            # GET operations whose sole path resource is dashboard_id are claimed.
+            with TestClient(app, raise_server_exceptions=False) as client:
+                _login(client, personas.usernames["admin"], personas.password)
+                headers = _tenant_headers(
+                    client,
+                    settings,
+                    personas.organizations["alpha"],
+                    personas.workspaces["alpha"],
+                )
+                for path, method, operation in operations:
+                    path_names = set(re.findall(r"\{([^}]+)\}", path))
+                    if method != "get" or path_names != {"dashboard_id"}:
+                        continue
+                    runtime_path = path.replace(
+                        "{dashboard_id}", str(personas.resources["beta_dashboard"])
+                    )
+                    response = client.get(runtime_path, headers=headers, follow_redirects=False)
+                    assert response.status_code == 404, (
+                        f"{operation['operationId']} exposed a cross-tenant dashboard: "
+                        f"{response.status_code}"
+                    )
+                    cross_resource_evidence = _evidence(
+                        test_id=CONTRACT_SWEEP_TEST_ID,
+                        persona="workspace_admin",
+                        status=response.status_code,
+                        resource=f"beta_dashboard:{personas.resources['beta_dashboard']}",
+                    )
+                    record = records[operation["operationId"]]
+                    _add_dimension(record, "cross_tenant_resource_probe", cross_resource_evidence)
+                    _add_dimension(record, "cross_tenant_isolated", cross_resource_evidence)
+    
+            # Real ACL mutations and evaluations against a persisted Alpha dashboard.
+            with TestClient(app, raise_server_exceptions=False) as client:
+                _login(client, personas.usernames["admin"], personas.password)
+                headers = _tenant_headers(
+                    client,
+                    settings,
+                    personas.organizations["alpha"],
+                    personas.workspaces["alpha"],
+                )
+                resource_id = personas.resources["alpha_dashboard"]
+                base = f"/api/v1/resources/dashboard/{resource_id}"
+                grant_id = "grant_access_api_v1_resources__resource_type___resource_id__access_post"
+                list_id = "list_access_api_v1_resources__resource_type___resource_id__access_get"
+                effective_id = (
+                    "effective_access_api_v1_resources__resource_type___resource_id__effective_get"
+                )
+                simulate_id = (
+                    "simulate_access_api_v1_resources__resource_type___resource_id__simulate_post"
+                )
+                revoke_id = (
+                    "revoke_access_api_v1_resources__resource_type___resource_id__access__"
+                    "entry_id__delete"
+                )
+                entries: list[UUID] = []
+    
+                def grant(subject_type: str, subject_id: UUID, level: str, effect: str) -&gt; Any:
+                    response = client.post(
+                        f"{base}/access",
+                        headers=headers,
+                        json={
+                            "subject_type": subject_type,
+                            "subject_id": str(subject_id),
+                            "access_level": level,
+                            "effect": effect,
+                        },
+                    )
+                    assert response.status_code == 200, response.text
+                    entries.append(UUID(response.json()["id"]))
+                    return response
+    
+                user_allow = grant("user", personas.users["restricted"], "view", "allow")
+                group_allow = grant("group", personas.resources["acl_group"], "interact", "allow")
+                access_list = client.get(f"{base}/access", headers=headers)
+                assert access_list.status_code == 200
+                assert len(access_list.json()) == 2
+                effective_allow = client.get(
+                    f"{base}/effective",
+                    headers=headers,
+                    params={"user_id": str(personas.users["restricted"])},
+                )
+                assert effective_allow.status_code == 200
+                assert effective_allow.json()["level"] == "interact"
+                simulated_allow = client.post(
+                    f"{base}/simulate",
+                    headers=headers,
+                    json={"user_id": str(personas.users["restricted"])},
+                )
+                assert simulated_allow.status_code == 200
+                assert simulated_allow.json()["level"] == "interact"
+    
+                user_deny = grant("user", personas.users["restricted"], "view", "deny")
+                group_deny = grant("group", personas.resources["acl_group"], "view", "deny")
+                effective_deny = client.get(
+                    f"{base}/effective",
+                    headers=headers,
+                    params={"user_id": str(personas.users["restricted"])},
+                )
+                assert effective_deny.status_code == 200
+                assert effective_deny.json()["level"] is None
+                assert effective_deny.json()["reason"] == "EXPLICIT_DENY"
+                simulated_deny = client.post(
+                    f"{base}/simulate",
+                    headers=headers,
+                    json={"user_id": str(personas.users["restricted"])},
+                )
+                assert simulated_deny.status_code == 200
+                assert simulated_deny.json()["level"] is None
+    
+                acl_observations = {
+                    "direct_acl_allow": user_allow.status_code,
+                    "group_acl_allow": group_allow.status_code,
+                    "direct_acl_deny": user_deny.status_code,
+                    "group_acl_deny": group_deny.status_code,
+                    "explicit_deny": effective_deny.status_code,
+                }
+                for operation_id in (grant_id, list_id, effective_id, simulate_id):
+                    for dimension, status in acl_observations.items():
+                        _add_dimension(
+                            records[operation_id],
+                            dimension,
+                            _evidence(
+                                test_id=CONTRACT_SWEEP_TEST_ID,
+                                persona="workspace_admin evaluating restricted user",
+                                status=status,
+                                resource=f"dashboard:{resource_id}",
+                            ),
+                        )
+                for entry_id in entries:
+                    revoked = client.delete(f"{base}/access/{entry_id}", headers=headers)
+                    assert revoked.status_code == 204
+                _add_dimension(
+                    records[revoke_id],
+                    "direct_acl_allow",
+                    _evidence(
+                        test_id=CONTRACT_SWEEP_TEST_ID,
+                        persona="workspace_admin",
+                        status=204,
+                        resource=f"dashboard:{resource_id}",
+                    ),
+                )
+    
+            # Issue the session first, then suspend the user in the database. Every
+            # protected operation must reject that still-present session directly.
+            with TestClient(app, raise_server_exceptions=False) as client:
+                active_login = client.post(
+                    "/auth/login",
+                    json={
+                        "username": personas.usernames["suspended"],
+                        "password": personas.password,
+                    },
+                )
+                assert active_login.status_code == 200
+                headers = _tenant_headers(
+                    client,
+                    settings,
+                    personas.organizations["alpha"],
+                    personas.workspaces["alpha"],
+                )
+                asyncio.run(_set_persona_status(settings, personas, "suspended", UserStatus.SUSPENDED))
+                for path, method, operation in operations:
+                    operation_id = operation["operationId"]
+                    if scopes[operation_id] == "public" or path == "/auth/logout":
+                        continue
+                    response = client.request(
+                        method.upper(),
+                        _runtime_path(path, operation),
+                        headers=headers,
+                        json={} if method in {"post", "put", "patch"} else None,
+                        follow_redirects=False,
+                    )
+                    assert response.status_code in {401, 403}, (
+                        f"{operation_id} accepted a suspended user's existing session: "
+                        f"{response.status_code}"
+                    )
+                    suspended_evidence = _evidence(
+                        test_id=CONTRACT_SWEEP_TEST_ID,
+                        persona="suspended_user",
+                        status=response.status_code,
+                        resource=_runtime_path(path, operation),
+                    )
+                    record = records[operation_id]
+                    _add_dimension(record, "suspended_user_probe", suspended_evidence)
+                    _add_dimension(record, "suspended_user_rejected", suspended_evidence)
+    
+            with TestClient(app, raise_server_exceptions=False) as client:
+                suspended_login = client.post(
+                    "/auth/login",
+                    json={
+                        "username": personas.usernames["suspended"],
+                        "password": personas.password,
+                    },
+                )
+                assert suspended_login.status_code in {401, 403}
+                assert settings.AUTH_ACCESS_COOKIE_NAME not in suspended_login.cookies
+    
+            for record in records.values():
+                required = set(cast(list[str], record.pop("required_probes")))
+                executed = set(cast(list[str], record["executed_dimensions"]))
+                evidence_dimensions = set(cast(dict[str, object], record["dimension_evidence"]))
+                assert required &lt;= executed, (
+                    f"{record['operation_id']} missing executed probes: {sorted(required - executed)}"
+                )
+                assert executed == evidence_dimensions, (
+                    f"{record['operation_id']} has claimed dimensions without exact evidence: "
+                    f"{sorted(executed - evidence_dimensions)}"
+                )
+                record["result"] = "pass"
+            execution = {str(key): value for key, value in records.items()}
+            verified = build_coverage(document, execution)
+&gt;           assert verified["executed_count"] == 255
+E           assert 256 == 255
+
+tests\integration\test_production_api_contract_sweep.py:1148: AssertionError</failure></testcase><testcase classname="tests.integration.test_production_api_contract_sweep" name="test_ai_catalog_direct_api_fails_closed_in_live_mode" time="8.696" /><testcase classname="tests.integration.test_resource_authorization_domains" name="test_resource_authorization_across_domains" time="0.653" /><testcase classname="tests.integration.test_resource_guard_enforcement" name="test_pipeline_guard_enforces_explicit_deny_and_expiration" time="0.676" /><testcase classname="tests.integration.test_resource_permissions" name="test_resource_permission_engine_end_to_end" time="0.701" /><testcase classname="tests.integration.test_role_assignment_security" name="test_role_assignment_privilege_ceilings" time="0.534" /><testcase classname="tests.integration.test_role_assignment_security" name="test_group_assignment_shares_the_same_ceiling" time="1.032" /><testcase classname="tests.integration.test_role_assignment_security" name="test_platform_admin_bypasses_ceiling_but_not_archived" time="1.019" /><testcase classname="tests.integration.test_role_assignment_security" name="test_cross_tenant_assignment_is_non_disclosing" time="0.969" /><testcase classname="tests.integration.test_semantic_audit" name="test_semantic_modeling_changes_are_audited" time="1.203" /><testcase classname="tests.integration.test_semantic_audit" name="test_invalid_validation_is_audited_as_failure" time="0.540" /><testcase classname="tests.integration.test_semantic_republish" name="test_semantic_model_can_be_published_repeatedly" time="1.244" /><testcase classname="tests.integration.test_semantic_republish" name="test_unauthorized_caller_cannot_publish_semantic_model" time="0.814" /><testcase classname="tests.integration.test_services" name="test_async_database_session_executes_query" time="0.323" /><testcase classname="tests.integration.test_services" name="test_redis_client_can_ping" time="0.058" /><testcase classname="tests.integration.test_services" name="test_redis_failure_is_clean" time="0.136" /><testcase classname="tests.integration.test_tenancy" name="test_organization_and_workspace_access_matrix" time="5.045" /><testcase classname="tests.integration.test_tenancy" name="test_audit_api_returns_live_traceable_events" time="3.524" /><testcase classname="tests.integration.test_tenancy" name="test_creation_updates_cross_tenant_denial_and_last_owner" time="6.850" /><testcase classname="tests.integration.test_tenancy" name="test_membership_removal_and_suspension_are_immediate" time="2.133" /><testcase classname="tests.integration.test_tenancy" name="test_invitation_hash_email_expiry_revocation_and_replay" time="4.462" /><testcase classname="tests.integration.test_tenancy" name="test_repository_methods_are_tenant_filtered" time="4.397" /></testsuite></testsuites>

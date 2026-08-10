@@ -1,0 +1,40 @@
+{
+  "measured_at": "2026-08-10T12:07:02.790446+00:00",
+  "fixture_prefix": "qa-phase1-scale-7e5c53966e",
+  "transaction_rolled_back": true,
+  "remaining_fixture_datasets": 0,
+  "measurements": [
+    {
+      "dataset_count": 10,
+      "returned_page_items": 10,
+      "http_requests": 1,
+      "quality_http_requests": 0,
+      "database_statements": 3,
+      "backend_ms": 51.35
+    },
+    {
+      "dataset_count": 100,
+      "returned_page_items": 50,
+      "http_requests": 1,
+      "quality_http_requests": 0,
+      "database_statements": 3,
+      "backend_ms": 80.59
+    },
+    {
+      "dataset_count": 250,
+      "returned_page_items": 50,
+      "http_requests": 1,
+      "quality_http_requests": 0,
+      "database_statements": 3,
+      "backend_ms": 86.39
+    },
+    {
+      "dataset_count": 1000,
+      "returned_page_items": 50,
+      "http_requests": 1,
+      "quality_http_requests": 0,
+      "database_statements": 3,
+      "backend_ms": 1211.06
+    }
+  ]
+}
