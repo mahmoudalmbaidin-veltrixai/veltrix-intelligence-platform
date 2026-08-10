@@ -6,6 +6,7 @@ import type { QueryFilter, QueryResult } from '@/shared/types/semantic'
 import { dashboardService } from './dashboards.service'
 import { semanticService } from '@/shared/services/semanticModels'
 import { ApiError } from '@/shared/types/api'
+import { scatterConfigurationIssue } from './widgetValidation'
 
 interface ReturnType {
   result: Ref<QueryResult | undefined>
@@ -36,6 +37,12 @@ export function useWidgetData(
 
   async function run() {
     const w = widget.value
+    if (scatterConfigurationIssue(w)) {
+      result.value = undefined
+      loading.value = false
+      error.value = undefined
+      return
+    }
     if (['text', 'rich-text', 'image', 'filter', 'date-filter'].includes(w.type) || !w.modelId) {
       result.value = undefined
       return

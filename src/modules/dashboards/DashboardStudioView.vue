@@ -16,6 +16,7 @@ import { semanticStudioService } from '@/modules/semantic/semantic.service'
 import { relativeTime } from '@/shared/lib/format'
 import { clone } from '@/shared/lib/mock'
 import { invalidateQueries } from '@/shared/lib/query'
+import { validateDashboardWidgets } from './widgetValidation'
 import FieldsPanel from './FieldsPanel.vue'
 import DashboardGridCanvas from './DashboardGridCanvas.vue'
 import WidgetInspector from './WidgetInspector.vue'
@@ -161,6 +162,17 @@ async function save(options: { notify?: boolean } = {}): Promise<boolean> {
   if (saveInFlight) {
     traceSave('joined')
     return saveInFlight
+  }
+
+  const configurationIssue = validateDashboardWidgets(editor.value.dashboard, models.value)[0]
+  if (configurationIssue) {
+    editor.value.selectedId.value = configurationIssue.widgetId
+    ui.pushToast({
+      kind: 'error',
+      title: 'Dashboard configuration is invalid',
+      message: `${configurationIssue.widgetName}: ${configurationIssue.message}`,
+    })
+    return false
   }
 
   const notify = options.notify ?? true

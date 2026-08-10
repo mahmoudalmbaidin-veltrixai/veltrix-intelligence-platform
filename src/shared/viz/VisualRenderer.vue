@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import type { DashboardWidget } from '@/shared/types/dashboard'
 import type { QueryResult } from '@/shared/types/semantic'
 import { toCartesian, toPie } from './chartData'
+import { toPivotTable } from './pivotData'
 import CartesianChart from './CartesianChart.vue'
 import PieChart from './PieChart.vue'
 import GaugeChart from './GaugeChart.vue'
@@ -14,6 +15,7 @@ import type { NumberFormat } from '@/shared/types/semantic'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipSpinner from '@/shared/ui/VipSpinner.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
+import { scatterConfigurationIssue } from '@/modules/dashboards/widgetValidation'
 
 const props = defineProps<{
   widget: DashboardWidget
@@ -37,6 +39,10 @@ const cartesian = computed(() => (props.result ? toCartesian(props.result) : { c
 const pie = computed(() => (props.result ? toPie(props.result) : { slices: [], format: undefined }))
 
 const hasData = computed(() => !!props.result && props.result.rows.length > 0)
+const configurationIssue = computed(() => scatterConfigurationIssue(props.widget))
+const tableResult = computed(() =>
+  props.result && props.widget.type === 'pivot' ? toPivotTable(props.widget, props.result) : props.result,
+)
 
 /* KPI value */
 const kpiValue = computed(() => {
@@ -56,18 +62,22 @@ const kpiSpark = computed(() => {
 })
 
 const scatterPoints = computed(() => {
-  if (!props.result) return []
-  const meas = props.result.columns.filter((c) => c.role === 'measure' || c.role === 'metric')
-  const dim = props.result.columns.find((c) => c.role === 'dimension')
-  return props.result.rows.slice(0, 40).map((r) => ({
-    x: Number(r[meas[0]?.key] ?? 0),
-    y: Number(r[meas[1]?.key ?? meas[0]?.key] ?? 0),
-    size: Number(r[meas[2]?.key ?? meas[0]?.key] ?? 1),
-    label: dim ? String(r[dim.key]) : undefined,
-  }))
+  if (!props.result || configurationIssue.value) return []
+  const metrics = (props.widget.wells.values ?? []).map((value) => value.fieldId)
+  const detail = props.widget.wells.category?.[0]
+  return props.result.rows.slice(0, 40).flatMap((row) => {
+    const x = Number(row[metrics[0]])
+    const y = Number(row[metrics[1]])
+    if (row[metrics[0]] == null || row[metrics[1]] == null || !Number.isFinite(x) || !Number.isFinite(y)) return []
+    const rawSize = metrics[2] ? Number(row[metrics[2]]) : 1
+    return [
+      { x, y, size: Number.isFinite(rawSize) ? rawSize : 1, label: detail ? String(row[detail] ?? '') : undefined },
+    ]
+  })
 })
 
 function cellFmt(col: QueryResult['columns'][number], value: unknown): string {
+  if (value == null) return '—'
   if (col.role === 'measure' || col.role === 'metric') {
     return formatNumber(Number(value), (col.format as Partial<NumberFormat>) ?? numFormat.value)
   }
@@ -86,6 +96,14 @@ void onBarClick
     <div v-if="loading" class="viz__state"><VipSpinner label="Running query…" /></div>
     <div v-else-if="error" class="viz__state">
       <VipEmptyState icon="error" tone="danger" title="Query failed" :description="error" />
+    </div>
+    <div v-else-if="configurationIssue" class="viz__state" data-testid="scatter-configuration-error">
+      <VipEmptyState
+        icon="error"
+        tone="danger"
+        title="Scatter configuration is incomplete"
+        :description="configurationIssue.message"
+      />
     </div>
     <div v-else-if="widget.type === 'text' || widget.type === 'rich-text'" class="viz__text">
       {{ widget.content || 'Double-click to edit text…' }}
@@ -108,12 +126,12 @@ void onBarClick
         <table>
           <thead>
             <tr>
-              <th v-for="c in result!.columns" :key="c.key">{{ c.label }}</th>
+              <th v-for="c in tableResult!.columns" :key="c.key">{{ c.label }}</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(r, i) in result!.rows.slice(0, 100)" :key="i">
-              <td v-for="c in result!.columns" :key="c.key">{{ cellFmt(c, r[c.key]) }}</td>
+            <tr v-for="(r, i) in tableResult!.rows.slice(0, 100)" :key="i">
+              <td v-for="c in tableResult!.columns" :key="c.key">{{ cellFmt(c, r[c.key]) }}</td>
             </tr>
           </tbody>
         </table>
@@ -164,13 +182,13 @@ void onBarClick
         <table>
           <thead>
             <tr>
-              <th v-for="c in result!.columns" :key="c.key">{{ c.label }}</th>
+              <th v-for="c in tableResult!.columns" :key="c.key">{{ c.label }}</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(r, i) in result!.rows.slice(0, 100)" :key="i">
+            <tr v-for="(r, i) in tableResult!.rows.slice(0, 100)" :key="i">
               <td
-                v-for="c in result!.columns"
+                v-for="c in tableResult!.columns"
                 :key="c.key"
                 :class="{ 'is-num': c.role === 'measure' || c.role === 'metric' }"
               >

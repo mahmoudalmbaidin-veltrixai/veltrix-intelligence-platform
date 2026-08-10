@@ -147,15 +147,21 @@ const operatorFromApi: Record<string, QueryFilter['operator']> = {
 
 export function widgetFromApi(item: ApiWidget): DashboardWidget {
   const persistedFilters = item.filters.length ? item.filters : item.query.filters
+  const type = item.type as WidgetType
+  const values = item.query.metrics.map((fieldId) => ({ fieldId, aggregation: 'sum' as const }))
+  const wells: DashboardWidget['wells'] = { values }
+  if (['table', 'pivot', 'pie', 'donut', 'scatter'].includes(type)) {
+    wells.category = item.query.dimensions
+  } else {
+    wells.xAxis = item.query.dimensions.slice(0, 1)
+    if (item.query.dimensions.length > 1) wells.legend = item.query.dimensions.slice(1)
+  }
   return {
     id: item.id!,
-    type: item.type as WidgetType,
+    type,
     modelId: item.semantic_model_id ?? undefined,
     pos: item.layout,
-    wells: {
-      xAxis: item.query.dimensions,
-      values: item.query.metrics.map((fieldId) => ({ fieldId, aggregation: 'sum' })),
-    },
+    wells,
     filters: persistedFilters.map((filter) => ({
       fieldId: filter.field,
       operator: operatorFromApi[filter.operator] ?? (filter.operator as QueryFilter['operator']),

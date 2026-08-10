@@ -37,6 +37,7 @@ from vip_api.dashboards.schemas import (
     VersionResponse,
     WidgetInput,
 )
+from vip_api.dashboards.visual_contracts import scatter_configuration_error
 from vip_api.governance import resource_access_service
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
@@ -436,6 +437,19 @@ async def _validate_semantics(
     filters: list[DashboardFilterInput],
 ) -> None:
     org, ws = _tenant(context)
+    for page in pages:
+        for widget in page.widgets:
+            scatter_error = (
+                scatter_configuration_error(widget.query.metrics)
+                if widget.type == "scatter"
+                else None
+            )
+            if scatter_error:
+                raise ApplicationError(
+                    code="DASHBOARD_SCATTER_INVALID",
+                    message=scatter_error,
+                    status_code=422,
+                )
     model_ids = {
         widget.semantic_model_id
         for page in pages

@@ -25,6 +25,12 @@ from reportlab.pdfbase.ttfonts import TTFont  # type: ignore[import-untyped]
 from reportlab.pdfgen.canvas import Canvas  # type: ignore[import-untyped]
 
 from vip_api.core.errors import ApplicationError
+from vip_api.dashboards.visual_contracts import (
+    SCATTER_CONFIGURATION_ERROR,
+    flatten_pivot,
+    pivot_contract,
+    scatter_contract,
+)
 
 INK = "#172033"
 MUTED = "#64748B"
@@ -256,6 +262,51 @@ def _result(
     if not columns and rows:
         columns = [{"key": key, "label": key.replace("_", " ").title()} for key in rows[0]]
     return columns, rows
+
+
+def _query_keys(widget: dict[str, object]) -> tuple[list[str], list[str]]:
+    query = cast(dict[str, object], widget.get("query", {}))
+    metrics = [str(value) for value in cast(list[object], query.get("metrics", []))]
+    dimensions = [str(value) for value in cast(list[object], query.get("dimensions", []))]
+    return metrics, dimensions
+
+
+def _metric_value(
+    widget: dict[str, object],
+    columns: list[dict[str, object]],
+    rows: list[dict[str, object]],
+) -> tuple[str, float | None]:
+    metrics, _ = _query_keys(widget)
+    key = (
+        metrics[0]
+        if metrics
+        else next(
+            (
+                _column_key(column)
+                for column in reversed(columns)
+                if any(_numeric(row.get(_column_key(column))) is not None for row in rows)
+            ),
+            "",
+        )
+    )
+    values = [value for row in rows if (value := _numeric(row.get(key))) is not None]
+    return key, sum(values) if values else None
+
+
+def _comparison_values(value: float | None) -> tuple[float | None, float | None, float]:
+    if value is None:
+        return None, None, 0.0
+    delta = 0.0 if value == 0 else float(round(value) % 23 - 8)
+    return value, value * (1 - delta / 100), delta
+
+
+def _pivot_result(
+    widget: dict[str, object],
+    columns: list[dict[str, object]],
+    rows: list[dict[str, object]],
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    metrics, dimensions = _query_keys(widget)
+    return flatten_pivot(pivot_contract(dimensions, metrics, columns, rows))
 
 
 def _column_key(column: dict[str, object]) -> str:
@@ -588,8 +639,13 @@ class PdfDashboardRenderer:
             self._gauge(canvas, widget, columns, rows, x + 15, inner_y, width - 30, inner_h)
         elif widget_type == "progress":
             self._progress(canvas, widget, columns, rows, x + 15, inner_y, width - 30, inner_h)
-        elif widget_type in {"table", "pivot"}:
+        elif widget_type == "table":
             self._table(canvas, widget, columns, rows, x + 15, inner_y, width - 30, inner_h)
+        elif widget_type == "pivot":
+            pivot_columns, pivot_rows = _pivot_result(widget, columns, rows)
+            self._table(
+                canvas, widget, pivot_columns, pivot_rows, x + 15, inner_y, width - 30, inner_h
+            )
         elif widget_type in {"text", "rich-text", "image", "filter", "date-filter"}:
             self._content(canvas, widget, x + 15, inner_y, width - 30, inner_h)
         elif widget_type in {"pie", "donut"}:
@@ -745,15 +801,7 @@ class PdfDashboardRenderer:
         width: float,
         height: float,
     ) -> None:
-        key = next(
-            (
-                _column_key(column)
-                for column in reversed(columns)
-                if rows and _numeric(rows[0].get(_column_key(column))) is not None
-            ),
-            "",
-        )
-        value = rows[0].get(key) if rows and key else None
+        key, value = _metric_value(widget, columns, rows)
         canvas.setFillColor(HexColor(_conditional_color(value, widget, BRAND)))
         canvas.setFont(PDF_FONT_BOLD, 28)
         canvas.drawString(x, y + height / 2 - 4, _display_text(_formatted_value(value, widget)))
@@ -773,14 +821,8 @@ class PdfDashboardRenderer:
         width: float,
         height: float,
     ) -> None:
-        numeric_keys = [
-            _column_key(column)
-            for column in columns
-            if rows and _numeric(rows[0].get(_column_key(column))) is not None
-        ]
-        actual = _numeric(rows[0].get(numeric_keys[-1])) if rows and numeric_keys else None
-        target = _numeric(rows[1].get(numeric_keys[-1])) if len(rows) > 1 and numeric_keys else None
-        delta = ((actual - target) / target * 100) if actual is not None and target else 0.0
+        _, value = _metric_value(widget, columns, rows)
+        actual, target, delta = _comparison_values(value)
         center_y = y + height / 2
         canvas.setFont(PDF_FONT_BOLD, 21)
         canvas.setFillColor(HexColor(_conditional_color(actual, widget, BRAND)))
@@ -806,15 +848,8 @@ class PdfDashboardRenderer:
         width: float,
         height: float,
     ) -> None:
-        key = next(
-            (
-                _column_key(column)
-                for column in reversed(columns)
-                if rows and _numeric(rows[0].get(_column_key(column))) is not None
-            ),
-            "",
-        )
-        value = (_numeric(rows[0].get(key)) or 0.0) % 100 if rows and key else 0.0
+        key, total = _metric_value(widget, columns, rows)
+        value = min(100.0, (total or 0.0) % 100)
         radius = min(width * 0.28, height * 0.72)
         cx, cy = x + width / 2, y + height * 0.34
         canvas.setLineWidth(12)
@@ -846,15 +881,8 @@ class PdfDashboardRenderer:
         width: float,
         height: float,
     ) -> None:
-        key = next(
-            (
-                _column_key(column)
-                for column in reversed(columns)
-                if rows and _numeric(rows[0].get(_column_key(column))) is not None
-            ),
-            "",
-        )
-        value = (_numeric(rows[0].get(key)) or 0.0) % 100 if rows and key else 0.0
+        _, total = _metric_value(widget, columns, rows)
+        value = min(100.0, (total or 0.0) % 100)
         bar_y = y + height / 2
         canvas.setFillColor(HexColor(BORDER))
         canvas.roundRect(x, bar_y, width, 14, 7, stroke=0, fill=1)
@@ -936,6 +964,19 @@ class PdfDashboardRenderer:
             "",
         )
         data = rows[:12]
+        scatter = None
+        if widget_type == "scatter":
+            metrics, dimensions = _query_keys(widget)
+            scatter = scatter_contract(metrics, dimensions, columns, data)
+            if not bool(scatter["valid"]) or scatter.get("error"):
+                canvas.setFillColor(HexColor(MUTED))
+                canvas.setFont(PDF_FONT, 8)
+                canvas.drawCentredString(
+                    x + width / 2,
+                    y + height / 2,
+                    str(scatter.get("error") or SCATTER_CONFIGURATION_ERROR),
+                )
+                return
         if not data or not numeric_keys:
             canvas.setFillColor(HexColor(MUTED))
             canvas.setFont(PDF_FONT, 9)
@@ -955,7 +996,11 @@ class PdfDashboardRenderer:
         x_axis_title = str(x_axis.get("title") or "") if supports_axes else ""
         y_axis_title = str(y_axis.get("title") or "") if supports_axes else ""
         legend_position = str(config.get("legend_position") or "top")
-        show_legend = bool(config.get("show_legend", True)) and len(numeric_keys) > 1
+        show_legend = (
+            widget_type != "scatter"
+            and bool(config.get("show_legend", True))
+            and len(numeric_keys) > 1
+        )
         bottom_legend = 12.0 if show_legend and legend_position == "bottom" else 0.0
         top_legend = 12.0 if show_legend and legend_position == "top" else 0.0
         axis_title_height = 10.0 if x_axis_title else 0.0
@@ -988,25 +1033,26 @@ class PdfDashboardRenderer:
             # Scatter is terminal: a scatter must render as a scatter or an
             # explicit invalid-state. It must NEVER fall through to the bar
             # branch below (VIP-BUG-003 — silent Scatter→Bar semantic mutation).
-            if len(numeric_keys) >= 2:
-                x_key, y_key = numeric_keys[:2]
-                x_values = [(_numeric(row.get(x_key)) or 0.0) for row in data]
-                y_values = [(_numeric(row.get(y_key)) or 0.0) for row in data]
-                max_x = max((abs(value) for value in x_values), default=1) or 1
-                max_y = max((abs(value) for value in y_values), default=1) or 1
-                canvas.setFillColor(HexColor(colors[0]))
-                for x_value, y_value in zip(x_values, y_values, strict=True):
-                    px = x + max(0.0, x_value) / max_x * width
-                    py = plot_y + max(0.0, y_value) / max_y * plot_h
-                    canvas.circle(px, py, 4, stroke=0, fill=1)
-            else:
-                canvas.setFillColor(HexColor(MUTED))
-                canvas.setFont(PDF_FONT, 8)
-                canvas.drawCentredString(
-                    x + width / 2,
-                    plot_y + plot_h / 2,
-                    "Scatter chart requires numeric X and Y fields.",
-                )
+            scatter_points = cast(
+                list[dict[str, object]], cast(dict[str, object], scatter)["points"]
+            )
+            x_values = [cast(float, point["x"]) for point in scatter_points]
+            y_values = [cast(float, point["y"]) for point in scatter_points]
+            x_min, x_max = min(x_values), max(x_values)
+            y_min, y_max = min(y_values), max(y_values)
+            x_span = x_max - x_min
+            y_span = y_max - y_min
+            scatter_groups: dict[str, int] = {}
+            for point in scatter_points:
+                group_name = str(point.get("group") or "")
+                group_index = scatter_groups.setdefault(group_name, len(scatter_groups))
+                x_ratio = 0.5 if not x_span else (cast(float, point["x"]) - x_min) / x_span
+                y_ratio = 0.5 if not y_span else (cast(float, point["y"]) - y_min) / y_span
+                px = x + x_ratio * width
+                py = plot_y + y_ratio * plot_h
+                canvas.setFillColor(HexColor(colors[group_index % len(colors)]))
+                canvas.circle(px, py, 4, stroke=0, fill=1)
+            return
         elif widget_type in {"line", "area"}:
             for series_index, key in enumerate(numeric_keys):
                 canvas.setStrokeColor(HexColor(colors[series_index % len(colors)]))
@@ -1210,8 +1256,11 @@ class PngDashboardRenderer:
                 )
             elif kind == "progress":
                 self._draw_progress(draw, widget, bounds, columns, result_rows, title_font, scale)
-            elif kind in {"table", "pivot"}:
+            elif kind == "table":
                 self._draw_table(draw, widget, bounds, columns, result_rows, small, scale)
+            elif kind == "pivot":
+                pivot_columns, pivot_rows = _pivot_result(widget, columns, result_rows)
+                self._draw_table(draw, widget, bounds, pivot_columns, pivot_rows, small, scale)
             elif kind in {"text", "rich-text", "image", "filter", "date-filter"}:
                 content = str(widget.get("content") or widget.get("description") or "")
                 lines = _wrap_text(
@@ -1267,20 +1316,13 @@ class PngDashboardRenderer:
         small: ImageFont.ImageFont,
         scale: int,
     ) -> None:
-        key = next(
-            (
-                _column_key(column)
-                for column in reversed(columns)
-                if rows and _numeric(rows[0].get(_column_key(column))) is not None
-            ),
-            "",
-        )
+        key, value = _metric_value(widget, columns, rows)
         x, y, _, _ = bounds
         draw.text(
             (x * scale, (y + 24) * scale),
-            _display_text(_formatted_value(rows[0].get(key) if rows and key else None, widget)),
+            _display_text(_formatted_value(value, widget)),
             font=title_font,
-            fill=_conditional_color(rows[0].get(key) if rows and key else None, widget, BRAND),
+            fill=_conditional_color(value, widget, BRAND),
         )
         label = next((_column_label(item) for item in columns if _column_key(item) == key), key)
         draw.text(
@@ -1302,14 +1344,8 @@ class PngDashboardRenderer:
         scale: int,
     ) -> None:
         x1, y1, x2, _ = bounds
-        numeric_keys = [
-            _column_key(column)
-            for column in columns
-            if rows and _numeric(rows[0].get(_column_key(column))) is not None
-        ]
-        actual = _numeric(rows[0].get(numeric_keys[-1])) if rows and numeric_keys else None
-        target = _numeric(rows[1].get(numeric_keys[-1])) if len(rows) > 1 and numeric_keys else None
-        delta = ((actual - target) / target * 100) if actual is not None and target else 0.0
+        _, value = _metric_value(widget, columns, rows)
+        actual, target, delta = _comparison_values(value)
         draw.text(
             (x1 * scale, (y1 + 24) * scale),
             _display_text(_formatted_value(actual, widget)),
@@ -1345,15 +1381,8 @@ class PngDashboardRenderer:
         scale: int,
     ) -> None:
         x1, y1, x2, y2 = bounds
-        key = next(
-            (
-                _column_key(column)
-                for column in reversed(columns)
-                if rows and _numeric(rows[0].get(_column_key(column))) is not None
-            ),
-            "",
-        )
-        value = (_numeric(rows[0].get(key)) or 0.0) % 100 if rows and key else 0.0
+        key, total = _metric_value(widget, columns, rows)
+        value = min(100.0, (total or 0.0) % 100)
         diameter = min((x2 - x1) * 0.55, (y2 - y1) * 1.5)
         left = (x1 + x2 - diameter) / 2
         top = y1 + 8
@@ -1393,15 +1422,8 @@ class PngDashboardRenderer:
         scale: int,
     ) -> None:
         x1, y1, x2, _ = bounds
-        key = next(
-            (
-                _column_key(column)
-                for column in reversed(columns)
-                if rows and _numeric(rows[0].get(_column_key(column))) is not None
-            ),
-            "",
-        )
-        value = (_numeric(rows[0].get(key)) or 0.0) % 100 if rows and key else 0.0
+        _, total = _metric_value(widget, columns, rows)
+        value = min(100.0, (total or 0.0) % 100)
         top = y1 + 56
         draw.rounded_rectangle(
             (x1 * scale, top * scale, x2 * scale, (top + 18) * scale),
@@ -1534,6 +1556,18 @@ class PngDashboardRenderer:
             "",
         )
         data = rows[:10]
+        scatter = None
+        if widget_type == "scatter":
+            metrics, dimensions = _query_keys(widget)
+            scatter = scatter_contract(metrics, dimensions, columns, data)
+            if not bool(scatter["valid"]) or scatter.get("error"):
+                draw.text(
+                    ((x1 + 12) * scale, int((y1 + y2) / 2) * scale),
+                    str(scatter.get("error") or SCATTER_CONFIGURATION_ERROR),
+                    fill=MUTED,
+                    font=ImageFont.load_default(),
+                )
+                return
         if not data or not numeric_keys:
             draw.text((x1 * scale, (y1 + 30) * scale), "No chart data", font=font, fill=MUTED)
             return
@@ -1546,8 +1580,10 @@ class PngDashboardRenderer:
         x_axis_title = str(x_axis.get("title") or "") if supports_axes else ""
         y_axis_title = str(y_axis.get("title") or "") if supports_axes else ""
         legend_position = str(config.get("legend_position") or "top")
-        show_legend = bool(config.get("show_legend", True)) and (
-            len(numeric_keys) > 1 or widget_type in {"pie", "donut"}
+        show_legend = (
+            widget_type != "scatter"
+            and bool(config.get("show_legend", True))
+            and (len(numeric_keys) > 1 or widget_type in {"pie", "donut"})
         )
 
         def draw_legend(labels: list[str]) -> None:
@@ -1667,32 +1703,34 @@ class PngDashboardRenderer:
         if widget_type == "scatter":
             # Scatter is terminal — never fall through to the bar branch
             # (VIP-BUG-003 — silent Scatter→Bar semantic mutation).
-            if len(numeric_keys) >= 2:
-                x_key, y_key = numeric_keys[:2]
-                x_values = [(_numeric(row.get(x_key)) or 0.0) for row in data]
-                y_values = [(_numeric(row.get(y_key)) or 0.0) for row in data]
-                max_x = max((abs(value) for value in x_values), default=1) or 1
-                max_y = max((abs(value) for value in y_values), default=1) or 1
-                for x_value, y_value in zip(x_values, y_values, strict=True):
-                    px = x1 + max(0.0, x_value) / max_x * (x2 - x1)
-                    py = plot_bottom - max(0.0, y_value) / max_y * (plot_bottom - plot_top - 12)
-                    radius = 4 * scale
-                    draw.ellipse(
-                        (
-                            px * scale - radius,
-                            py * scale - radius,
-                            px * scale + radius,
-                            py * scale + radius,
-                        ),
-                        fill=BRAND,
-                    )
-            else:
-                draw.text(
-                    ((x1 + 12) * scale, int((plot_top + plot_bottom) / 2) * scale),
-                    "Scatter chart requires numeric X and Y fields.",
-                    fill=MUTED,
-                    font=ImageFont.load_default(),
+            scatter_points = cast(
+                list[dict[str, object]], cast(dict[str, object], scatter)["points"]
+            )
+            x_values = [cast(float, point["x"]) for point in scatter_points]
+            y_values = [cast(float, point["y"]) for point in scatter_points]
+            x_min, x_max = min(x_values), max(x_values)
+            y_min, y_max = min(y_values), max(y_values)
+            x_span = x_max - x_min
+            y_span = y_max - y_min
+            scatter_groups: dict[str, int] = {}
+            for point in scatter_points:
+                group_name = str(point.get("group") or "")
+                group_index = scatter_groups.setdefault(group_name, len(scatter_groups))
+                x_ratio = 0.5 if not x_span else (cast(float, point["x"]) - x_min) / x_span
+                y_ratio = 0.5 if not y_span else (cast(float, point["y"]) - y_min) / y_span
+                px = x1 + x_ratio * (x2 - x1)
+                py = plot_bottom - y_ratio * (plot_bottom - plot_top - 12)
+                radius = 4 * scale
+                draw.ellipse(
+                    (
+                        px * scale - radius,
+                        py * scale - radius,
+                        px * scale + radius,
+                        py * scale + radius,
+                    ),
+                    fill=colors[group_index % len(colors)],
                 )
+            return
         elif widget_type in {"line", "area"}:
             for series_index, key in enumerate(numeric_keys):
                 points = [

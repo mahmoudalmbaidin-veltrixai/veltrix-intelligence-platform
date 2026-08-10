@@ -15,6 +15,11 @@ from vip_api.dashboard_delivery.cache import cache_key, read_cache, write_cache
 from vip_api.dashboards.models import DashboardVersion, DashboardWidget
 from vip_api.dashboards.schemas import WidgetDataRequest, WidgetDataResponse, WidgetInput
 from vip_api.dashboards.services import _access, get_dashboard
+from vip_api.dashboards.visual_contracts import (
+    pivot_contract,
+    scatter_configuration_error,
+    scatter_contract,
+)
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
 from vip_api.redis.client import RedisClient
@@ -23,7 +28,9 @@ from vip_api.semantic.schemas import QueryFilter, QueryOrder, SemanticQueryReque
 
 
 def _shape(
-    widget: WidgetInput, rows: list[dict[str, object]]
+    widget: WidgetInput,
+    columns: list[dict[str, object]],
+    rows: list[dict[str, object]],
 ) -> tuple[dict[str, object], dict[str, object]]:
     metrics = widget.query.metrics
     dimensions = widget.query.dimensions
@@ -32,6 +39,20 @@ def _shape(
         return {"value": value}, {"value_field": metrics[0]}
     if widget.type == "table":
         return {"rows": rows}, {"columns": dimensions + metrics}
+    if widget.type == "pivot":
+        shaped = pivot_contract(dimensions, metrics, columns, rows)
+        return shaped, {
+            "row_fields": shaped["row_fields"],
+            "column_fields": shaped["column_fields"],
+            "value_fields": shaped["value_fields"],
+        }
+    if widget.type == "scatter":
+        shaped = scatter_contract(metrics, dimensions, columns, rows)
+        return shaped, {
+            "x_field": shaped.get("x_field"),
+            "y_field": shaped.get("y_field"),
+            "group_field": shaped.get("group_field"),
+        }
     categories = [row.get(dimensions[0]) for row in rows] if dimensions else list(range(len(rows)))
     series = [{"key": metric, "values": [row.get(metric) for row in rows]} for metric in metrics]
     return {"categories": categories, "series": series}, {
@@ -131,6 +152,15 @@ async def execute_widget(
             message="The requested widget was not found.",
             status_code=404,
         )
+    scatter_error = (
+        scatter_configuration_error(widget.query.metrics) if widget.type == "scatter" else None
+    )
+    if scatter_error:
+        raise ApplicationError(
+            code="DASHBOARD_SCATTER_INVALID",
+            message=scatter_error,
+            status_code=422,
+        )
     result_cache_key: str | None = None
     if not payload.preview and version is not None:
         result_cache_key = await cache_key(
@@ -203,13 +233,14 @@ async def execute_widget(
             status_code=exc.status_code,
         ) from exc
     rows = cast(list[dict[str, object]], [dict(row) for row in result.rows])
-    shaped, hint = _shape(widget, rows)
+    columns = [item.model_dump(mode="json") for item in result.columns]
+    shaped, hint = _shape(widget, columns, rows)
     response = WidgetDataResponse(
         dashboard_id=dashboard.id,
         widget_id=widget_id,
         dashboard_version=version_number,
         widget_type=widget.type,
-        columns=[item.model_dump(mode="json") for item in result.columns],
+        columns=columns,
         rows=result.rows,
         row_count=result.row_count,
         truncated=result.truncated,

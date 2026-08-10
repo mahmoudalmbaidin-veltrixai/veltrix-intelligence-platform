@@ -11,6 +11,7 @@ import VipSwitch from '@/shared/ui/VipSwitch.vue'
 import VipMenu from '@/shared/ui/VipMenu.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
+import { scatterConfigurationIssue } from './widgetValidation'
 
 const props = defineProps<{ editor: DashboardEditor; models: SemanticModel[] }>()
 const tab = ref<'build' | 'format' | 'interactions' | 'general'>('build')
@@ -55,6 +56,7 @@ const wellDefs = computed<WellDef[]>(() => {
 
 const dims = computed(() => (model.value?.fields ?? []).filter((f) => f.role === 'dimension' || f.role === 'time'))
 const measures = computed(() => (model.value?.fields ?? []).filter((f) => f.role === 'measure' || f.role === 'metric'))
+const configurationIssue = computed(() => (w.value ? scatterConfigurationIssue(w.value, model.value) : undefined))
 
 function fieldLabel(id: string): string {
   return model.value?.fields.find((f) => f.id === id)?.label ?? id
@@ -245,6 +247,10 @@ const vizTypeOptions = WIDGET_CATALOG.filter((c) => c.group !== 'Content' && c.g
               </div>
             </div>
           </div>
+
+          <p v-if="configurationIssue" class="winsp__validation" role="alert" data-testid="scatter-inspector-error">
+            {{ configurationIssue.message }} The first value is X and the second is Y.
+          </p>
 
           <div v-if="w.type === 'text' || w.type === 'rich-text' || w.type === 'image'" class="winsp__section">
             <label class="winsp__label">Content</label>
@@ -554,6 +560,15 @@ const vizTypeOptions = WIDGET_CATALOG.filter((c) => c.group !== 'Content' && c.g
   color: var(--vip-text-disabled);
   padding: var(--vip-sp-2);
   text-align: center;
+}
+.winsp__validation {
+  margin: 0 0 var(--vip-sp-3);
+  padding: var(--vip-sp-3);
+  border: 1px solid var(--vip-danger-border);
+  border-radius: var(--vip-radius-sm);
+  background: var(--vip-danger-soft);
+  color: var(--vip-danger-text);
+  font-size: var(--vip-fs-xs);
 }
 .winsp__hint {
   font-size: var(--vip-fs-xs);
