@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.connections.models import Connection
 from vip_api.datasets.models import Dataset, DatasetField
+from vip_api.governance import resource_access_service
 from vip_api.governance.context import AuthorizationContext
 from vip_api.pipelines.formula import parse_formula
 from vip_api.pipelines.registry import NODE_REGISTRY
@@ -366,6 +369,17 @@ async def validate_graph(
     source_schemas: dict[str, list[Column] | None] = {}
     if ws is not None and dataset_refs:
         wanted = {dataset_id for _, dataset_id in dataset_refs}
+        subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
+            db, org, context.user_id
+        )
+        allowed_ids, denied_ids = resource_access_service.collection_visibility_subqueries(
+            "dataset", subjects, now=datetime.now(UTC)
+        )
+        visibility_filters: list[Any] = [Dataset.id.notin_(denied_ids)]
+        if resource_access_service.role_level("dataset", context.permissions) is None:
+            visibility_filters.append(
+                or_(Dataset.owner_user_id == context.user_id, Dataset.id.in_(allowed_ids))
+            )
         found_rows = (
             await db.scalars(
                 select(Dataset).where(
@@ -373,6 +387,7 @@ async def validate_graph(
                     Dataset.workspace_id == ws,
                     Dataset.id.in_(wanted),
                     Dataset.archived_at.is_(None),
+                    *visibility_filters,
                 )
             )
         ).all()

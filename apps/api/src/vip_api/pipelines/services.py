@@ -63,6 +63,29 @@ def _slug(name: str) -> str:
     return value or "pipeline"
 
 
+def _reject_unpersistable_draft(validation: ValidationResponse) -> None:
+    unsafe = {"UNSUPPORTED_NODE_TYPE", "UNKNOWN_CONFIG_FIELD"}
+    unavailable_sources = {
+        "DATASET_NOT_FOUND",
+        "SOURCE_UNAVAILABLE",
+        "SOURCE_SCHEMA_CHANGED",
+        "SOURCE_FIELD_NOT_FOUND",
+    }
+    codes = {issue.code for issue in validation.errors}
+    if codes & unavailable_sources:
+        raise ApplicationError(
+            code="PIPELINE_SOURCE_UNAVAILABLE",
+            message="A selected dataset is unavailable, changed, or no longer accessible.",
+            status_code=422,
+        )
+    if codes & unsafe:
+        raise ApplicationError(
+            code="INVALID_PIPELINE",
+            message="The pipeline contains unsupported configuration.",
+            status_code=422,
+        )
+
+
 async def _authorize_pipeline(
     db: AsyncSession,
     context: AuthorizationContext,
@@ -251,6 +274,10 @@ async def create_pipeline(
     db: AsyncSession, context: AuthorizationContext, payload: PipelineCreate
 ) -> PipelineEditor:
     org, ws = _scope(context)
+    validation = await validate_graph(db, context, payload.nodes, payload.edges)
+    # Drafts may be incomplete, but unsafe contracts and stale/inaccessible
+    # governed source references are never persisted.
+    _reject_unpersistable_draft(validation)
     base = _slug(payload.name)
     slug = base
     suffix = 2
@@ -269,9 +296,39 @@ async def create_pipeline(
         description=payload.description,
         owner_user_id=context.user_id,
         tags=payload.tags,
+        canvas=payload.canvas,
     )
     db.add(item)
     await db.flush()
+    for node in payload.nodes:
+        db.add(
+            PipelineNode(
+                id=node.id,
+                organization_id=org,
+                workspace_id=ws,
+                pipeline_id=item.id,
+                node_key=node.key,
+                node_type=node.type,
+                title=node.title,
+                position_x=node.x,
+                position_y=node.y,
+                configuration=node.config,
+            )
+        )
+    for edge in payload.edges:
+        db.add(
+            PipelineEdge(
+                id=edge.id,
+                organization_id=org,
+                workspace_id=ws,
+                pipeline_id=item.id,
+                edge_key=edge.key,
+                source_node_key=edge.source,
+                target_node_key=edge.target,
+                source_port=edge.source_port,
+                target_port=edge.target_port,
+            )
+        )
     await record_audit(
         db,
         "pipeline.created",
@@ -282,14 +339,7 @@ async def create_pipeline(
         resource_id=item.id,
     )
     await db.commit()
-    await db.refresh(item)
-    return PipelineEditor(
-        pipeline=await _summary(db, item),
-        canvas={},
-        nodes=[],
-        edges=[],
-        access=await pipeline_access(db, context, item.id),
-    )
+    return await get_editor(db, context, item.id)
 
 
 async def get_editor(
@@ -355,14 +405,7 @@ async def save_editor(
             status_code=409,
         )
     validation = await validate_graph(db, context, payload.nodes, payload.edges)
-    # Drafts may be incomplete, but executable-code contracts are never persisted.
-    unsafe = {"UNSUPPORTED_NODE_TYPE", "UNKNOWN_CONFIG_FIELD"}
-    if any(issue.code in unsafe for issue in validation.errors):
-        raise ApplicationError(
-            code="INVALID_PIPELINE",
-            message="The pipeline contains unsupported configuration.",
-            status_code=422,
-        )
+    _reject_unpersistable_draft(validation)
     org, ws = _scope(context)
     await db.execute(delete(PipelineEdge).where(PipelineEdge.pipeline_id == item.id))
     await db.execute(delete(PipelineNode).where(PipelineNode.pipeline_id == item.id))

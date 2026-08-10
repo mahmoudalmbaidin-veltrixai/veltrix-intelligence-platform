@@ -44,6 +44,9 @@ const validation = ref<ValidationReport | null>(null)
 const bottomTab = ref<'validation' | 'logs' | 'results'>('validation')
 const saving = ref(false)
 const autosaveAt = ref<string | null>(null)
+type SaveState = 'NEW' | 'DIRTY' | 'SAVING' | 'SAVED' | 'SAVE_FAILED' | 'RECOVERABLE'
+const saveState = ref<SaveState>('NEW')
+const saveError = ref('')
 
 const leftPanel = useResizable({ key: 'pipeline.left', initial: 260, min: 200, max: 400 })
 const rightPanel = useResizable({ key: 'pipeline.right', initial: 330, min: 260, max: 520, invert: true })
@@ -89,6 +92,11 @@ const accessLevel = computed(() => perms.level.value)
 
 // Unwrapped accessors for template use (composable exposes refs).
 const dirty = computed(() => editor.value?.dirty.value ?? false)
+watch(dirty, (isDirty) => {
+  if (saving.value) return
+  if (isDirty && saveState.value !== 'SAVE_FAILED') saveState.value = 'DIRTY'
+  else if (!isDirty && editor.value?.pipeline.id === 'new') saveState.value = 'NEW'
+})
 // Publishing is available whenever there are unpublished changes: a never- or
 // re-drafted pipeline (status !== 'published') or unsaved edits on top of a
 // published version. A clean, already-published pipeline has nothing to publish.
@@ -167,6 +175,7 @@ async function load() {
   try {
     const pipeline: Pipeline = id && id !== 'new' ? await pipelineService.get(id) : newDraft()
     editor.value = usePipelineEditor(pipeline)
+    saveState.value = pipeline.id === 'new' ? 'NEW' : 'SAVED'
     validation.value = editor.value.validate()
   } catch (error) {
     // The backend is the authority on per-resource access: an explicit deny or a
@@ -209,27 +218,51 @@ watch(
 )
 
 /* ---- actions ---- */
-async function persist(showToast = false) {
-  if (!editor.value || !canEdit.value) return
-  const isFirstSave = editor.value.pipeline.id === 'new'
-  saving.value = true
-  try {
-    const saved = isFirstSave
-      ? await pipelineService.create(editor.value.pipeline as Pipeline)
-      : await pipelineService.save(editor.value.pipeline as Pipeline)
-    Object.assign(editor.value.pipeline, saved)
-    editor.value.markSaved()
-    autosaveAt.value = saved.updatedAt
-    if (isFirstSave) await router.replace(`/pipelines/${saved.id}`)
-    if (showToast) ui.pushToast({ kind: 'success', title: 'Pipeline saved' })
-    return saved
-  } finally {
-    saving.value = false
-  }
+let saveFlight: Promise<Pipeline | undefined> | null = null
+function persist(showToast = false): Promise<Pipeline | undefined> {
+  if (saveFlight) return saveFlight
+  if (!editor.value || !canEdit.value) return Promise.resolve(undefined)
+  saveFlight = (async () => {
+    const isFirstSave = editor.value!.pipeline.id === 'new'
+    saving.value = true
+    saveState.value = 'SAVING'
+    saveError.value = ''
+    try {
+      const saved = isFirstSave
+        ? await pipelineService.create(editor.value!.pipeline as Pipeline)
+        : await pipelineService.save(editor.value!.pipeline as Pipeline)
+      Object.assign(editor.value!.pipeline, saved)
+      editor.value!.markSaved()
+      autosaveAt.value = saved.updatedAt
+      saveState.value = 'SAVED'
+      if (isFirstSave) await router.replace(`/pipelines/${saved.id}`)
+      if (showToast) ui.pushToast({ kind: 'success', title: 'Pipeline saved' })
+      return saved
+    } catch (cause) {
+      saveState.value = 'SAVE_FAILED'
+      saveError.value = cause instanceof Error ? cause.message : 'The pipeline could not be saved.'
+      if (showToast) {
+        ui.pushToast({
+          kind: 'error',
+          title: 'Pipeline was not saved',
+          message: `${saveError.value} Your changes are retained and can be retried.`,
+        })
+      }
+      throw cause
+    } finally {
+      saving.value = false
+      saveFlight = null
+    }
+  })()
+  return saveFlight
 }
 
 async function save() {
-  await persist(true)
+  try {
+    await persist(true)
+  } catch {
+    // persist records the recoverable failure and keeps the editor graph dirty.
+  }
 }
 
 async function runValidation() {
@@ -386,7 +419,7 @@ watch(
       window.clearTimeout(autosaveTimer)
       autosaveTimer = window.setTimeout(async () => {
         if (!editor.value?.dirty.value) return
-        await persist()
+        await persist().catch(() => undefined)
       }, 2500)
     }
   },
@@ -457,6 +490,7 @@ onBeforeUnmount(() => {
             <span class="pstudio__ver">v{{ editor?.pipeline.version }}</span>
             <span v-if="dirty" class="pstudio__dirty">● Unsaved</span>
             <span v-else-if="autosaveAt" class="pstudio__saved">Saved {{ relativeTime(autosaveAt) }}</span>
+            <span data-testid="pipeline-save-state" class="sr-only">{{ saveState }}</span>
           </div>
         </div>
       </div>
@@ -512,7 +546,13 @@ onBeforeUnmount(() => {
             @click="runValidation"
             >Validate</VipButton
           >
-          <VipButton variant="secondary" size="sm" icon="save" :loading="saving" :disabled="!canEdit" @click="save"
+          <VipButton
+            variant="secondary"
+            size="sm"
+            icon="save"
+            :loading="saving"
+            :disabled="!canEdit || saving"
+            @click="save"
             >Save</VipButton
           >
         </div>
@@ -552,6 +592,9 @@ onBeforeUnmount(() => {
         />
       </div>
     </header>
+    <p v-if="saveError" class="pstudio__save-error" role="alert">
+      {{ saveError }} Your changes are retained; retry Save.
+    </p>
 
     <div v-if="loading" class="pstudio__loading"><VipSpinner :size="24" label="Loading pipeline…" /></div>
 
@@ -837,6 +880,14 @@ onBeforeUnmount(() => {
 .pstudio__saved {
   font-size: var(--vip-fs-xs);
   color: var(--vip-text-disabled);
+}
+.pstudio__save-error {
+  margin: 0;
+  padding: var(--vip-sp-3) var(--vip-sp-6);
+  color: var(--vip-danger-text);
+  background: var(--vip-danger-soft);
+  border-bottom: 1px solid var(--vip-danger-border);
+  font-size: var(--vip-fs-xs);
 }
 
 .pstudio__tb-right {

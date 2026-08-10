@@ -213,12 +213,11 @@ function mapSummary(dto: SummaryDto): PipelineListItem {
     nodeCount: dto.node_count,
   }
 }
-function saveBody(pipeline: Pipeline) {
+function graphBody(pipeline: Pipeline) {
   return {
     name: pipeline.name,
     description: pipeline.description,
     tags: pipeline.tags,
-    expected_version: pipeline.rowVersion,
     canvas: pipeline.canvas,
     nodes: pipeline.nodes.map((node) => ({
       key: node.id,
@@ -236,6 +235,9 @@ function saveBody(pipeline: Pipeline) {
       target_port: edge.targetPort,
     })),
   }
+}
+function saveBody(pipeline: Pipeline) {
+  return { ...graphBody(pipeline), expected_version: pipeline.rowVersion }
 }
 function mapRun(dto: RunDto): PipelineRun {
   const states: RunNodeState[] = (dto.nodes ?? []).map((node) => ({
@@ -348,20 +350,7 @@ export const pipelineService = {
     return mapEditor(await apiClient.get<EditorDto>(`/api/v1/pipelines/${id}`))
   },
   async create(draft: Pipeline): Promise<Pipeline> {
-    const created = mapEditor(
-      await apiClient.post<EditorDto>('/api/v1/pipelines', {
-        name: draft.name,
-        description: draft.description,
-        tags: draft.tags,
-      }),
-    )
-    if (!draft.nodes.length && !draft.edges.length) return created
-    return mapEditor(
-      await apiClient.put<EditorDto>(
-        `/api/v1/pipelines/${created.id}`,
-        saveBody({ ...draft, ...created, nodes: draft.nodes, edges: draft.edges }),
-      ),
-    )
+    return mapEditor(await apiClient.post<EditorDto>('/api/v1/pipelines', graphBody(draft)))
   },
   async save(pipeline: Pipeline): Promise<Pipeline> {
     return mapEditor(await apiClient.put<EditorDto>(`/api/v1/pipelines/${pipeline.id}`, saveBody(pipeline)))

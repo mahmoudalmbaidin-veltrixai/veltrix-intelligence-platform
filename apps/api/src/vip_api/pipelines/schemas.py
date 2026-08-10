@@ -45,13 +45,13 @@ class PipelineCreate(StrictModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
     tags: list[str] = Field(default_factory=list, max_length=30)
+    canvas: dict[str, object] = Field(default_factory=dict)
+    nodes: list[NodeInput] = Field(default_factory=list, max_length=250)
+    edges: list[EdgeInput] = Field(default_factory=list, max_length=1000)
 
 
 class PipelineEditorSave(PipelineCreate):
     expected_version: int = Field(ge=1)
-    canvas: dict[str, object] = Field(default_factory=dict)
-    nodes: list[NodeInput] = Field(max_length=250)
-    edges: list[EdgeInput] = Field(max_length=1000)
 
 
 class PipelineSummary(StrictModel):
