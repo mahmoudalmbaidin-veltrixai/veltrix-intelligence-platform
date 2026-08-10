@@ -116,6 +116,7 @@ async def test_select_rename_validation_against_real_dataset_fields(settings: Se
                 display_name="Customers",
                 source_object_type="table",
                 status="active",
+                owner_user_id=user.id,
                 version=1,
             )
             db.add(dataset)

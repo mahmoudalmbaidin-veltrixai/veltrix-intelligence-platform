@@ -15,7 +15,7 @@ from vip_api.database.session import Database
 from vip_api.pipelines.execution import normalize, transform, validate_rows
 from vip_api.pipelines.formula import evaluate, parse_formula, referenced_fields
 from vip_api.pipelines.registry import NODE_REGISTRY
-from vip_api.pipelines.schemas import NodeInput
+from vip_api.pipelines.schemas import EdgeInput, NodeInput, PipelineCreate
 from vip_api.pipelines.storage import (
     ArtifactStorageError,
     DownloadClaims,
@@ -152,6 +152,35 @@ def test_source_dataset_schema_snapshot_is_strictly_validated() -> None:
     issues = _typed_config_issues(invalid)
     assert issues
     assert issues[0].field == "config.schema_snapshot"
+
+
+def test_pipeline_create_contract_accepts_the_initial_graph() -> None:
+    payload = PipelineCreate(
+        name="Atomic first save",
+        canvas={"x": 40, "y": 20, "scale": 1},
+        nodes=[
+            NodeInput(
+                key="source",
+                type="source-dataset",
+                title="Source",
+                x=10,
+                y=20,
+                config={"dataset_id": str(uuid4())},
+            ),
+            NodeInput(
+                key="export",
+                type="file-export",
+                title="Export",
+                x=300,
+                y=20,
+                config={"format": "csv", "filename": "result.csv"},
+            ),
+        ],
+        edges=[EdgeInput(key="flow", source="source", target="export")],
+    )
+    assert len(payload.nodes) == 2
+    assert payload.edges[0].source == "source"
+    assert payload.canvas["scale"] == 1
 
 
 def test_artifact_storage_rejects_paths_and_token_is_tenant_bound(tmp_path: Path) -> None:

@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, event, select
 
 from vip_api.auth.models import User, UserStatus
 from vip_api.connections.models import Connection, ConnectionType
@@ -24,11 +24,13 @@ from vip_api.connections.services import get_connection, list_connections
 from vip_api.core.config import Settings, get_settings
 from vip_api.core.errors import ApplicationError
 from vip_api.database.session import Database
-from vip_api.datasets.models import Dataset
+from vip_api.datasets.models import Dataset, DatasetQualityEvaluation
 from vip_api.datasets.services import get_dataset, list_datasets
 from vip_api.governance import resource_access_service
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.models import Group, GroupMembership, ResourceAccessEntry, Role
+from vip_api.pipelines.schemas import EdgeInput, NodeInput, PipelineCreate
+from vip_api.pipelines.services import create_pipeline
 from vip_api.semantic.models import SemanticModel
 from vip_api.semantic.query import execute_query
 from vip_api.semantic.schemas import SemanticQueryRequest
@@ -206,6 +208,18 @@ async def test_resource_authorization_across_domains(settings: Settings) -> None
             )
             db.add_all((dataset, other_dataset))
             await db.flush()
+            db.add(
+                DatasetQualityEvaluation(
+                    organization_id=org.id,
+                    workspace_id=ws.id,
+                    dataset_id=dataset.id,
+                    status="completed",
+                    score=96,
+                    total_rules=3,
+                    passing=3,
+                    completed_at=datetime.now(UTC),
+                )
+            )
             model = SemanticModel(
                 organization_id=org.id,
                 workspace_id=ws.id,
@@ -284,11 +298,23 @@ async def test_resource_authorization_across_domains(settings: Settings) -> None
             # Group grant elevates (edit implies query).
             assert (await get_dataset(db, group_ctx, dataset.id)).id == dataset.id
             # Collection visibility: viewer sees only the granted dataset.
-            viewer_list = await list_datasets(
-                db, viewer_ctx, page=1, page_size=50, search=None, status=None
-            )
+            query_count = 0
+
+            def count_query(*_args: object) -> None:
+                nonlocal query_count
+                query_count += 1
+
+            event.listen(database.engine.sync_engine, "before_cursor_execute", count_query)
+            try:
+                viewer_list = await list_datasets(
+                    db, viewer_ctx, page=1, page_size=50, search=None, status=None
+                )
+            finally:
+                event.remove(database.engine.sync_engine, "before_cursor_execute", count_query)
             assert {row.id for row in viewer_list.items} == {dataset.id}
             assert viewer_list.total == 1
+            assert viewer_list.items[0].quality_score == 96
+            assert query_count == 3  # group visibility + count + one projected page
             # Deny hides it entirely from the list.
             denied_list = await list_datasets(
                 db, denied_ctx, page=1, page_size=50, search=None, status=None
@@ -300,6 +326,42 @@ async def test_resource_authorization_across_domains(settings: Settings) -> None
             )
             assert dataset.id in {row.id for row in owner_list.items}
             assert other_dataset.id not in {row.id for row in owner_list.items}
+
+            source_payload = PipelineCreate(
+                name="Authorized source",
+                nodes=[
+                    NodeInput(
+                        key="source",
+                        type="source-dataset",
+                        title="Source",
+                        x=0,
+                        y=0,
+                        config={"dataset_id": str(dataset.id), "dataset_version": 1},
+                    ),
+                    NodeInput(
+                        key="export",
+                        type="file-export",
+                        title="Export",
+                        x=300,
+                        y=0,
+                        config={"format": "csv", "filename": "result.csv"},
+                    ),
+                ],
+                edges=[EdgeInput(key="flow", source="source", target="export")],
+            )
+            # A current ACL grant permits the governed source. Removing access
+            # or deleting the dataset is rejected deterministically at save.
+            allowed_pipeline = await create_pipeline(db, viewer_ctx, source_payload)
+            persisted_source = next(node for node in allowed_pipeline.nodes if node.key == "source")
+            assert persisted_source.config["dataset_id"] == str(dataset.id)
+            with pytest.raises(ApplicationError) as removed_permission:
+                await create_pipeline(db, denied_ctx, source_payload)
+            assert removed_permission.value.code == "PIPELINE_SOURCE_UNAVAILABLE"
+            deleted_payload = source_payload.model_copy(deep=True)
+            deleted_payload.nodes[0].config["dataset_id"] = str(uuid4())
+            with pytest.raises(ApplicationError) as deleted_source:
+                await create_pipeline(db, viewer_ctx, deleted_payload)
+            assert deleted_source.value.code == "PIPELINE_SOURCE_UNAVAILABLE"
 
             # ---- CONNECTION -------------------------------------------------
             conn = await get_connection(db, viewer_ctx, connection.id)

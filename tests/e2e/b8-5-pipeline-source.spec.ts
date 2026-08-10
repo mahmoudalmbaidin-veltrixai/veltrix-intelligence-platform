@@ -93,7 +93,7 @@ test('Pipeline Studio uploads, previews, persists, and publishes a governed CSV 
   await expect(page.locator('.pstudio__run-meta').getByText(/Rows: [1-9]\d*/)).toBeVisible()
 
   await page.goto('/datasets')
-  await page.getByPlaceholder('Search datasets, owners or tags').fill(datasetName)
+  await page.getByPlaceholder('Search dataset name or source').fill(datasetName)
   await page.getByText(datasetName, { exact: true }).click()
   await expect(page).toHaveURL(/\/datasets\/[0-9a-f-]{36}$/)
   const datasetId = page.url().split('/').at(-1)!

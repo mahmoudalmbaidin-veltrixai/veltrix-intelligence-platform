@@ -149,6 +149,7 @@ async def _seed(db: AsyncSession, suffix: str) -> tuple[UUID, UUID, UUID, UUID, 
         display_name="Customers",
         source_object_type="table",
         status="active",
+        owner_user_id=owner.id,
         version=1,
     )
     db.add(dataset)

@@ -131,8 +131,27 @@ async def test_pipeline_tables_tenant_isolation_and_conflict(settings: Settings)
                 context(user.id, beta.id, beta_ws.id),
             )
             created = await create_pipeline(
-                db, alpha_context, PipelineCreate(name="Tenant pipeline")
+                db,
+                alpha_context,
+                PipelineCreate(
+                    name="Tenant pipeline",
+                    canvas={"x": 12, "y": 24, "scale": 1},
+                    nodes=[
+                        NodeInput(
+                            key="initial-export",
+                            type="file-export",
+                            title="Initial export",
+                            x=100,
+                            y=100,
+                            config={"format": "csv", "filename": "initial.csv"},
+                        )
+                    ],
+                ),
             )
+            assert created.canvas["x"] == 12
+            assert [node.key for node in created.nodes] == ["initial-export"]
+            initial_reload = await get_editor(db, alpha_context, created.pipeline.id)
+            assert [node.key for node in initial_reload.nodes] == ["initial-export"]
             assert len((await list_pipelines(db, alpha_context)).items) == 1
             assert (await list_pipelines(db, beta_context)).items == []
             payload = PipelineEditorSave(
@@ -142,11 +161,11 @@ async def test_pipeline_tables_tenant_isolation_and_conflict(settings: Settings)
                 nodes=[
                     NodeInput(
                         key="source",
-                        type="source-dataset",
-                        title="Source",
+                        type="file-export",
+                        title="Staging export",
                         x=10,
                         y=20,
-                        config={"dataset_id": str(uuid4())},
+                        config={"format": "csv", "filename": "staging.csv"},
                     ),
                     NodeInput(
                         key="export",
