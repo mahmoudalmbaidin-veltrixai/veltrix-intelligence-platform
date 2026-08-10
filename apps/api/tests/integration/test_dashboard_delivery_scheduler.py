@@ -8,17 +8,21 @@ creator access, and tenant isolation.
 from __future__ import annotations
 
 import asyncio
+import base64
 import csv
 import hashlib
 import io
 import json
 import os
+import re
 import socket
+import zlib
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from email import policy
 from email.parser import BytesParser
 from pathlib import Path
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -103,6 +107,25 @@ DATA_WIDGET_TYPES = frozenset(ALL_WIDGET_TYPES[:14]) | {"map"}
 def _reportlab_pdf_utf16(value: str) -> bytes:
     """Encode ASCII as ReportLab's escaped UTF-16BE PDF string representation."""
     return b"".join(b"\\000" + bytes((character,)) for character in value.encode("ascii"))
+
+
+def _pdf_visible_streams(content: bytes) -> bytes:
+    decoded: list[bytes] = []
+    for match in re.finditer(rb"stream\r?\n(.*?)endstream", content, re.DOTALL):
+        value = match.group(1).strip()
+        try:
+            if value.endswith(b"~>"):
+                value = base64.a85decode(value, adobe=True)
+            decoded.append(zlib.decompress(value))
+        except (ValueError, zlib.error):
+            continue
+    return b"\n".join(decoded)
+
+
+def _png_widget_body(image: Image.Image, widget_index: int) -> Image.Image:
+    page_stride = 38 + 8 * (76 + 10) + 36
+    grid_top = 150 + widget_index * page_stride + 38
+    return image.crop((120, (grid_top + 58) * 2, image.width - 120, (grid_top + 658) * 2))
 
 
 class _QueueStub:
@@ -496,6 +519,23 @@ async def test_all_twenty_widgets_traverse_every_real_delivery_format(
                     "('الدمام / Dammam', 5, 26.4207, 50.0888)"
                 )
             )
+            await db.execute(text(f'ALTER TABLE "{source_table}" ADD COLUMN quarter text'))
+            await db.execute(
+                text(
+                    f'UPDATE "{source_table}" SET '  # noqa: S608 - generated hex identifier
+                    "category = CASE orders WHEN 12 THEN 'Region A' WHEN 8 THEN 'Region A' "
+                    "ELSE 'Region B' END, "
+                    "quarter = CASE orders WHEN 12 THEN 'Q1' WHEN 8 THEN 'Q2' ELSE 'Q1' END, "
+                    "orders = CASE orders WHEN 12 THEN 111 WHEN 8 THEN 222 ELSE 333 END"
+                )
+            )
+            await db.execute(
+                text(
+                    f'INSERT INTO "{source_table}" '  # noqa: S608 - generated hex identifier
+                    "(category, orders, latitude, longitude, quarter) VALUES "
+                    "('Region B', 444, 26.9207, 50.5888, 'Q2')"
+                )
+            )
             connection_type = await db.scalar(
                 select(ConnectionType).where(ConnectionType.key == "postgresql")
             )
@@ -582,6 +622,17 @@ async def test_all_twenty_widgets_traverse_every_real_delivery_format(
                 normalized_data_type="integer",
                 is_nullable=False,
             )
+            quarter = DatasetField(
+                organization_id=seed.org_id,
+                workspace_id=seed.ws_id,
+                dataset_id=dataset.id,
+                source_name="quarter",
+                display_name="Quarter",
+                ordinal_position=4,
+                physical_data_type="varchar",
+                normalized_data_type="string",
+                is_nullable=False,
+            )
             latitude = DatasetField(
                 organization_id=seed.org_id,
                 workspace_id=seed.ws_id,
@@ -604,7 +655,7 @@ async def test_all_twenty_widgets_traverse_every_real_delivery_format(
                 normalized_data_type="decimal",
                 is_nullable=False,
             )
-            db.add_all((category, orders, latitude, longitude))
+            db.add_all((category, orders, latitude, longitude, quarter))
             await db.flush()
             semantic_model = SemanticModel(
                 organization_id=seed.org_id,
@@ -649,6 +700,17 @@ async def test_all_twenty_widgets_traverse_every_real_delivery_format(
                         workspace_id=seed.ws_id,
                         semantic_model_id=semantic_model.id,
                         dataset_id=dataset.id,
+                        field_id=quarter.id,
+                        key="quarter",
+                        name="Quarter",
+                        dimension_type="categorical",
+                        data_type="string",
+                    ),
+                    SemanticDimension(
+                        organization_id=seed.org_id,
+                        workspace_id=seed.ws_id,
+                        semantic_model_id=semantic_model.id,
+                        dataset_id=dataset.id,
                         field_id=latitude.id,
                         key="latitude",
                         name="Latitude",
@@ -672,6 +734,16 @@ async def test_all_twenty_widgets_traverse_every_real_delivery_format(
                         semantic_model_id=semantic_model.id,
                         key="orders",
                         name="Orders",
+                        metric_type="measure",
+                        base_measure_id=measure.id,
+                        status="published",
+                    ),
+                    SemanticMetric(
+                        organization_id=seed.org_id,
+                        workspace_id=seed.ws_id,
+                        semantic_model_id=semantic_model.id,
+                        key="orders_y",
+                        name="Orders Y",
                         metric_type="measure",
                         base_measure_id=measure.id,
                         status="published",
@@ -703,10 +775,18 @@ async def test_all_twenty_widgets_traverse_every_real_delivery_format(
                         semantic_model.id if widget_type in DATA_WIDGET_TYPES else None
                     ),
                     query={
-                        "metrics": ["orders"] if widget_type in DATA_WIDGET_TYPES else [],
+                        "metrics": (
+                            ["orders", "orders_y"]
+                            if widget_type == "scatter"
+                            else ["orders"]
+                            if widget_type in DATA_WIDGET_TYPES
+                            else []
+                        ),
                         "dimensions": (
                             ["category", "latitude", "longitude"]
                             if widget_type == "map"
+                            else ["category", "quarter"]
+                            if widget_type == "pivot"
                             else ["category"]
                             if widget_type in DATA_WIDGET_TYPES
                             else []
@@ -763,6 +843,14 @@ async def test_all_twenty_widgets_traverse_every_real_delivery_format(
             assert version is not None
             assert published_view["version"] == published.version_number
             assert published_view["snapshot"] == version.snapshot
+            snapshot_pages = cast(list[dict[str, object]], version.snapshot["pages"])
+            published_widgets = {
+                str(widget["type"]): widget
+                for page in snapshot_pages
+                for widget in cast(list[dict[str, object]], page["widgets"])
+            }
+            pivot_widget_id = str(published_widgets["pivot"]["id"])
+            scatter_widget_id = str(published_widgets["scatter"]["id"])
 
             schedules: dict[str, UUID] = {}
             for index, export_format in enumerate(("pdf", "png", "csv", "json")):
@@ -836,9 +924,30 @@ async def test_all_twenty_widgets_traverse_every_real_delivery_format(
 
                 if export_format == "json":
                     assert str(published.id).encode() in artifact
-                    definition = json.loads(artifact)["definition"]
+                    payload = json.loads(artifact)
+                    definition = payload["definition"]
+                    pivot_result = payload["widget_data"][pivot_widget_id]
+                    assert pivot_result["shaped"]["row_fields"] == ["category"]
+                    assert pivot_result["shaped"]["column_fields"] == ["quarter"]
+                    pivot_cells = {
+                        row["row_values"][0]: row["cells"] for row in pivot_result["shaped"]["rows"]
+                    }
+                    assert pivot_cells == {
+                        "Region A": [111, 222],
+                        "Region B": [333, 444],
+                    }
+                    scatter_result = payload["widget_data"][scatter_widget_id]
+                    assert scatter_result["shaped"]["valid"] is True
+                    assert scatter_result["shaped"]["x_field"] == "orders"
+                    assert scatter_result["shaped"]["y_field"] == "orders_y"
+                    assert {
+                        (point["x"], point["y"], point["group"])
+                        for point in scatter_result["shaped"]["points"]
+                    } == {(333.0, 333.0, "Region A"), (777.0, 777.0, "Region B")}
                 elif export_format == "csv":
                     assert str(published.id).encode() in artifact
+                    assert b"Region A" in artifact and b"Region B" in artifact
+                    assert all(value in artifact for value in (b"111", b"222", b"333", b"444"))
                     rows = list(csv.reader(io.StringIO(artifact.decode("utf-8-sig"))))
                     definition = json.loads(rows[1][1])
                     assert any(row and row[0].startswith("Widget ") for row in rows)
@@ -846,11 +955,34 @@ async def test_all_twenty_widgets_traverse_every_real_delivery_format(
                     with Image.open(io.BytesIO(artifact)) as image:
                         definition = json.loads(image.info["vip.dashboard.definition"])
                         assert image.width > 0 and image.height > 0
+                        pivot_body = _png_widget_body(image.convert("RGB"), 3)
+                        assert list(pivot_body.get_flattened_data()).count((22, 58, 112)) > 500
+                        scatter_body = _png_widget_body(image.convert("RGB"), 11)
+                        scatter_pixels = list(scatter_body.get_flattened_data()).count(
+                            (37, 99, 235)
+                        )
+                        assert 20 < scatter_pixels < 5000
                 else:
                     assert artifact.startswith(b"%PDF-")
                     assert _reportlab_pdf_utf16(str(published.id)) in artifact
                     for widget_type in ALL_WIDGET_TYPES:
                         assert _reportlab_pdf_utf16(widget_type) in artifact
+                    visible_pdf = _pdf_visible_streams(artifact)
+                    assert all(
+                        value in visible_pdf
+                        for value in (
+                            b"Region A",
+                            b"Region B",
+                            b"Q1",
+                            b"Q2",
+                            b"111",
+                            b"222",
+                            b"333",
+                            b"444",
+                            b"1,110",
+                        )
+                    )
+                    assert b"Scatter chart requires numeric X and Y fields." not in visible_pdf
                     definition = version.snapshot | {
                         "dashboard_version_id": str(published.id),
                     }

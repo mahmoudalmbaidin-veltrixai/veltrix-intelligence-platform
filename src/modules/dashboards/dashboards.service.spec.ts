@@ -9,7 +9,13 @@ describe('dashboard widget persistence parity', () => {
       type: 'scatter',
       modelId: '22222222-2222-4222-8222-222222222222',
       pos: { x: 3, y: 5, w: 7, h: 6 },
-      wells: { category: ['region'], values: [{ fieldId: 'revenue', aggregation: 'sum' }] },
+      wells: {
+        category: ['region'],
+        values: [
+          { fieldId: 'revenue', aggregation: 'sum' },
+          { fieldId: 'profit', aggregation: 'sum' },
+        ],
+      },
       filters: [{ fieldId: 'region', operator: 'eq', value: 'الرياض' }],
       sorts: [{ fieldId: 'revenue', dir: 'desc' }],
       format: {
@@ -51,6 +57,7 @@ describe('dashboard widget persistence parity', () => {
 
     expect(restored.type).toBe(source.type)
     expect(restored.pos).toEqual(source.pos)
+    expect(restored.wells).toEqual(source.wells)
     expect(restored.filters).toEqual(source.filters)
     expect(restored.sorts).toEqual(source.sorts)
     expect(restored.format).toEqual(source.format)

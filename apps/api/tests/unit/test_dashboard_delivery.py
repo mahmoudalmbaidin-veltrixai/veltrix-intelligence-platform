@@ -72,6 +72,28 @@ def test_export_number_and_conditional_formatting_matches_definition() -> None:
     assert _conditional_color(42, widget, "#000000") == "#DC2626"
 
 
+@pytest.mark.parametrize(
+    ("value", "config", "expected"),
+    (
+        (42, {"number_style": "plain", "decimals": 0}, "42"),
+        (42.125, {"number_style": "plain", "decimals": 2}, "42.12"),
+        (0.125, {"number_style": "percent", "decimals": 1}, "12.5%"),
+        (-42.5, {"number_style": "currency", "currency": "SAR", "decimals": 2}, "SAR -42.50"),
+        (0, {"number_style": "plain", "decimals": 0}, "0"),
+        (None, {"number_style": "plain", "decimals": 0}, "â€”"),
+        (1_234_567, {"number_style": "compact", "decimals": 1}, "1.2M"),
+        ("2026-08-10", {"number_style": "plain", "decimals": 0}, "2026-08-10"),
+    ),
+)
+def test_export_formatting_covers_certification_value_classes(
+    value: object, config: dict[str, object], expected: str
+) -> None:
+    if value is None:
+        assert _formatted_value(value, {"config": config}) == "\N{EM DASH}"
+        return
+    assert _formatted_value(value, {"config": config}) == expected
+
+
 def test_email_composition_preserves_attachments_and_hides_bcc() -> None:
     message = DashboardEmail(
         recipients=["owner@example.com"],
@@ -543,3 +565,10 @@ async def test_download_token_is_bound_and_single_use(settings: Settings) -> Non
     with pytest.raises(ApplicationError) as raised:
         verify_download_token(token, item, other_user, signing_settings)
     assert raised.value.code == "DASHBOARD_DOWNLOAD_TOKEN_INVALID"
+    for mismatched_context in (
+        replace(context, organization_id=uuid4()),
+        replace(context, workspace_id=uuid4()),
+    ):
+        with pytest.raises(ApplicationError) as tenant_mismatch:
+            verify_download_token(token, item, mismatched_context, signing_settings)
+        assert tenant_mismatch.value.code == "DASHBOARD_DOWNLOAD_TOKEN_INVALID"

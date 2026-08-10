@@ -26,6 +26,11 @@ Set-Persona 'VIP_E2E_GOVERNANCE_RESTRICTED' 'qa_explicitly_denied_user'
 Set-Persona 'VIP_E2E_MODULE_RESTRICTED' 'qa_direct_acl_user'
 Set-Persona 'VIP_E2E_NORMAL_USER' 'qa_organization_member'
 
+# Legacy Governance Demo remains a deliberately local, non-production fixture.
+# Its documented browser credential is not part of the DPAPI QA inventory.
+$env:VIP_E2E_GOVERNANCE_DEMO_EMAIL = 'governance-admin@vip.demo'
+$env:VIP_E2E_GOVERNANCE_DEMO_PASSWORD = 'Enterprise review 2026!'
+
 $env:VIP_E2E_ORGANIZATION_NAME = 'QA_Enterprise_A_20260804'
 $env:VIP_E2E_ORGANIZATION_A_NAME = 'QA_Enterprise_A_20260804'
 $env:VIP_E2E_ORGANIZATION_B_NAME = 'QA_Enterprise_B_20260804'

@@ -7,8 +7,9 @@ from pydantic import ValidationError
 
 from vip_api.core.errors import ApplicationError
 from vip_api.dashboards.models import Dashboard
-from vip_api.dashboards.schemas import EditorSave, GridLayout, WidgetInput
-from vip_api.dashboards.services import _check_version
+from vip_api.dashboards.schemas import EditorSave, GridLayout, PageInput, WidgetInput
+from vip_api.dashboards.services import _check_version, _validate_semantics
+from vip_api.governance.context import AuthorizationContext
 
 
 def test_layout_is_bounded_to_twelve_columns() -> None:
@@ -96,3 +97,41 @@ def test_stale_version_fails_with_stable_conflict() -> None:
         _check_version(dashboard, 6)
     assert raised.value.code == "DASHBOARD_VERSION_CONFLICT"
     assert raised.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_save_and_publish_semantics_reject_incomplete_scatter() -> None:
+    model_id = uuid4()
+    page = PageInput(
+        key="overview",
+        name="Overview",
+        position=0,
+        widgets=[
+            WidgetInput(
+                type="scatter",
+                title="Legacy invalid scatter",
+                semantic_model_id=model_id,
+                query={"metrics": ["revenue"], "dimensions": ["region"]},
+                layout=GridLayout(x=0, y=0, w=6, h=5),
+            )
+        ],
+    )
+    context = AuthorizationContext(
+        user_id=uuid4(),
+        organization_id=uuid4(),
+        workspace_id=uuid4(),
+        organization_role_key="organization_admin",
+        workspace_role_key="workspace_admin",
+        permissions=frozenset({"dashboard.update", "dashboard.publish"}),
+        entitlements=frozenset({"dashboard_studio"}),
+        feature_flags={"dashboard_studio": True},
+        quotas={},
+        correlation_id="scatter-validation-unit",
+    )
+
+    with pytest.raises(ApplicationError) as raised:
+        await _validate_semantics(None, context, [page], [])  # type: ignore[arg-type]
+
+    assert raised.value.code == "DASHBOARD_SCATTER_INVALID"
+    assert raised.value.status_code == 422
+    assert raised.value.message == "Scatter chart requires numeric X and Y fields."

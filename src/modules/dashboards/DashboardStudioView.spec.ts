@@ -2,7 +2,7 @@ import { createPinia } from 'pinia'
 import { enableAutoUnmount, flushPromises, shallowMount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/shared/types/api'
-import type { Dashboard } from '@/shared/types/dashboard'
+import type { Dashboard, DashboardWidget } from '@/shared/types/dashboard'
 
 const mocks = vi.hoisted(() => ({
   route: {
@@ -187,6 +187,44 @@ describe('Dashboard Studio save coordinator behavior', () => {
     mocks.save.mockRejectedValue(ApiError.fromStatus(500))
     await wrapper.vm.publish()
     expect(mocks.publish).not.toHaveBeenCalled()
+  })
+
+  it('blocks save and publish for an incomplete Scatter without mutating the visual type', async () => {
+    const dashboard = makeDashboard()
+    const scatter: DashboardWidget = {
+      id: 'legacy-scatter',
+      type: 'scatter',
+      pos: { x: 0, y: 0, w: 6, h: 5 },
+      wells: { values: [{ fieldId: 'revenue', aggregation: 'sum' }] },
+      filters: [],
+      format: {
+        showTitle: true,
+        showLegend: true,
+        legendPosition: 'bottom',
+        showDataLabels: false,
+        showGridlines: true,
+        decimals: 0,
+        numberStyle: 'plain',
+        border: true,
+        padding: 12,
+        conditional: [],
+      },
+      interactions: { crossFilter: true, drillDown: false, tooltip: true, exportable: true },
+      general: { name: 'Legacy Scatter', visible: true, locked: false },
+    }
+    dashboard.pages[0]!.widgets.push(scatter)
+    const wrapper = await mountStudio({ dashboard })
+    dirtyEdit(wrapper)
+
+    expect(await wrapper.vm.save()).toBe(false)
+    await wrapper.vm.publish()
+
+    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.publish).not.toHaveBeenCalled()
+    expect(wrapper.vm.editor.dashboard.pages[0]!.widgets[0]!.type).toBe('scatter')
+    expect(mocks.pushToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('numeric Y field') }),
+    )
   })
 
   it('blocks a real unsaved route leave and bypasses only the confirmed create transition', async () => {

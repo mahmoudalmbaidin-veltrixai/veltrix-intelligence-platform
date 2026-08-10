@@ -1,24 +1,24 @@
-"""Permanent dashboard-export SEMANTIC parity harness (VIP Phase 2).
+"""Dashboard-export semantic parity harness for every supported widget type.
 
-Drives the REAL PDF (ReportLab) and PNG (PIL) renderers with deterministic
-fixtures and asserts *analytical meaning*, not just that an artifact exists.
-
-It is designed to fail on the Phase-2 P0 defects:
-  * VIP-BUG-002 — Pivot renders blank (known cell values missing from PDF).
-  * VIP-BUG-003 — Scatter silently rendered as Bar (invalid scatter must show an
-    explicit invalid-state, never a bar chart).
-
-PDF semantics are checked via extracted text (pypdf). PNG is checked for a
-non-blank widget region (PIL) — a blank widget is a semantic failure.
+The suite combines immutable-definition checks, renderer-dispatch observation,
+known-value assertions, and widget-body pixel inspection. It deliberately does
+not treat successful file generation or a non-blank full dashboard as semantic
+proof.
 """
 
 from __future__ import annotations
 
+import base64
 import io
+import os
+import re
+import zlib
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import get_args
 from uuid import uuid4
 
-import pypdf
+import pytest
 from PIL import Image
 
 from vip_api.dashboard_delivery.rendering import (
@@ -26,130 +26,265 @@ from vip_api.dashboard_delivery.rendering import (
     PngDashboardRenderer,
     RenderDocument,
 )
+from vip_api.dashboards.schemas import WidgetType
+from vip_api.dashboards.visual_contracts import SCATTER_CONFIGURATION_ERROR
 
-# --- deterministic known values (kept < 1000 to avoid thousands-formatting) ---
-PIVOT_CELLS = {"111", "222", "333", "444"}
-PIVOT_LABELS = {"Region A", "Region B", "Q1", "Q2"}
-SCATTER_INVALID_MSG = "Scatter chart requires numeric X and Y fields."
+ALL_WIDGET_TYPES = (
+    "kpi",
+    "metric-comparison",
+    "table",
+    "pivot",
+    "bar",
+    "stacked-bar",
+    "column",
+    "line",
+    "area",
+    "pie",
+    "donut",
+    "scatter",
+    "gauge",
+    "progress",
+    "text",
+    "rich-text",
+    "image",
+    "filter",
+    "date-filter",
+    "map",
+)
+DATA_WIDGET_TYPES = frozenset(ALL_WIDGET_TYPES[:14]) | {"map"}
+CHART_DISPATCH_TYPES = ("bar", "stacked-bar", "column", "line", "area", "scatter")
+PNG_CHART_DISPATCH_TYPES = (
+    "bar",
+    "stacked-bar",
+    "column",
+    "line",
+    "area",
+    "pie",
+    "donut",
+    "scatter",
+)
+PIVOT_CELLS = ("111", "222", "333", "444")
+PIVOT_LABELS = ("Region A", "Region B", "Q1", "Q2")
 
 
-def _widget(widget_id: str, wtype: str, title: str) -> dict[str, object]:
-    return {
+def _evidence(name: str, content: bytes) -> None:
+    directory = os.getenv("VIP_SEMANTIC_PARITY_EVIDENCE_DIR")
+    if not directory:
+        return
+    target = Path(directory) / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(content)
+
+
+def _pdf_content_streams(content: bytes) -> bytes:
+    """Decode ReportLab page streams with only Python's standard library."""
+
+    decoded: list[bytes] = []
+    for match in re.finditer(rb"stream\r?\n(.*?)endstream", content, re.DOTALL):
+        value = match.group(1).strip()
+        try:
+            if value.endswith(b"~>"):
+                value = base64.a85decode(value, adobe=True)
+            decoded.append(zlib.decompress(value))
+        except (ValueError, zlib.error):
+            continue
+    return b"\n".join(decoded)
+
+
+def _widget(
+    widget_type: str, *, invalid_scatter: bool = False
+) -> tuple[dict[str, object], dict[str, object]]:
+    widget_id = str(uuid4())
+    metrics = ["revenue"] if widget_type in DATA_WIDGET_TYPES else []
+    dimensions = ["category"] if widget_type in DATA_WIDGET_TYPES else []
+    columns: list[dict[str, object]] = [
+        {"key": "category", "label": "Category", "data_type": "string", "role": "dimension"},
+        {"key": "revenue", "label": "Revenue", "data_type": "integer", "role": "metric"},
+        {"key": "profit", "label": "Profit", "data_type": "decimal", "role": "metric"},
+    ]
+    rows: list[dict[str, object]] = [
+        {"category": "Alpha", "revenue": 100, "profit": -10},
+        {"category": "Beta", "revenue": 23, "profit": 7},
+    ]
+    content = None
+
+    if widget_type == "pivot":
+        dimensions = ["region", "quarter"]
+        columns = [
+            {"key": "region", "label": "Region", "data_type": "string", "role": "dimension"},
+            {"key": "quarter", "label": "Quarter", "data_type": "string", "role": "dimension"},
+            {"key": "revenue", "label": "Revenue", "data_type": "integer", "role": "metric"},
+        ]
+        rows = [
+            {"region": "Region A", "quarter": "Q1", "revenue": 111},
+            {"region": "Region A", "quarter": "Q2", "revenue": 222},
+            {"region": "Region B", "quarter": "Q1", "revenue": 333},
+            {"region": "Region B", "quarter": "Q2", "revenue": 444},
+        ]
+    elif widget_type == "scatter":
+        metrics = ["revenue"] if invalid_scatter else ["revenue", "profit"]
+        rows = [
+            {"category": "Alpha", "revenue": -20, "profit": 5},
+            {"category": "Beta", "revenue": 0, "profit": None},
+            {"category": "Gamma", "revenue": 40, "profit": 30},
+        ]
+    elif widget_type == "map":
+        dimensions = ["category", "latitude", "longitude"]
+        columns = [
+            {"key": "category", "label": "City", "data_type": "string", "role": "dimension"},
+            {"key": "latitude", "label": "Latitude", "data_type": "decimal", "role": "dimension"},
+            {"key": "longitude", "label": "Longitude", "data_type": "decimal", "role": "dimension"},
+            {"key": "revenue", "label": "Revenue", "data_type": "integer", "role": "metric"},
+        ]
+        rows = [
+            {"category": "Riyadh", "latitude": 24.7136, "longitude": 46.6753, "revenue": 100},
+            {"category": "Jeddah", "latitude": 21.4858, "longitude": 39.1925, "revenue": 23},
+        ]
+    elif widget_type not in DATA_WIDGET_TYPES:
+        content = {
+            "text": "Visible plain text",
+            "rich-text": "Visible rich semantic text",
+            "image": "Expected asset: qa-logo",
+            "filter": "Selected region: Region A",
+            "date-filter": "Selected dates: 2026-01-01 to 2026-03-31",
+        }[widget_type]
+        columns, rows = [], []
+
+    widget: dict[str, object] = {
         "id": widget_id,
-        "type": wtype,
-        "title": title,
-        "semantic_model_id": str(uuid4()),
+        "type": widget_type,
+        "title": f"QA {widget_type}",
+        "description": content or "",
+        "semantic_model_id": str(uuid4()) if widget_type in DATA_WIDGET_TYPES else None,
         "hidden": False,
-        "layout": {"x": 0, "y": 0, "w": 12, "h": 6},
-        "query": {"dimensions": [], "metrics": []},
-        "config": {},
+        "layout": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "query": {"dimensions": dimensions, "metrics": metrics},
+        "config": {
+            "number_style": "plain",
+            "decimals": 0,
+            "show_legend": True,
+            "show_gridlines": True,
+        },
+        "content": content,
     }
+    result = {"columns": columns, "rows": rows, "row_count": len(rows), "truncated": False}
+    return widget, result
 
 
-def _result(columns: list[dict[str, str]], rows: list[dict[str, object]]) -> dict[str, object]:
-    return {"columns": columns, "rows": rows, "row_count": len(rows), "truncated": False}
-
-
-def _document() -> RenderDocument:
-    pivot_id, table_id = str(uuid4()), str(uuid4())
-    scatter_ok_id, scatter_bad_id, bar_id = str(uuid4()), str(uuid4()), str(uuid4())
-    pivot_cols = [
-        {"key": "region", "label": "Region"},
-        {"key": "q1", "label": "Q1"},
-        {"key": "q2", "label": "Q2"},
-    ]
-    pivot_rows = [
-        {"region": "Region A", "q1": 111, "q2": 222},
-        {"region": "Region B", "q1": 333, "q2": 444},
-    ]
-    scatter_cols = [{"key": "x", "label": "X"}, {"key": "y", "label": "Y"}]
-    scatter_rows = [{"x": 12, "y": 34}, {"x": 56, "y": 78}, {"x": 90, "y": 21}]
-    scatter_bad_cols = [{"key": "label", "label": "Label"}, {"key": "x", "label": "X"}]
-    scatter_bad_rows = [{"label": "Alpha", "x": 5}, {"label": "Beta", "x": 9}]
-    bar_cols = [{"key": "cat", "label": "Category"}, {"key": "val", "label": "Value"}]
-    bar_rows = [{"cat": "One", "val": 10}, {"cat": "Two", "val": 20}]
-
-    snapshot = {
-        "dashboard": {"name": "Parity Fixture"},
-        "pages": [
+def _document(
+    widget_types: tuple[str, ...] = ALL_WIDGET_TYPES, *, invalid_scatter: bool = False
+) -> RenderDocument:
+    pages: list[dict[str, object]] = []
+    results: dict[str, dict[str, object]] = {}
+    for index, widget_type in enumerate(widget_types):
+        widget, result = _widget(
+            widget_type, invalid_scatter=invalid_scatter and widget_type == "scatter"
+        )
+        pages.append(
             {
                 "id": str(uuid4()),
-                "name": "Page 1",
-                "widgets": [
-                    _widget(pivot_id, "pivot", "Revenue by Region/Quarter"),
-                    _widget(table_id, "table", "Revenue Table"),
-                    _widget(scatter_ok_id, "scatter", "Valid Scatter"),
-                    _widget(scatter_bad_id, "scatter", "Invalid Scatter"),
-                    _widget(bar_id, "bar", "Bar Widget"),
-                ],
+                "name": f"{index + 1:02d} {widget_type}",
+                "position": index,
+                "widgets": [widget],
             }
-        ],
-    }
-    widget_results = {
-        pivot_id: _result(pivot_cols, pivot_rows),
-        table_id: _result(pivot_cols, pivot_rows),
-        scatter_ok_id: _result(scatter_cols, scatter_rows),
-        scatter_bad_id: _result(scatter_bad_cols, scatter_bad_rows),
-        bar_id: _result(bar_cols, bar_rows),
-    }
+        )
+        results[str(widget["id"])] = result
     return RenderDocument(
         dashboard_id=uuid4(),
         dashboard_version_id=uuid4(),
-        dashboard_version=1,
+        dashboard_version=7,
         organization_id=uuid4(),
         workspace_id=uuid4(),
         generated_at=datetime.now(UTC),
-        dashboard_name="Parity Fixture",
-        snapshot=snapshot,
-        widget_results=widget_results,
-        filters={},
+        dashboard_name="Phase 2 semantic parity",
+        snapshot={"dashboard": {"name": "Phase 2 semantic parity"}, "pages": pages, "filters": []},
+        widget_results=results,
+        filters={"region": "Region A", "date": ["2026-01-01", "2026-03-31"]},
         locale="en-US",
         timezone="UTC",
     )
 
 
-def _pdf_text(content: bytes) -> str:
-    reader = pypdf.PdfReader(io.BytesIO(content))
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
+def _body_crop(content: bytes) -> Image.Image:
+    image = Image.open(io.BytesIO(content)).convert("RGB")
+    # Single-page fixture: exclude dashboard/page/card chrome so another region
+    # cannot make a semantically empty widget pass.
+    return image.crop((120, 492, image.width - 120, min(image.height - 80, 1660)))
 
 
-def _png_nonblank_ratio(content: bytes) -> float:
-    """Fraction of non-white pixels — a fully blank export tends toward 0."""
-    image = Image.open(io.BytesIO(content)).convert("L")
-    histogram = image.histogram()
-    total = sum(histogram)
-    near_white = sum(histogram[245:])
-    return 1.0 - (near_white / total if total else 1.0)
+def _non_white_ratio(image: Image.Image) -> float:
+    pixels = list(image.get_flattened_data())
+    non_white = sum(1 for red, green, blue in pixels if min(red, green, blue) < 242)
+    return non_white / max(1, len(pixels))
 
 
-def test_pdf_pivot_contains_known_values() -> None:
-    """VIP-BUG-002: the pivot's known labels and cell values must appear in the PDF."""
+def _color_count(image: Image.Image, color: tuple[int, int, int]) -> int:
+    return list(image.get_flattened_data()).count(color)
+
+
+def test_inventory_matches_the_authoritative_backend_contract() -> None:
+    assert tuple(get_args(WidgetType)) == ALL_WIDGET_TYPES
+
+
+def test_pdf_preserves_all_widget_definitions_and_known_text_semantics() -> None:
     artifact = PdfDashboardRenderer().render(_document())
-    text = _pdf_text(artifact.content)
-    missing_labels = {label for label in PIVOT_LABELS if label not in text}
-    missing_cells = {cell for cell in PIVOT_CELLS if cell not in text}
-    assert not missing_labels, f"Pivot labels missing from PDF (blank pivot?): {missing_labels}"
-    assert not missing_cells, f"Pivot cell values missing from PDF (blank pivot?): {missing_cells}"
+    _evidence("all-widget-direct-renderer.pdf", artifact.content)
+    assert artifact.content.startswith(b"%PDF-")
+    visible_content = _pdf_content_streams(artifact.content)
+    for widget_type in ALL_WIDGET_TYPES:
+        assert f"QA {widget_type}".encode() in visible_content
+    for value in (*PIVOT_LABELS, *PIVOT_CELLS, "Visible plain text", "qa-logo"):
+        assert value.encode() in visible_content
+    # Live KPI sums 100 + 23; PDF must use the same aggregate, not row zero.
+    assert b"123" in visible_content
 
 
-def test_pdf_invalid_scatter_is_explicit_not_bar() -> None:
-    """VIP-BUG-003: an invalid scatter must render an explicit message, never a bar."""
-    artifact = PdfDashboardRenderer().render(_document())
-    text = _pdf_text(artifact.content)
-    assert SCATTER_INVALID_MSG in text, "Invalid scatter did not render its explicit invalid-state message (silent fallback?)"
+@pytest.mark.parametrize("widget_type", ALL_WIDGET_TYPES)
+def test_png_widget_body_is_independently_nonblank(widget_type: str) -> None:
+    artifact = PngDashboardRenderer().render(_document((widget_type,)))
+    if widget_type in {"pivot", "scatter"}:
+        _evidence(f"{widget_type}/valid.png", artifact.content)
+    body = _body_crop(artifact.content)
+    assert _non_white_ratio(body) > 0.00005, f"{widget_type} body is visually blank"
+    if widget_type == "pivot":
+        brand_dark = _color_count(body, (22, 58, 112))
+        assert brand_dark > 500, "Pivot matrix header is absent from its own PNG region"
+    if widget_type == "scatter":
+        brand = _color_count(body, (37, 99, 235))
+        assert 20 < brand < 2500, "Scatter points are absent or have bar-sized fill area"
 
 
-def test_pdf_valid_scatter_renders_without_invalid_message() -> None:
-    """A valid scatter (>=2 numeric fields) must render as a scatter, not error."""
-    doc = _document()
-    artifact = PdfDashboardRenderer().render(doc)
-    assert artifact.content_type == "application/pdf"
-    assert len(artifact.content) > 1000
+def test_pdf_and_png_dispatch_each_chart_as_its_persisted_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf_seen: list[str] = []
+    png_seen: list[str] = []
+    pdf_original = PdfDashboardRenderer._chart
+    png_original = PngDashboardRenderer._draw_chart
+
+    def pdf_capture(*args: object, **kwargs: object) -> None:
+        pdf_seen.append(str(args[2]))
+        pdf_original(*args, **kwargs)  # type: ignore[arg-type]
+
+    def png_capture(*args: object, **kwargs: object) -> None:
+        png_seen.append(str(args[2]))
+        png_original(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(PdfDashboardRenderer, "_chart", staticmethod(pdf_capture))
+    monkeypatch.setattr(PngDashboardRenderer, "_draw_chart", staticmethod(png_capture))
+    PdfDashboardRenderer().render(_document())
+    PngDashboardRenderer().render(_document())
+    assert tuple(pdf_seen) == CHART_DISPATCH_TYPES
+    assert tuple(png_seen) == PNG_CHART_DISPATCH_TYPES
 
 
-def test_png_renders_nonblank() -> None:
-    """PNG export must not be a blank canvas (data-backed widgets present)."""
-    artifact = PngDashboardRenderer().render(_document())
-    assert artifact.extension == "png"
-    ratio = _png_nonblank_ratio(artifact.content)
-    assert ratio > 0.01, f"PNG export appears blank (non-white ratio {ratio:.4f})"
+def test_invalid_scatter_is_explicit_and_never_bar_sized() -> None:
+    document = _document(("scatter",), invalid_scatter=True)
+    pdf = PdfDashboardRenderer().render(document)
+    invalid_png = PngDashboardRenderer().render(document)
+    _evidence("scatter/invalid.pdf", pdf.content)
+    _evidence("scatter/invalid.png", invalid_png.content)
+    assert SCATTER_CONFIGURATION_ERROR.encode() in _pdf_content_streams(pdf.content)
+    body = _body_crop(invalid_png.content)
+    brand = _color_count(body, (37, 99, 235))
+    assert brand == 0, "Invalid Scatter rendered data marks (possible Bar fallback)"

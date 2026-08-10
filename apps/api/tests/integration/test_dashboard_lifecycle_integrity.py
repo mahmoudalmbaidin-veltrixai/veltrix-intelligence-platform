@@ -435,6 +435,17 @@ async def test_all_widget_types_traverse_real_publish_and_export_contract(
                     status="published",
                 )
             )
+            db.add(
+                SemanticMetric(
+                    organization_id=org.id,
+                    workspace_id=ws.id,
+                    semantic_model_id=model.id,
+                    key="orders_y",
+                    name="Orders Y",
+                    metric_type="calculated",
+                    status="published",
+                )
+            )
             await db.commit()
 
             ctx = _context(user.id, org.id, ws.id)
@@ -451,7 +462,13 @@ async def test_all_widget_types_traverse_real_publish_and_export_contract(
                         description="Enterprise ثم العربية 123",
                         semantic_model_id=model.id if data_widget else None,
                         query={
-                            "metrics": ["orders"] if data_widget else [],
+                            "metrics": (
+                                ["orders", "orders_y"]
+                                if widget_type == "scatter"
+                                else ["orders"]
+                                if data_widget
+                                else []
+                            ),
                             "dimensions": ["category"] if data_widget else [],
                             "filters": [],
                             "order_by": [],
