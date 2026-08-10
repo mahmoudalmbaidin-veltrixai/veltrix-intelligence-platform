@@ -984,17 +984,29 @@ class PdfDashboardRenderer:
             for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
                 grid_y = plot_y + fraction * plot_h
                 canvas.line(x, grid_y, x + width, grid_y)
-        if widget_type == "scatter" and len(numeric_keys) >= 2:
-            x_key, y_key = numeric_keys[:2]
-            x_values = [(_numeric(row.get(x_key)) or 0.0) for row in data]
-            y_values = [(_numeric(row.get(y_key)) or 0.0) for row in data]
-            max_x = max((abs(value) for value in x_values), default=1) or 1
-            max_y = max((abs(value) for value in y_values), default=1) or 1
-            canvas.setFillColor(HexColor(colors[0]))
-            for x_value, y_value in zip(x_values, y_values, strict=True):
-                px = x + max(0.0, x_value) / max_x * width
-                py = plot_y + max(0.0, y_value) / max_y * plot_h
-                canvas.circle(px, py, 4, stroke=0, fill=1)
+        if widget_type == "scatter":
+            # Scatter is terminal: a scatter must render as a scatter or an
+            # explicit invalid-state. It must NEVER fall through to the bar
+            # branch below (VIP-BUG-003 — silent Scatter→Bar semantic mutation).
+            if len(numeric_keys) >= 2:
+                x_key, y_key = numeric_keys[:2]
+                x_values = [(_numeric(row.get(x_key)) or 0.0) for row in data]
+                y_values = [(_numeric(row.get(y_key)) or 0.0) for row in data]
+                max_x = max((abs(value) for value in x_values), default=1) or 1
+                max_y = max((abs(value) for value in y_values), default=1) or 1
+                canvas.setFillColor(HexColor(colors[0]))
+                for x_value, y_value in zip(x_values, y_values, strict=True):
+                    px = x + max(0.0, x_value) / max_x * width
+                    py = plot_y + max(0.0, y_value) / max_y * plot_h
+                    canvas.circle(px, py, 4, stroke=0, fill=1)
+            else:
+                canvas.setFillColor(HexColor(MUTED))
+                canvas.setFont(PDF_FONT, 8)
+                canvas.drawCentredString(
+                    x + width / 2,
+                    plot_y + plot_h / 2,
+                    "Scatter chart requires numeric X and Y fields.",
+                )
         elif widget_type in {"line", "area"}:
             for series_index, key in enumerate(numeric_keys):
                 canvas.setStrokeColor(HexColor(colors[series_index % len(colors)]))
@@ -1652,24 +1664,34 @@ class PngDashboardRenderer:
                     fill=BORDER,
                     width=scale,
                 )
-        if widget_type == "scatter" and len(numeric_keys) >= 2:
-            x_key, y_key = numeric_keys[:2]
-            x_values = [(_numeric(row.get(x_key)) or 0.0) for row in data]
-            y_values = [(_numeric(row.get(y_key)) or 0.0) for row in data]
-            max_x = max((abs(value) for value in x_values), default=1) or 1
-            max_y = max((abs(value) for value in y_values), default=1) or 1
-            for x_value, y_value in zip(x_values, y_values, strict=True):
-                px = x1 + max(0.0, x_value) / max_x * (x2 - x1)
-                py = plot_bottom - max(0.0, y_value) / max_y * (plot_bottom - plot_top - 12)
-                radius = 4 * scale
-                draw.ellipse(
-                    (
-                        px * scale - radius,
-                        py * scale - radius,
-                        px * scale + radius,
-                        py * scale + radius,
-                    ),
-                    fill=BRAND,
+        if widget_type == "scatter":
+            # Scatter is terminal — never fall through to the bar branch
+            # (VIP-BUG-003 — silent Scatter→Bar semantic mutation).
+            if len(numeric_keys) >= 2:
+                x_key, y_key = numeric_keys[:2]
+                x_values = [(_numeric(row.get(x_key)) or 0.0) for row in data]
+                y_values = [(_numeric(row.get(y_key)) or 0.0) for row in data]
+                max_x = max((abs(value) for value in x_values), default=1) or 1
+                max_y = max((abs(value) for value in y_values), default=1) or 1
+                for x_value, y_value in zip(x_values, y_values, strict=True):
+                    px = x1 + max(0.0, x_value) / max_x * (x2 - x1)
+                    py = plot_bottom - max(0.0, y_value) / max_y * (plot_bottom - plot_top - 12)
+                    radius = 4 * scale
+                    draw.ellipse(
+                        (
+                            px * scale - radius,
+                            py * scale - radius,
+                            px * scale + radius,
+                            py * scale + radius,
+                        ),
+                        fill=BRAND,
+                    )
+            else:
+                draw.text(
+                    ((x1 + 12) * scale, int((plot_top + plot_bottom) / 2) * scale),
+                    "Scatter chart requires numeric X and Y fields.",
+                    fill=MUTED,
+                    font=ImageFont.load_default(),
                 )
         elif widget_type in {"line", "area"}:
             for series_index, key in enumerate(numeric_keys):
