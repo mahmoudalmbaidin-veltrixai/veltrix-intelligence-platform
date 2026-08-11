@@ -39,8 +39,12 @@ from vip_api.datasets.schemas import (
     LineageEdgeResponse,
     LineageGraph,
     QualityEvaluationResponse,
+    QualityIncidentItem,
+    QualityIncidentPage,
     QualityResultResponse,
     QualityRuleCreate,
+    QualityRuleOverviewItem,
+    QualityRuleOverviewPage,
     QualityRuleResponse,
     QualitySummary,
 )
@@ -137,21 +141,20 @@ async def _connection(
     return connection, kind
 
 
-async def list_datasets(
-    db: AsyncSession,
-    context: AuthorizationContext,
-    *,
-    page: int,
-    page_size: int,
-    search: str | None,
-    status: str | None,
-) -> DatasetListResponse:
-    org, ws = _scope(context)
+async def _dataset_visibility_filters(
+    db: AsyncSession, context: AuthorizationContext, org: UUID
+) -> list[object]:
+    """Build the per-user dataset visibility predicate (on ``Dataset``).
+
+    Broad-role users (``dataset.read`` etc.) see the whole workspace. Everyone
+    else sees only datasets reachable through ownership or a non-expired ACL
+    allow (direct or group), minus lowest-level denies — all expressed in SQL so
+    pagination and totals never leak hidden datasets (no N+1). This is the single
+    source of truth reused by the dataset collection AND the workspace-wide
+    Quality aggregates, so Quality can never surface a dataset the user cannot
+    see on the dataset list.
+    """
     extra_filters: list[object] = []
-    # Broad-role users (dataset.read etc.) see the whole workspace, unchanged.
-    # Everyone else sees only datasets reachable through ownership or a non-expired
-    # ACL allow (direct or group), minus lowest-level denies — filtered in SQL so
-    # pagination and totals never leak hidden datasets (no N+1).
     subjects = {context.user_id} | await resource_access_service.group_ids_for_user(
         db, org, context.user_id
     )
@@ -163,6 +166,20 @@ async def list_datasets(
         extra_filters.append(
             or_(Dataset.owner_user_id == context.user_id, Dataset.id.in_(allowed_ids))
         )
+    return extra_filters
+
+
+async def list_datasets(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    *,
+    page: int,
+    page_size: int,
+    search: str | None,
+    status: str | None,
+) -> DatasetListResponse:
+    org, ws = _scope(context)
+    extra_filters = await _dataset_visibility_filters(db, context, org)
     items, total = await DatasetRepository(db, org, ws).list_scoped(
         page=page, page_size=page_size, search=search, status=status, extra_filters=extra_filters
     )
@@ -176,6 +193,74 @@ async def list_datasets(
         page=page,
         page_size=page_size,
         total=total,
+    )
+
+
+async def list_quality_rule_overview(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    *,
+    page: int,
+    page_size: int,
+    search: str | None,
+    status: str | None,
+) -> QualityRuleOverviewPage:
+    """Bounded workspace-wide quality-rule listing (replaces the per-dataset
+    frontend fan-out). Authorization mirrors the dataset collection exactly."""
+    org, ws = _scope(context)
+    dataset_filters = await _dataset_visibility_filters(db, context, org)
+    items, total = await DatasetRepository(db, org, ws).list_quality_rules_scoped(
+        page=page,
+        page_size=page_size,
+        search=search,
+        status=status,
+        dataset_filters=dataset_filters,
+    )
+    responses = [
+        QualityRuleOverviewItem(
+            **QualityRuleResponse.model_validate(rule).model_dump(),
+            dataset_name=dataset_name,
+        )
+        for rule, dataset_name, _dataset_id in items
+    ]
+    return QualityRuleOverviewPage(
+        items=responses, page=page, page_size=page_size, total=total
+    )
+
+
+async def list_quality_incident_overview(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    *,
+    page: int,
+    page_size: int,
+) -> QualityIncidentPage:
+    """Bounded workspace-wide open-incident listing (latest failing/warning
+    result per rule), replacing the former per-dataset rule+result fan-out."""
+    org, ws = _scope(context)
+    dataset_filters = await _dataset_visibility_filters(db, context, org)
+    items, total = await DatasetRepository(db, org, ws).list_quality_incidents_scoped(
+        page=page, page_size=page_size, dataset_filters=dataset_filters
+    )
+    responses = [
+        QualityIncidentItem(
+            id=result.id,
+            quality_rule_id=rule.id,
+            dataset_id=dataset_id,
+            dataset_name=dataset_name,
+            rule_name=rule.name,
+            severity=rule.severity,
+            status=result.status,
+            evaluated_at=result.evaluated_at,
+            observed_value=result.observed_value,
+            expected_value=result.expected_value,
+            safe_message=result.safe_message,
+            issue_details=result.issue_details,
+        )
+        for result, rule, dataset_name, dataset_id in items
+    ]
+    return QualityIncidentPage(
+        items=responses, page=page, page_size=page_size, total=total
     )
 
 

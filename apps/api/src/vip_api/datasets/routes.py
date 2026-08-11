@@ -38,8 +38,10 @@ from vip_api.datasets.schemas import (
     LineageEdgeResponse,
     LineageGraph,
     QualityEvaluationResponse,
+    QualityIncidentPage,
     QualityResultResponse,
     QualityRuleCreate,
+    QualityRuleOverviewPage,
     QualityRuleResponse,
     QualitySummary,
 )
@@ -61,7 +63,9 @@ from vip_api.datasets.services import (
     list_datasets,
     list_fields,
     list_quality_evaluations,
+    list_quality_incident_overview,
     list_quality_results,
+    list_quality_rule_overview,
     list_quality_rules,
     quality_summary,
     require_dataset_access,
@@ -122,6 +126,39 @@ async def datasets_index(
 ) -> DatasetListResponse:
     return await list_datasets(
         db, context, page=page, page_size=page_size, search=search, status=status_filter
+    )
+
+
+# Bounded workspace-wide Quality aggregates (VIP-BUG-004). Declared before the
+# ``/{dataset_id}`` routes so the literal ``quality`` prefix is never captured as
+# a dataset id. These replace the former per-dataset rule/incident fan-out with a
+# single paginated call each, while enforcing the same collection authorization.
+@router.get("/quality/rules", response_model=QualityRuleOverviewPage)
+async def quality_rules_overview(
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(quality_capability)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 50,
+    search: Annotated[str | None, Query(max_length=200)] = None,
+    status_filter: Annotated[
+        Literal["passing", "warning", "failing", "unknown", "not_evaluated"] | None,
+        Query(alias="status"),
+    ] = None,
+) -> QualityRuleOverviewPage:
+    return await list_quality_rule_overview(
+        db, context, page=page, page_size=page_size, search=search, status=status_filter
+    )
+
+
+@router.get("/quality/incidents", response_model=QualityIncidentPage)
+async def quality_incidents_overview(
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    context: Annotated[AuthorizationContext, Depends(quality_capability)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> QualityIncidentPage:
+    return await list_quality_incident_overview(
+        db, context, page=page, page_size=page_size
     )
 
 

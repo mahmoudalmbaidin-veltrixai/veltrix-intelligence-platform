@@ -316,6 +316,44 @@ class QualitySummary(BaseModel):
     not_evaluated: int
 
 
+class QualityRuleOverviewItem(QualityRuleResponse):
+    """A quality rule projected with its owning dataset's display name so the
+    workspace-wide Quality screen never issues a per-dataset lookup."""
+
+    dataset_name: str
+
+
+class QualityRuleOverviewPage(BaseModel):
+    items: list[QualityRuleOverviewItem]
+    page: int
+    page_size: int
+    total: int
+
+
+class QualityIncidentItem(BaseModel):
+    """The latest failing/warning result for a rule, aggregated workspace-wide."""
+
+    id: UUID
+    quality_rule_id: UUID
+    dataset_id: UUID
+    dataset_name: str
+    rule_name: str
+    severity: str
+    status: str
+    evaluated_at: datetime
+    observed_value: str | None = None
+    expected_value: str | None = None
+    safe_message: str | None = None
+    issue_details: list[dict[str, object]] = Field(default_factory=list)
+
+
+class QualityIncidentPage(BaseModel):
+    items: list[QualityIncidentItem]
+    page: int
+    page_size: int
+    total: int
+
+
 class QualityEvaluationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
