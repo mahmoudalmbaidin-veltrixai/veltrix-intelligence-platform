@@ -46,6 +46,14 @@ test('collapsed navigation stays discoverable, can be pinned, and persists', asy
   await expect(page.getByRole('link', { name: 'Pipelines', exact: true })).toBeVisible()
 
   const pipelines = page.locator('a[href="/pipelines"]').first()
+  // Keyboard discoverability while collapsed (accessible name via aria-label).
+  await pipelines.focus()
+  await expect(pipelines).toHaveAccessibleName(/Pipelines/i)
+  await expect(page.getByRole('tooltip').filter({ hasText: 'Pipelines' })).toBeVisible()
+
+  await pipelines.blur()
+  await expect(nav).toHaveAttribute('aria-expanded', 'false')
+
   await pipelines.hover()
   await expect(page.getByRole('tooltip').filter({ hasText: 'Pipelines' })).toBeVisible()
 

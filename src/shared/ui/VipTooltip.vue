@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 const props = withDefaults(
   defineProps<{
     text: string
@@ -12,18 +12,43 @@ const props = withDefaults(
   { placement: 'top' },
 )
 const show = ref(false)
+let hideTimer: ReturnType<typeof setTimeout> | undefined
 // Show whenever there is any content to display.
 const hasContent = computed(() => !!(props.text || props.description || props.shortcut))
 const isRich = computed(() => !!(props.description || props.shortcut))
+
+function clearHideTimer() {
+  if (hideTimer) {
+    clearTimeout(hideTimer)
+    hideTimer = undefined
+  }
+}
+
+function open() {
+  clearHideTimer()
+  if (hasContent.value) show.value = true
+}
+
+function scheduleClose() {
+  clearHideTimer()
+  // Brief delay survives WebKit layout/re-render races when a collapsed rail
+  // floats open while the pointer remains on the same navigation item.
+  hideTimer = setTimeout(() => {
+    show.value = false
+    hideTimer = undefined
+  }, 180)
+}
+
+onBeforeUnmount(() => clearHideTimer())
 </script>
 
 <template>
   <span
     class="vip-tt"
-    @mouseenter="show = true"
-    @mouseleave="show = false"
-    @focusin="show = true"
-    @focusout="show = false"
+    @pointerenter="open"
+    @pointerleave="scheduleClose"
+    @focusin="open"
+    @focusout="scheduleClose"
   >
     <slot />
     <span

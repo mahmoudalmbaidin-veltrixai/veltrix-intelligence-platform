@@ -47,9 +47,10 @@ function clearHoverTimer() {
 
 function onRailEnter() {
   if (!collapsed.value) return
-  // Small dwell before expanding so a quick pass shows tooltips instead.
+  // Dwell long enough for collapsed icon tooltips to paint before the rail
+  // floats open (WebKit was losing the tooltip during the remount/layout).
   clearHoverTimer()
-  hoverTimer = setTimeout(() => (hovered.value = true), 220)
+  hoverTimer = setTimeout(() => (hovered.value = true), 420)
 }
 function onRailLeave() {
   clearHoverTimer()
@@ -136,7 +137,7 @@ onBeforeUnmount(() => {
 
       <div class="vip-sidebar__scroll">
         <div v-for="group in groups" :key="group.key" class="vip-sidebar__group">
-          <div v-if="expanded" class="vip-sidebar__group-label">{{ group.label }}</div>
+          <div class="vip-sidebar__group-label" :hidden="!expanded">{{ group.label }}</div>
           <VipTooltip
             v-for="item in group.items"
             :key="item.to"
@@ -149,11 +150,11 @@ onBeforeUnmount(() => {
               :to="item.to"
               class="vip-sidebar__item"
               :class="{ 'is-active': isActive(item.to) }"
-              :aria-label="!expanded ? item.label : undefined"
+              :aria-label="collapsed && !floating ? item.label : undefined"
               :aria-current="isActive(item.to) ? 'page' : undefined"
             >
               <VipIcon :name="item.icon" :size="17" class="vip-sidebar__item-icon" />
-              <span v-if="expanded" class="vip-sidebar__item-label">{{ item.label }}</span>
+              <span class="vip-sidebar__item-label" :hidden="!expanded">{{ item.label }}</span>
             </RouterLink>
           </VipTooltip>
         </div>
@@ -165,12 +166,16 @@ onBeforeUnmount(() => {
           :description="collapsed ? 'Guides, API reference and support.' : ''"
           placement="right"
         >
-          <RouterLink to="/developer" class="vip-sidebar__item" :aria-label="!expanded ? 'Help & docs' : undefined">
+          <RouterLink
+            to="/developer"
+            class="vip-sidebar__item"
+            :aria-label="collapsed && !floating ? 'Help & docs' : undefined"
+          >
             <VipIcon name="help" :size="17" class="vip-sidebar__item-icon" />
-            <span v-if="expanded" class="vip-sidebar__item-label">Help &amp; docs</span>
+            <span class="vip-sidebar__item-label" :hidden="!expanded">Help &amp; docs</span>
           </RouterLink>
         </VipTooltip>
-        <div v-if="expanded" class="vip-sidebar__version">VIP · v0.1.0 · hybrid local</div>
+        <div class="vip-sidebar__version" :hidden="!expanded">VIP · v0.1.0 · hybrid local</div>
       </div>
     </nav>
   </div>
