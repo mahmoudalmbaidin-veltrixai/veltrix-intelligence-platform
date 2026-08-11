@@ -214,6 +214,7 @@ class Settings(BaseSettings):
         default_factory=lambda: [
             "application/json",
             "application/pdf",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "image/png",
             "image/jpeg",
             "text/csv",
@@ -221,7 +222,16 @@ class Settings(BaseSettings):
         ]
     )
     FILE_ALLOWED_EXTENSIONS: CsvList = Field(
-        default_factory=lambda: [".csv", ".json", ".pdf", ".png", ".jpg", ".jpeg", ".txt"]
+        default_factory=lambda: [
+            ".csv",
+            ".json",
+            ".pdf",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".txt",
+            ".xlsx",
+        ]
     )
     FILE_DOWNLOAD_TOKEN_TTL_SECONDS: int = Field(default=300, ge=30, le=3600)
     FILE_DOWNLOAD_SIGNING_KEY: SecretStr | None = None

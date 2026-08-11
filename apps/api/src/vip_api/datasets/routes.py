@@ -190,6 +190,7 @@ async def datasets_ingest_file(
         provider,
         registry,
         settings,
+        sheet_name=payload.sheet_name,
     )
 
 

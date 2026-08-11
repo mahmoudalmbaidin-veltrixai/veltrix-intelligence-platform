@@ -1,4 +1,4 @@
-"""Safe bounded CSV ingestion into a tenant-selected PostgreSQL connection."""
+"""Safe bounded CSV/XLSX ingestion into a tenant-selected PostgreSQL connection."""
 
 from __future__ import annotations
 
@@ -6,9 +6,11 @@ import asyncio
 import csv
 import io
 import re
+import tempfile
 from collections.abc import Callable
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from uuid import UUID
 
 import asyncpg  # type: ignore[import-untyped]
@@ -23,16 +25,44 @@ from vip_api.datasets.discovery import MetadataDiscoveryAdapterRegistry
 from vip_api.datasets.models import Dataset
 from vip_api.datasets.schemas import CsvIngestRequest, DiscoveryRequest, DiscoveryResult
 from vip_api.datasets.services import _connection, discover
+from vip_api.files.capabilities import tabular_ingest_extensions
 from vip_api.files.models import PlatformFile
 from vip_api.files.storage import StorageProviderError, storage_provider
+from vip_api.files.xlsx import parse_xlsx
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
 
-HEADER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
+# Unicode-aware so Arabic/Latin headers work with quoted PostgreSQL identifiers.
+HEADER = re.compile(r"^[^\W\d]\w{0,62}$", re.UNICODE)
 
 
 def _quote(value: str) -> str:
     return f'"{value.replace(chr(34), chr(34) * 2)}"'
+
+
+def _normalize_headers(raw: list[str]) -> list[str]:
+    headers: list[str] = []
+    seen: dict[str, int] = {}
+    for index, item in enumerate(raw):
+        candidate = item.strip()
+        if not candidate or not HEADER.fullmatch(candidate):
+            candidate = f"column_{index + 1}"
+        base = candidate[:63]
+        count = seen.get(base, 0)
+        seen[base] = count + 1
+        if count:
+            suffix = f"_{count + 1}"
+            candidate = f"{base[: 63 - len(suffix)]}{suffix}"
+        else:
+            candidate = base
+        headers.append(candidate)
+    if not headers or len(headers) > 200 or len(set(headers)) != len(headers):
+        raise ApplicationError(
+            code="CSV_HEADERS_INVALID",
+            message="CSV headers must be unique and contain at most 200 columns.",
+            status_code=422,
+        )
+    return headers
 
 
 def _parse(payload: CsvIngestRequest) -> tuple[list[str], list[list[str | None]]]:
@@ -42,23 +72,11 @@ def _parse(payload: CsvIngestRequest) -> tuple[list[str], list[list[str | None]]
         )
     reader = csv.reader(io.StringIO(payload.csv_content, newline=""))
     try:
-        headers = [item.strip() for item in next(reader)]
+        headers = _normalize_headers([item.strip() for item in next(reader)])
     except StopIteration as exc:
         raise ApplicationError(
             code="CSV_EMPTY", message="The CSV must include a header row.", status_code=422
         ) from exc
-    if not headers or len(headers) > 200 or len(set(headers)) != len(headers):
-        raise ApplicationError(
-            code="CSV_HEADERS_INVALID",
-            message="CSV headers must be unique and contain at most 200 columns.",
-            status_code=422,
-        )
-    if any(not HEADER.fullmatch(item) for item in headers):
-        raise ApplicationError(
-            code="CSV_HEADERS_INVALID",
-            message="CSV headers must use letters, numbers, and underscores.",
-            status_code=422,
-        )
     rows: list[list[str | None]] = []
     for number, row in enumerate(reader, start=2):
         if number > 50_001:
@@ -79,6 +97,139 @@ def _parse(payload: CsvIngestRequest) -> tuple[list[str], list[list[str | None]]
             code="CSV_EMPTY", message="The CSV must include at least one data row.", status_code=422
         )
     return headers, rows
+
+
+async def _write_tabular(
+    db: AsyncSession,
+    context: AuthorizationContext,
+    *,
+    connection_id: UUID,
+    source_schema: str,
+    source_name: str,
+    display_name: str | None,
+    description: str,
+    headers: list[str],
+    rows: list[list[str | None]],
+    provider: SecretProvider,
+    registry: MetadataDiscoveryAdapterRegistry,
+    settings: Settings,
+    audit_event: str,
+    audit_metadata: dict[str, object],
+) -> DiscoveryResult:
+    connection, kind = await _connection(db, context, connection_id)
+    workspace_id = context.workspace_id
+    if workspace_id is None:
+        raise ApplicationError(
+            code="WORKSPACE_REQUIRED", message="Select a workspace to continue.", status_code=422
+        )
+    if kind.key != "postgresql" or connection.secret_id is None:
+        raise ApplicationError(
+            code="CSV_INGEST_UNSUPPORTED",
+            message="Interactive tabular ingestion requires a PostgreSQL connection.",
+            status_code=422,
+        )
+    credentials = await provider.read_secret(
+        db,
+        organization_id=context.organization_id,
+        workspace_id=workspace_id,
+        connection_id=connection.id,
+        secret_id=connection.secret_id,
+    )
+    host = str(connection.configuration["host"])
+    port = int(str(connection.configuration["port"]))
+    try:
+        await validate_host(host, port, settings)
+    except UnsafeDestinationError as exc:
+        raise ApplicationError(
+            code="CSV_INGEST_DESTINATION_BLOCKED",
+            message="The connection destination is not allowed.",
+            status_code=422,
+        ) from exc
+    types = [_column_type([row[index] for row in rows]) for index in range(len(headers))]
+    converted = [[types[index][1](value) for index, value in enumerate(row)] for row in rows]
+    driver: asyncpg.Connection[asyncpg.Record] | None = None
+    try:
+        driver = await asyncio.wait_for(
+            asyncpg.connect(
+                host=host,
+                port=port,
+                database=str(connection.configuration["database"]),
+                user=str(connection.configuration["username"]),
+                password=credentials["password"],
+                ssl=str(connection.configuration["ssl_mode"]),
+                command_timeout=settings.METADATA_DISCOVERY_TIMEOUT_SECONDS,
+                server_settings={"application_name": "vip-tabular-ingestion"},
+            ),
+            settings.METADATA_DISCOVERY_TIMEOUT_SECONDS,
+        )
+        assert driver is not None
+        table = f"{_quote(source_schema)}.{_quote(source_name)}"
+        columns = ", ".join(
+            f"{_quote(header)} {types[index][0]}" for index, header in enumerate(headers)
+        )
+        parameters = ", ".join(f"${index + 1}" for index in range(len(headers)))
+        async with driver.transaction():
+            await driver.execute(f"CREATE SCHEMA IF NOT EXISTS {_quote(source_schema)}")
+            await driver.execute(f"CREATE TABLE {table} ({columns})")
+            await driver.executemany(
+                f"INSERT INTO {table} VALUES ({parameters})",  # noqa: S608
+                converted,
+            )
+    except asyncpg.DuplicateTableError as exc:
+        raise ApplicationError(
+            code="DATASET_TABLE_CONFLICT",
+            message="A table with this name already exists.",
+            status_code=409,
+        ) from exc
+    except (OSError, asyncpg.PostgresError) as exc:
+        raise ApplicationError(
+            code="CSV_INGEST_FAILED",
+            message="The file could not be written to the selected connection.",
+            status_code=502,
+        ) from exc
+    finally:
+        if driver is not None:
+            await driver.close(timeout=2)
+    result = await discover(
+        db,
+        context,
+        DiscoveryRequest(
+            connection_id=connection_id,
+            schemas=[source_schema],
+            include_object_types=["table"],
+            include_names=[source_name],
+            persist=True,
+        ),
+        provider,
+        registry,
+    )
+    if result.datasets:
+        dataset = await db.get(Dataset, result.datasets[0].id)
+        if dataset is not None:
+            dataset.display_name = display_name or source_name
+            dataset.description = description
+            dataset.row_count_estimate = len(rows)
+            dataset.version += 1
+            await record_audit(
+                db,
+                audit_event,
+                actor_user_id=context.user_id,
+                organization_id=context.organization_id,
+                workspace_id=workspace_id,
+                resource_type="dataset",
+                resource_id=dataset.id,
+                metadata={**audit_metadata, "rows": len(rows), "columns": len(headers)},
+            )
+            await db.commit()
+            result.datasets[0] = result.datasets[0].model_copy(
+                update={
+                    "display_name": dataset.display_name,
+                    "description": dataset.description,
+                    "row_count_estimate": len(rows),
+                    "version": dataset.version,
+                }
+            )
+    return result
 
 
 def _column_type(
@@ -114,121 +265,23 @@ async def ingest_csv(
     registry: MetadataDiscoveryAdapterRegistry,
     settings: Settings,
 ) -> DiscoveryResult:
-    connection, kind = await _connection(db, context, payload.connection_id)
-    workspace_id = context.workspace_id
-    if workspace_id is None:
-        raise ApplicationError(
-            code="WORKSPACE_REQUIRED", message="Select a workspace to continue.", status_code=422
-        )
-    if kind.key != "postgresql" or connection.secret_id is None:
-        raise ApplicationError(
-            code="CSV_INGEST_UNSUPPORTED",
-            message="Interactive CSV ingestion requires a PostgreSQL connection.",
-            status_code=422,
-        )
     headers, rows = _parse(payload)
-    credentials = await provider.read_secret(
-        db,
-        organization_id=context.organization_id,
-        workspace_id=workspace_id,
-        connection_id=connection.id,
-        secret_id=connection.secret_id,
-    )
-    host = str(connection.configuration["host"])
-    port = int(str(connection.configuration["port"]))
-    try:
-        await validate_host(host, port, settings)
-    except UnsafeDestinationError as exc:
-        raise ApplicationError(
-            code="CSV_INGEST_DESTINATION_BLOCKED",
-            message="The connection destination is not allowed.",
-            status_code=422,
-        ) from exc
-    types = [_column_type([row[index] for row in rows]) for index in range(len(headers))]
-    converted = [[types[index][1](value) for index, value in enumerate(row)] for row in rows]
-    driver: asyncpg.Connection[asyncpg.Record] | None = None
-    try:
-        driver = await asyncio.wait_for(
-            asyncpg.connect(
-                host=host,
-                port=port,
-                database=str(connection.configuration["database"]),
-                user=str(connection.configuration["username"]),
-                password=credentials["password"],
-                ssl=str(connection.configuration["ssl_mode"]),
-                command_timeout=settings.METADATA_DISCOVERY_TIMEOUT_SECONDS,
-                server_settings={"application_name": "vip-csv-ingestion"},
-            ),
-            settings.METADATA_DISCOVERY_TIMEOUT_SECONDS,
-        )
-        assert driver is not None
-        table = f"{_quote(payload.source_schema)}.{_quote(payload.source_name)}"
-        columns = ", ".join(
-            f"{_quote(header)} {types[index][0]}" for index, header in enumerate(headers)
-        )
-        parameters = ", ".join(f"${index + 1}" for index in range(len(headers)))
-        async with driver.transaction():
-            await driver.execute(f"CREATE SCHEMA IF NOT EXISTS {_quote(payload.source_schema)}")
-            await driver.execute(f"CREATE TABLE {table} ({columns})")
-            await driver.executemany(
-                f"INSERT INTO {table} VALUES ({parameters})",  # noqa: S608
-                converted,
-            )
-    except asyncpg.DuplicateTableError as exc:
-        raise ApplicationError(
-            code="DATASET_TABLE_CONFLICT",
-            message="A table with this name already exists.",
-            status_code=409,
-        ) from exc
-    except (OSError, asyncpg.PostgresError) as exc:
-        raise ApplicationError(
-            code="CSV_INGEST_FAILED",
-            message="The CSV could not be written to the selected connection.",
-            status_code=502,
-        ) from exc
-    finally:
-        if driver is not None:
-            await driver.close(timeout=2)
-    result = await discover(
+    return await _write_tabular(
         db,
         context,
-        DiscoveryRequest(
-            connection_id=payload.connection_id,
-            schemas=[payload.source_schema],
-            include_object_types=["table"],
-            include_names=[payload.source_name],
-            persist=True,
-        ),
-        provider,
-        registry,
+        connection_id=payload.connection_id,
+        source_schema=payload.source_schema,
+        source_name=payload.source_name,
+        display_name=payload.display_name,
+        description=payload.description,
+        headers=headers,
+        rows=rows,
+        provider=provider,
+        registry=registry,
+        settings=settings,
+        audit_event="dataset.csv_ingested",
+        audit_metadata={},
     )
-    if result.datasets:
-        dataset = await db.get(Dataset, result.datasets[0].id)
-        if dataset is not None:
-            dataset.display_name = payload.display_name or payload.source_name
-            dataset.description = payload.description
-            dataset.row_count_estimate = len(rows)
-            dataset.version += 1
-            await record_audit(
-                db,
-                "dataset.csv_ingested",
-                actor_user_id=context.user_id,
-                organization_id=context.organization_id,
-                workspace_id=workspace_id,
-                resource_type="dataset",
-                resource_id=dataset.id,
-                metadata={"rows": len(rows), "columns": len(headers)},
-            )
-            await db.commit()
-            result.datasets[0] = result.datasets[0].model_copy(
-                update={
-                    "display_name": dataset.display_name,
-                    "description": dataset.description,
-                    "row_count_estimate": len(rows),
-                    "version": dataset.version,
-                }
-            )
-    return result
 
 
 async def ingest_csv_file(
@@ -243,7 +296,9 @@ async def ingest_csv_file(
     provider: SecretProvider,
     registry: MetadataDiscoveryAdapterRegistry,
     settings: Settings,
+    sheet_name: str | None = None,
 ) -> DiscoveryResult:
+    """Register a previously uploaded CSV or XLSX file as a dataset."""
     workspace_id = context.workspace_id
     if workspace_id is None:
         raise ApplicationError(
@@ -262,22 +317,24 @@ async def ingest_csv_file(
         raise ApplicationError(
             code="FILE_NOT_FOUND", message="The uploaded file is unavailable.", status_code=404
         )
-    if item.extension != ".csv" or item.mime_type not in {"text/csv", "application/csv"}:
+    allowed = tabular_ingest_extensions()
+    if item.extension not in allowed:
         raise ApplicationError(
-            code="CSV_FILE_REQUIRED",
-            message="Pipeline dataset registration currently supports validated CSV files.",
+            code="TABULAR_FILE_REQUIRED",
+            message="Dataset registration supports validated CSV and XLSX files.",
             status_code=422,
         )
     chunks: list[bytes] = []
     size = 0
+    max_bytes = 5_000_000
     try:
         store = storage_provider(item.storage_provider, settings.FILE_STORAGE_ROOT)
         async for chunk in store.stream(item.storage_key, settings.FILE_STREAM_CHUNK_BYTES):
             size += len(chunk)
-            if size > 5_000_000:
+            if size > max_bytes:
                 raise ApplicationError(
-                    code="CSV_FILE_TOO_LARGE",
-                    message="Interactive CSV registration is limited to 5 MB.",
+                    code="TABULAR_FILE_TOO_LARGE",
+                    message="Interactive tabular registration is limited to 5 MB.",
                     status_code=413,
                 )
             chunks.append(chunk)
@@ -287,29 +344,62 @@ async def ingest_csv_file(
             message="The uploaded file is temporarily unavailable.",
             status_code=503,
         ) from exc
-    try:
-        csv_content = b"".join(chunks).decode("utf-8-sig", errors="strict")
-    except UnicodeDecodeError as exc:
-        raise ApplicationError(
-            code="CSV_ENCODING_INVALID",
-            message="The CSV must use UTF-8 encoding.",
-            status_code=422,
-        ) from exc
-    result = await ingest_csv(
-        db,
-        context,
-        CsvIngestRequest(
+
+    if item.extension == ".csv":
+        if item.mime_type not in {"text/csv", "application/csv"}:
+            raise ApplicationError(
+                code="CSV_FILE_REQUIRED",
+                message="Dataset registration supports validated CSV and XLSX files.",
+                status_code=422,
+            )
+        try:
+            csv_content = b"".join(chunks).decode("utf-8-sig", errors="strict")
+        except UnicodeDecodeError as exc:
+            raise ApplicationError(
+                code="CSV_ENCODING_INVALID",
+                message="The CSV must use UTF-8 encoding.",
+                status_code=422,
+            ) from exc
+        result = await ingest_csv(
+            db,
+            context,
+            CsvIngestRequest(
+                connection_id=connection_id,
+                source_schema=source_schema,
+                source_name=source_name,
+                display_name=display_name,
+                description=description,
+                csv_content=csv_content,
+            ),
+            provider,
+            registry,
+            settings,
+        )
+    else:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as handle:
+            handle.write(b"".join(chunks))
+            temp_path = Path(handle.name)
+        try:
+            headers, rows, used_sheet = parse_xlsx(temp_path, sheet_name=sheet_name)
+        finally:
+            await asyncio.to_thread(temp_path.unlink, True)
+        result = await _write_tabular(
+            db,
+            context,
             connection_id=connection_id,
             source_schema=source_schema,
             source_name=source_name,
             display_name=display_name,
             description=description,
-            csv_content=csv_content,
-        ),
-        provider,
-        registry,
-        settings,
-    )
+            headers=headers,
+            rows=rows,
+            provider=provider,
+            registry=registry,
+            settings=settings,
+            audit_event="dataset.xlsx_ingested",
+            audit_metadata={"sheet": used_sheet},
+        )
+
     if result.datasets:
         await record_audit(
             db,
@@ -319,7 +409,11 @@ async def ingest_csv_file(
             workspace_id=workspace_id,
             resource_type="dataset",
             resource_id=result.datasets[0].id,
-            metadata={"file_id": str(item.id), "file_sha256": item.sha256},
+            metadata={
+                "file_id": str(item.id),
+                "file_sha256": item.sha256,
+                "extension": item.extension,
+            },
         )
         await db.commit()
     return result

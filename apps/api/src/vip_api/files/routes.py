@@ -14,6 +14,7 @@ from vip_api.auth.dependencies import require_csrf
 from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
 from vip_api.database.session import get_db_session
+from vip_api.files.capabilities import capability_contract
 from vip_api.files.schemas import DownloadLink, FileList, FileResponse, FileVersionResponse
 from vip_api.files.services import (
     consume_download,
@@ -33,6 +34,15 @@ from vip_api.governance.dependencies import require_permission
 from vip_api.redis.client import RedisClient
 
 router = APIRouter(prefix="/files", tags=["files"])
+
+
+@router.get("/capabilities")
+async def file_format_capabilities(
+    context: Annotated[AuthorizationContext, Depends(require_permission("file.download"))],
+) -> dict[str, object]:
+    """Server-authoritative upload and tabular-ingest format contract."""
+    _ = context
+    return capability_contract()
 
 
 async def _enforce_rate_limit(

@@ -42,6 +42,8 @@ class FileCsvIngestRequest(BaseModel):
     source_name: str = Field(min_length=1, max_length=63, pattern=r"^[a-z][a-z0-9_]*$")
     display_name: str | None = Field(default=None, max_length=255)
     description: str = Field(default="", max_length=2000)
+    # Optional worksheet for XLSX; when omitted the first sheet is imported.
+    sheet_name: str | None = Field(default=None, max_length=31)
 
 
 class DatasetPreviewColumn(BaseModel):
