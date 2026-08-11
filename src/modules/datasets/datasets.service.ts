@@ -760,16 +760,6 @@ interface ApiQualitySummary {
   status: string
   score: number | null
 }
-interface ApiQualityResult {
-  id: string
-  quality_rule_id: string
-  status: string
-  evaluated_at: string
-  observed_value: string | null
-  expected_value: string | null
-  safe_message: string | null
-  issue_details: Array<Record<string, unknown>>
-}
 interface ApiQualityEvaluation {
   id: string
   status: string
@@ -906,58 +896,75 @@ async function liveRulesForDataset(datasetId: string): Promise<QualityRule[]> {
   return rules.map((rule) => mapQualityRule(rule, { id: dataset.id, name: dataset.display_name }))
 }
 
+// VIP-BUG-004: the Quality workspace must load in a bounded number of calls
+// regardless of dataset count. These consume the workspace-wide aggregate
+// endpoints (one bounded, authorized, paginated request each) instead of
+// iterating one request per dataset for rules and results.
+const QUALITY_OVERVIEW_PAGE_SIZE = 100
+
+interface ApiQualityRuleOverviewItem extends ApiQualityRule {
+  dataset_name: string
+}
+interface ApiQualityRuleOverviewPage {
+  items: ApiQualityRuleOverviewItem[]
+  page: number
+  page_size: number
+  total: number
+}
+interface ApiQualityIncidentItem {
+  id: string
+  quality_rule_id: string
+  dataset_id: string
+  dataset_name: string
+  rule_name: string
+  severity: 'info' | 'warning' | 'error' | 'critical'
+  status: string
+  evaluated_at: string
+  observed_value: string | null
+  expected_value: string | null
+  safe_message: string | null
+  issue_details: Array<Record<string, unknown>>
+}
+interface ApiQualityIncidentPage {
+  items: ApiQualityIncidentItem[]
+  page: number
+  page_size: number
+  total: number
+}
+
 async function liveRules(): Promise<QualityRule[]> {
-  const datasets = await liveDatasets()
-  const groups = await Promise.all(
-    datasets.map(async (dataset) => {
-      const rules = await apiClient.get<ApiQualityRule[]>(`/datasets/${dataset.id}/quality-rules`)
-      return rules.map((rule) => mapQualityRule(rule, dataset))
-    }),
+  const page = await apiClient.get<ApiQualityRuleOverviewPage>(
+    `/datasets/quality/rules?page=1&page_size=${QUALITY_OVERVIEW_PAGE_SIZE}`,
   )
-  return groups.flat()
+  return page.items.map((rule) => mapQualityRule(rule, { id: rule.dataset_id, name: rule.dataset_name }))
 }
 
 async function liveIncidents(): Promise<QualityIncident[]> {
-  const datasets = await liveDatasets()
-  const groups = await Promise.all(
-    datasets.map(async (dataset) => {
-      const [rules, results] = await Promise.all([
-        apiClient.get<ApiQualityRule[]>(`/datasets/${dataset.id}/quality-rules`),
-        apiClient.get<ApiQualityResult[]>(`/datasets/${dataset.id}/quality-results`),
-      ])
-      const rulesById = new Map(rules.map((rule) => [rule.id, rule]))
-      const latest = new Map<string, ApiQualityResult>()
-      for (const result of results) {
-        if (!latest.has(result.quality_rule_id)) latest.set(result.quality_rule_id, result)
-      }
-      return [...latest.values()]
-        .filter((result) => ['failing', 'warning'].includes(result.status))
-        .map((result): QualityIncident => {
-          const rule = rulesById.get(result.quality_rule_id)
-          const severity: QualitySeverity =
-            rule?.severity === 'critical' || rule?.severity === 'error'
-              ? 'high'
-              : rule?.severity === 'warning'
-                ? 'medium'
-                : 'low'
-          return {
-            id: result.id,
-            rule: rule?.name ?? 'Quality rule',
-            severity,
-            status: 'open',
-            owner: 'Dataset owner',
-            openedAt: result.evaluated_at,
-            dataset: dataset.name,
-            datasetId: dataset.id,
-            message: result.safe_message ?? undefined,
-            observed: result.observed_value,
-            expected: result.expected_value,
-            issueDetails: result.issue_details,
-          }
-        })
-    }),
+  const page = await apiClient.get<ApiQualityIncidentPage>(
+    `/datasets/quality/incidents?page=1&page_size=${QUALITY_OVERVIEW_PAGE_SIZE}`,
   )
-  return groups.flat()
+  return page.items.map((incident): QualityIncident => {
+    const severity: QualitySeverity =
+      incident.severity === 'critical' || incident.severity === 'error'
+        ? 'high'
+        : incident.severity === 'warning'
+          ? 'medium'
+          : 'low'
+    return {
+      id: incident.id,
+      rule: incident.rule_name,
+      severity,
+      status: 'open',
+      owner: 'Dataset owner',
+      openedAt: incident.evaluated_at,
+      dataset: incident.dataset_name,
+      datasetId: incident.dataset_id,
+      message: incident.safe_message ?? undefined,
+      observed: incident.observed_value,
+      expected: incident.expected_value,
+      issueDetails: incident.issue_details,
+    }
+  })
 }
 
 const apiDatasetService: DatasetService = {
