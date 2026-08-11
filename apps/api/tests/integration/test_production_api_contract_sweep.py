@@ -22,6 +22,7 @@ from vip_api.api.operation_coverage import (
     CONTRACT_SWEEP_TEST_ID,
     build_coverage,
 )
+from vip_api.api.operation_manifest import assert_manifest_matches, build_manifest
 from vip_api.auth.models import User, UserStatus
 from vip_api.auth.password import PasswordService
 from vip_api.core.config import AppEnvironment, Settings
@@ -361,8 +362,8 @@ def test_every_production_operation_has_a_resolvable_contract_and_fails_closed(
     operations = list(_operations(document))
 
     # Pin the enterprise surface against accidental disappearance while allowing
-    # additive API growth. The certified baseline exposes 198 paths / 255 ops
-    # (post-Core P1/P2: +6 pipeline-schedule & dataset-version paths, +8 ops).
+    # additive API growth. Exact inventory is governed by the reviewed manifest
+    # (see test_every_operation_is_classified_for_authenticated_certification).
     assert len(document["paths"]) >= 198
     assert len(operations) >= 255
     assert len({operation["operationId"] for _, _, operation in operations}) == len(operations)
@@ -428,13 +429,15 @@ def test_every_production_operation_has_a_resolvable_contract_and_fails_closed(
 @pytest.mark.integration
 def test_every_operation_is_classified_for_authenticated_certification(settings: Settings) -> None:
     document = create_application(settings).openapi()
+    # Reviewed manifest is the governance source of truth — never hard-code counts.
+    manifest = assert_manifest_matches(document)
     coverage = build_coverage(document)
     operations = cast(list[dict[str, object]], coverage["operations"])
-    assert coverage["operation_count"] == 255
-    assert coverage["classified_count"] == 255
-    assert coverage["test_mapped_count"] == 255
+    assert coverage["operation_count"] == manifest["operation_count"]
+    assert coverage["classified_count"] == manifest["operation_count"]
+    assert coverage["test_mapped_count"] == manifest["operation_count"]
     assert coverage["executed_count"] == 0
-    assert len({item["operation_id"] for item in operations}) == 255
+    assert len({item["operation_id"] for item in operations}) == manifest["operation_count"]
     for item in operations:
         assert item["mapped_test_ids"]
         assert item["personas"]
@@ -1145,8 +1148,9 @@ def test_authenticated_personas_exercise_every_protected_operation(settings: Set
             record["result"] = "pass"
         execution = {str(key): value for key, value in records.items()}
         verified = build_coverage(document, execution)
-        assert verified["executed_count"] == 255
-        assert verified["passed_count"] == 255
+        manifest = build_manifest(document)
+        assert verified["executed_count"] == manifest["operation_count"]
+        assert verified["passed_count"] == manifest["operation_count"]
         report_path = os.getenv("VIP_API_OPERATION_EVIDENCE_PATH")
         if report_path:
             target = Path(report_path)
