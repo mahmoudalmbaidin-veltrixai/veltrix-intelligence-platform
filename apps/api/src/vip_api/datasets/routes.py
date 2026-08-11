@@ -157,9 +157,7 @@ async def quality_incidents_overview(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> QualityIncidentPage:
-    return await list_quality_incident_overview(
-        db, context, page=page, page_size=page_size
-    )
+    return await list_quality_incident_overview(db, context, page=page, page_size=page_size)
 
 
 @router.post(

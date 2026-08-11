@@ -261,9 +261,7 @@ async def test_quality_overview_is_bounded_and_authorized(settings: Settings) ->
         # issues the SAME number of statements; an N+1 would grow with dataset count.
         async with database.session_factory() as db:
             conn2 = (
-                await db.scalars(
-                    select(Connection).where(Connection.organization_id == org_id)
-                )
+                await db.scalars(select(Connection).where(Connection.organization_id == org_id))
             ).first()
             assert conn2 is not None
             for i in range(3, 15):
@@ -374,18 +372,14 @@ async def test_quality_overview_is_bounded_and_authorized(settings: Settings) ->
             denied_rules = await list_quality_rule_overview(
                 db, broad, page=1, page_size=50, search="orders_00", status=None
             )
-            denied_incidents = await list_quality_incident_overview(
-                db, broad, page=1, page_size=50
-            )
+            denied_incidents = await list_quality_incident_overview(db, broad, page=1, page_size=50)
         assert denied_rules.total == 0  # orders_00 hidden from the broad-role admin now
         assert all(i.dataset_name != "orders_00" for i in denied_incidents.items)
     finally:
         if org_id is not None:
             async with database.session_factory() as db:
                 await db.execute(
-                    delete(ResourceAccessEntry).where(
-                        ResourceAccessEntry.organization_id == org_id
-                    )
+                    delete(ResourceAccessEntry).where(ResourceAccessEntry.organization_id == org_id)
                 )
                 await db.execute(
                     delete(DatasetQualityResult).where(

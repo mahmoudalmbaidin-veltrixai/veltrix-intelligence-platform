@@ -15,7 +15,7 @@ import re
 import zlib
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import get_args
+from typing import cast, get_args
 from uuid import uuid4
 
 import pytest
@@ -213,13 +213,15 @@ def _body_crop(content: bytes) -> Image.Image:
 
 
 def _non_white_ratio(image: Image.Image) -> float:
-    pixels = list(image.get_flattened_data())
+    # Pillow 12 exposes get_flattened_data; stubs may still type it loosely.
+    pixels = cast(list[tuple[int, int, int]], list(image.get_flattened_data()))
     non_white = sum(1 for red, green, blue in pixels if min(red, green, blue) < 242)
     return non_white / max(1, len(pixels))
 
 
 def _color_count(image: Image.Image, color: tuple[int, int, int]) -> int:
-    return list(image.get_flattened_data()).count(color)
+    pixels = cast(list[tuple[int, int, int]], list(image.get_flattened_data()))
+    return pixels.count(color)
 
 
 def test_inventory_matches_the_authoritative_backend_contract() -> None:

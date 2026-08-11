@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from vip_api.dashboards.visual_contracts import (
     SCATTER_CONFIGURATION_ERROR,
     flatten_pivot,
@@ -10,12 +12,12 @@ from vip_api.dashboards.visual_contracts import (
 
 
 def test_pivot_builds_deterministic_region_quarter_matrix() -> None:
-    columns = [
+    columns: list[dict[str, object]] = [
         {"key": "region", "label": "Region", "role": "dimension"},
         {"key": "quarter", "label": "Quarter", "role": "dimension"},
         {"key": "revenue", "label": "Revenue", "role": "metric"},
     ]
-    rows = [
+    rows: list[Mapping[str, object]] = [
         {"region": "Region A", "quarter": "Q1", "revenue": 111},
         {"region": "Region A", "quarter": "Q2", "revenue": 222},
         {"region": "Region B", "quarter": "Q1", "revenue": 333},
@@ -35,13 +37,13 @@ def test_pivot_builds_deterministic_region_quarter_matrix() -> None:
 
 
 def test_pivot_preserves_multiple_measures_and_null_cells() -> None:
-    columns = [
+    columns: list[dict[str, object]] = [
         {"key": "region", "label": "Region"},
         {"key": "quarter", "label": "Quarter"},
         {"key": "revenue", "label": "Revenue"},
         {"key": "profit", "label": "Profit"},
     ]
-    rows = [
+    rows: list[Mapping[str, object]] = [
         {"region": "Long Region A", "quarter": "Q1", "revenue": 10, "profit": 2},
         {"region": "Long Region A", "quarter": "Q2", "revenue": None, "profit": -3},
     ]
@@ -61,13 +63,13 @@ def test_pivot_preserves_multiple_measures_and_null_cells() -> None:
 
 
 def test_scatter_uses_configured_metric_order_and_omits_null_pairs() -> None:
-    columns = [
+    columns: list[dict[str, object]] = [
         {"key": "group", "data_type": "string"},
         {"key": "profit", "data_type": "decimal"},
         {"key": "revenue", "data_type": "integer"},
         {"key": "unrelated", "data_type": "integer"},
     ]
-    rows = [
+    rows: list[Mapping[str, object]] = [
         {"group": "A", "profit": -2, "revenue": 10, "unrelated": 999},
         {"group": "B", "profit": None, "revenue": 20, "unrelated": 888},
         {"group": "A", "profit": 4, "revenue": 30, "unrelated": 777},

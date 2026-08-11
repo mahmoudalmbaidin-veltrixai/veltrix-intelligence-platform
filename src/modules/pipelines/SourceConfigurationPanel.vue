@@ -52,11 +52,7 @@ const datasetOptions = computed(() =>
 )
 const fileOptions = computed(() =>
   uploadedFiles.value
-    .filter(
-      (item) =>
-        item.status === 'ready' &&
-        ['.csv', '.xlsx'].includes(item.extension.toLowerCase()),
-    )
+    .filter((item) => item.status === 'ready' && ['.csv', '.xlsx'].includes(item.extension.toLowerCase()))
     .map((item) => ({ value: item.id, label: `${item.original_filename} (${Math.ceil(item.size_bytes / 1024)} KB)` })),
 )
 const connectionOptions = computed(() =>
@@ -299,7 +295,13 @@ onMounted(async () => {
         >Register selected file</VipButton
       >
       <label class="source__file-label" for="pipeline-source-file">CSV file</label>
-      <input id="pipeline-source-file" class="source__file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" @change="chooseFile" />
+      <input
+        id="pipeline-source-file"
+        class="source__file"
+        type="file"
+        accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        @change="chooseFile"
+      />
       <VipButton
         :loading="loading"
         :disabled="!file || !connectionId || !schemaName || !objectName"

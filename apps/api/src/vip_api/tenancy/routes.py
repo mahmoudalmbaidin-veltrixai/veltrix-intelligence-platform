@@ -6,7 +6,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.auth.dependencies import get_current_user, require_csrf
@@ -49,6 +49,7 @@ from vip_api.tenancy.models import (
     Organization,
     OrganizationMembership,
     OrganizationStatus,
+    Workspace,
     WorkspaceMembership,
     WorkspaceStatus,
 )
@@ -266,6 +267,23 @@ async def get_workspace(
     return WorkspaceSummary.model_validate(result[0])
 
 
+async def _active_workspace_count(
+    db: AsyncSession, organization_id: UUID, *, exclude_id: UUID | None = None
+) -> int:
+    """Count active (non-archived, non-deleted) workspaces in an organization."""
+    stmt = (
+        select(func.count())
+        .select_from(Workspace)
+        .where(
+            Workspace.organization_id == organization_id,
+            Workspace.status == WorkspaceStatus.ACTIVE,
+        )
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(Workspace.id != exclude_id)
+    return int((await db.execute(stmt)).scalar_one())
+
+
 @router.patch(
     "/organizations/{organization_id}/workspaces/{workspace_id}",
     response_model=WorkspaceSummary,
@@ -325,6 +343,19 @@ async def patch_workspace(
                 message="The default workspace must remain active.",
                 status_code=409,
             )
+        deactivating = (
+            payload.status is not WorkspaceStatus.ACTIVE
+            and workspace.status is WorkspaceStatus.ACTIVE
+        )
+        if (
+            deactivating
+            and await _active_workspace_count(db, organization_id, exclude_id=workspace_id) == 0
+        ):
+            raise ApplicationError(
+                code="LAST_ACTIVE_WORKSPACE",
+                message="You cannot archive the only active workspace in this organization.",
+                status_code=409,
+            )
         workspace.status = payload.status
         if payload.status is WorkspaceStatus.ARCHIVED:
             workspace.archived_at = utc_now()
@@ -338,6 +369,60 @@ async def patch_workspace(
         resource_id=workspace_id,
     )
     return WorkspaceSummary.model_validate(workspace)
+
+
+@router.delete(
+    "/organizations/{organization_id}/workspaces/{workspace_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+async def delete_workspace(
+    organization_id: UUID,
+    workspace_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    authorization: Annotated[AuthorizationContext, Depends(require_permission("workspace.update"))],
+) -> None:
+    """Soft-delete a workspace. Data is retained (no cascade); the workspace is
+    hidden from navigation and management. Guards preserve the one-default and
+    at-least-one-active-workspace invariants."""
+    ensure_authorization_scope(authorization, organization_id)
+    await authorized_organization(db, organization_id, user.id, manager=True)
+    repository = WorkspaceRepository(db)
+    workspace = await repository.get_in_organization(organization_id, workspace_id)
+    if workspace is None:
+        raise ApplicationError(
+            code="WORKSPACE_NOT_FOUND", message="The workspace was not found.", status_code=404
+        )
+    if workspace.status is WorkspaceStatus.DELETED:
+        return None
+    if workspace.is_default:
+        raise ApplicationError(
+            code="DEFAULT_WORKSPACE_REQUIRED",
+            message="Select another default workspace first, then delete this one.",
+            status_code=409,
+        )
+    if (
+        workspace.status is WorkspaceStatus.ACTIVE
+        and await _active_workspace_count(db, organization_id, exclude_id=workspace_id) == 0
+    ):
+        raise ApplicationError(
+            code="LAST_ACTIVE_WORKSPACE",
+            message="You cannot delete the only active workspace in this organization.",
+            status_code=409,
+        )
+    workspace.status = WorkspaceStatus.DELETED
+    workspace.deleted_at = utc_now()
+    await db.commit()
+    audit_event(
+        "workspace.deleted",
+        actor_user_id=user.id,
+        organization_id=organization_id,
+        workspace_id=workspace_id,
+        resource_type="workspace",
+        resource_id=workspace_id,
+    )
+    return None
 
 
 @router.get("/organizations/{organization_id}/members", response_model=MemberList)

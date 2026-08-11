@@ -496,11 +496,19 @@ _AUDIT_SNAPSHOT_FIELDS = (
 
 def _entity_snapshot(item: object) -> dict[str, object]:
     """Non-sensitive attribute snapshot for audit before/after payloads."""
+    from decimal import Decimal
+
     snapshot: dict[str, object] = {}
     for field_name in _AUDIT_SNAPSHOT_FIELDS:
         if hasattr(item, field_name):
             value = getattr(item, field_name)
-            snapshot[field_name] = str(value) if isinstance(value, UUID) else value
+            if isinstance(value, UUID):
+                snapshot[field_name] = str(value)
+            elif isinstance(value, Decimal):
+                # Audit metadata is JSON; Decimal must be serialized.
+                snapshot[field_name] = str(value)
+            else:
+                snapshot[field_name] = value
     return snapshot
 
 

@@ -124,6 +124,14 @@ export const adminService = {
     }
   },
 
+  async setDefaultWorkspace(workspaceId: string): Promise<WorkspaceRow> {
+    return this.updateWorkspace(workspaceId, { is_default: true })
+  },
+
+  async deleteWorkspace(workspaceId: string): Promise<void> {
+    await tenancyService.deleteWorkspace(activeOrganizationId(), workspaceId)
+  },
+
   async listAssignableOrganizationRoles(): Promise<RoleDto[]> {
     return (await governanceService.roles()).filter((role) => role.scope === 'organization' && role.is_assignable)
   },

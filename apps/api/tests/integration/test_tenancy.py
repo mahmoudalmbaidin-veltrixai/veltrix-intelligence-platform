@@ -612,3 +612,48 @@ def test_repository_methods_are_tenant_filtered(
             await database.dispose()
 
     asyncio.run(exercise())
+
+
+def test_workspace_make_default_delete_lifecycle_and_rbac(
+    tenant_setup: tuple[TenantFixture, dict[str, TestClient]],
+) -> None:
+    """Issue 3 remediation: reassign default, delete a former-default workspace,
+    block deleting the last/default active workspace, and enforce RBAC."""
+    fixture, clients = tenant_setup
+    admin = clients["a"]
+    viewer = clients["c"]
+    alpha = fixture.organizations["alpha"]
+    ws_default = fixture.workspaces["alpha1"]  # seeded is_default=True
+    ws_other = fixture.workspaces["alpha2"]  # seeded active, non-default
+    base = f"/api/v1/organizations/{alpha}/workspaces"
+
+    # Deleting the default workspace is blocked until another becomes default.
+    blocked = admin.request("DELETE", f"{base}/{ws_default}", headers=csrf(admin))
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["code"] == "DEFAULT_WORKSPACE_REQUIRED"
+
+    # A viewer (no workspace.update) cannot delete, even via the raw API.
+    denied = viewer.request("DELETE", f"{base}/{ws_other}", headers=csrf(viewer))
+    assert denied.status_code in (403, 404)
+
+    # Promote the other workspace to default (Make default).
+    made = admin.patch(f"{base}/{ws_other}", json={"is_default": True}, headers=csrf(admin))
+    assert made.status_code == 200
+    assert made.json()["is_default"] is True
+
+    # The former default can now be deleted (soft-delete; data retained).
+    deleted = admin.request("DELETE", f"{base}/{ws_default}", headers=csrf(admin))
+    assert deleted.status_code == 204
+
+    # It disappears from the active list but remains via include_archived.
+    active = admin.get(base).json()["items"]
+    assert str(ws_default) not in {item["id"] for item in active}
+
+    # The remaining workspace is now the only active default — deletion blocked.
+    last = admin.request("DELETE", f"{base}/{ws_other}", headers=csrf(admin))
+    assert last.status_code == 409
+    assert last.json()["error"]["code"] == "DEFAULT_WORKSPACE_REQUIRED"
+
+    # Cross-tenant: beta admin cannot delete an alpha workspace.
+    cross = clients["b"].request("DELETE", f"{base}/{ws_other}", headers=csrf(clients["b"]))
+    assert cross.status_code == 404

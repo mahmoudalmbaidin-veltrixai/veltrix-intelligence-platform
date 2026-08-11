@@ -10,8 +10,8 @@ from vip_api.api.operation_manifest import (
     assert_manifest_matches,
     write_manifest,
 )
-from vip_api.main import create_application
 from vip_api.core.config import get_settings
+from vip_api.main import create_application
 
 
 def main() -> None:

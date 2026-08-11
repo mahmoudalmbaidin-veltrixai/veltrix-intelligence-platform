@@ -38,6 +38,7 @@ dev = [
   "pytest>=9.0.3,<10",
   "pytest-asyncio>=1.1,<2",
   "ruff>=0.12,<1",
+  "types-openpyxl>=3.1,<4",
 ]
 # Optional drivers for the beta connectors (mssql/snowflake/bigquery/s3). These
 # are lazily imported by connections/testers.py; when a driver is absent the

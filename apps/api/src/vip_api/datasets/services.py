@@ -223,9 +223,7 @@ async def list_quality_rule_overview(
         )
         for rule, dataset_name, _dataset_id in items
     ]
-    return QualityRuleOverviewPage(
-        items=responses, page=page, page_size=page_size, total=total
-    )
+    return QualityRuleOverviewPage(items=responses, page=page, page_size=page_size, total=total)
 
 
 async def list_quality_incident_overview(
@@ -259,9 +257,7 @@ async def list_quality_incident_overview(
         )
         for result, rule, dataset_name, dataset_id in items
     ]
-    return QualityIncidentPage(
-        items=responses, page=page, page_size=page_size, total=total
-    )
+    return QualityIncidentPage(items=responses, page=page, page_size=page_size, total=total)
 
 
 async def get_dataset(

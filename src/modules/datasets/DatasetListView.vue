@@ -86,8 +86,7 @@ async function onCsvFileSelected(event: Event): Promise<void> {
   const lower = name.toLowerCase()
   if (isLegacyXlsFilename(name)) {
     input.value = ''
-    discoverError.value =
-      'Legacy .xls workbooks are not supported. Save as .xlsx or CSV UTF-8, then upload again.'
+    discoverError.value = 'Legacy .xls workbooks are not supported. Save as .xlsx or CSV UTF-8, then upload again.'
     return
   }
   if (isXlsxFilename(name) || file.type.includes('spreadsheetml')) {

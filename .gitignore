@@ -52,6 +52,23 @@ pnpm-workspace.yaml
 /live_uat_expected_results.json
 /PHASE_B9_RELEASE_CERTIFICATION.md
 
+# Local phase/certification evidence trees and working workbooks (not RC source)
+/VIP_BUG_EVIDENCE/
+/VIP_TEST_EVIDENCE/
+/VIP_PHASE7A_EVIDENCE/
+/VIP_PHASE7B_EVIDENCE/
+/VIP_FINAL_RECERTIFICATION_EVIDENCE/
+/VIP_PHASE2_EVIDENCE/after/
+/VIP_PHASE2_EVIDENCE/tests/
+/VIP_FINAL_FULL_PLATFORM_RECERTIFICATION.md
+/VIP_FINAL_FULL_PLATFORM_RECERTIFICATION.xlsx
+/VIP Credentials.xlsx
+/VIP_Complete_Platform_Feature_GTM_Inventory.xlsx
+/VIP_v1_Platform_and_UAT_Master_Workbook.xlsx
+/outputs/
+/reports/
+/docs/qa/platform-capability-and-uat/
+
 # Python backend
 __pycache__/
 *.py[cod]

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from vip_api.api.operation_coverage import HTTP_METHODS, _scope
 
@@ -56,7 +56,10 @@ def build_manifest(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_manifest(path: Path = DEFAULT_MANIFEST_PATH) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    payload: object = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Manifest at {path} must be a JSON object")
+    return cast(dict[str, Any], payload)
 
 
 def write_manifest(document: dict[str, Any], path: Path = DEFAULT_MANIFEST_PATH) -> dict[str, Any]:

@@ -9,6 +9,7 @@
  * metadata extraction.
  */
 import { config } from '@/shared/config/env'
+import { invalidateAllQueries } from '@/shared/lib/query'
 import { ApiError, statusToKind, type DownloadContract, type FieldError } from '@/shared/types/api'
 import { errorEnvelopeSchema, standardErrorEnvelopeSchema } from '@/shared/contracts/apiContracts'
 
@@ -330,6 +331,13 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     try {
       const { data } = await once<T>(path, opts, controller)
       unauthorizedNotified = false
+      // A successful mutation can change server state any view depends on, so
+      // drop the query cache and let mounted views refetch immediately. The
+      // silent token refresh is excluded to avoid refetch storms.
+      const method = opts.method ?? 'GET'
+      if (method !== 'GET' && !opts.download && path !== '/auth/refresh') {
+        invalidateAllQueries()
+      }
       return data
     } catch (raw) {
       // Classify aborts precisely: timeout vs user cancellation.

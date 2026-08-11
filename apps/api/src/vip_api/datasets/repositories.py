@@ -185,9 +185,7 @@ class DatasetRepository:
             )
             .subquery()
         )
-        latest = (
-            select(ranked.c.result_id).where(ranked.c.result_rank == 1).subquery()
-        )
+        latest = select(ranked.c.result_id).where(ranked.c.result_rank == 1).subquery()
         filters: list[Any] = [
             DatasetQualityResult.organization_id == self.organization_id,
             DatasetQualityResult.workspace_id == self.workspace_id,
@@ -196,12 +194,10 @@ class DatasetRepository:
             Dataset.archived_at.is_(None),
             *dataset_filters,
         ]
-        join = (
-            DatasetQualityResult.__table__.join(
-                DatasetQualityRule.__table__,
-                DatasetQualityRule.id == DatasetQualityResult.quality_rule_id,
-            ).join(Dataset.__table__, Dataset.id == DatasetQualityRule.dataset_id)
-        )
+        join = DatasetQualityResult.__table__.join(
+            DatasetQualityRule.__table__,
+            DatasetQualityRule.id == DatasetQualityResult.quality_rule_id,
+        ).join(Dataset.__table__, Dataset.id == DatasetQualityRule.dataset_id)
         total = int(
             await self.db.scalar(select(func.count()).select_from(join).where(*filters)) or 0
         )

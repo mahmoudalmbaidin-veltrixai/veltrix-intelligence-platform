@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 from openpyxl import Workbook
@@ -13,10 +14,10 @@ from vip_api.files.validation import inspect_signature, sanitize_filename, valid
 from vip_api.files.xlsx import parse_xlsx
 from vip_api.qa.certification_lifecycle import (
     CertificationFixtureRegistry,
+    RegisteredResource,
     identify_likely_stale_names,
     new_run_id,
 )
-
 
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -34,7 +35,7 @@ def _write_xlsx(path: Path, rows: list[list[object]], sheet: str = "Sheet1") -> 
 
 def test_capability_contract_advertises_xlsx_not_xls_or_parquet() -> None:
     contract = capability_contract()
-    formats = contract["formats"]
+    formats = cast(dict[str, dict[str, object]], contract["formats"])
     assert formats["xlsx"]["supported"] is True
     assert formats["xlsx"]["role"] == "tabular_ingest"
     assert formats["xls"]["supported"] is False
@@ -116,11 +117,11 @@ async def test_certification_registry_cleanup_is_id_scoped(tmp_path: Path) -> No
     )
     deleted: list[str] = []
 
-    async def delete_dataset(item: object) -> None:
-        deleted.append(getattr(item, "id"))
+    async def delete_dataset(item: RegisteredResource) -> None:
+        deleted.append(item.id)
 
-    async def delete_file(item: object) -> None:
-        deleted.append(getattr(item, "id"))
+    async def delete_file(item: RegisteredResource) -> None:
+        deleted.append(item.id)
 
     report = await registry.cleanup({"dataset": delete_dataset, "file": delete_file})
     assert report.created == 2

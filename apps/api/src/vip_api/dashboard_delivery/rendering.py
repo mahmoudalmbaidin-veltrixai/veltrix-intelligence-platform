@@ -115,7 +115,9 @@ class RenderDocument:
     generated_at: datetime
     dashboard_name: str
     snapshot: dict[str, object]
-    widget_results: dict[str, object]
+    # Values are widget-result payloads (nested mappings). Mapping keeps the
+    # field covariant for callers that build typed nested dicts in tests.
+    widget_results: dict[str, Any]
     filters: dict[str, object]
     locale: str
     timezone: str

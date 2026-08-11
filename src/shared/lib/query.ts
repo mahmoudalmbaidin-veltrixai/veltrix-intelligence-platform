@@ -41,6 +41,16 @@ export function invalidateQueries(prefix: string) {
   notify(prefix)
 }
 
+/**
+ * Drop every cached query and force all mounted queries to refetch. Called after
+ * any mutating request so status changes / deletes are reflected immediately
+ * across every view (list, switcher, counts) without a re-login.
+ */
+export function invalidateAllQueries() {
+  cache.clear()
+  for (const set of listeners.values()) set.forEach((fn) => fn())
+}
+
 export interface UseQueryOptions {
   staleTime?: number
   retry?: number

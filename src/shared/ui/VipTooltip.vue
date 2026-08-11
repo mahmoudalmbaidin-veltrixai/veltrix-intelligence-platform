@@ -43,13 +43,7 @@ onBeforeUnmount(() => clearHideTimer())
 </script>
 
 <template>
-  <span
-    class="vip-tt"
-    @pointerenter="open"
-    @pointerleave="scheduleClose"
-    @focusin="open"
-    @focusout="scheduleClose"
-  >
+  <span class="vip-tt" @pointerenter="open" @pointerleave="scheduleClose" @focusin="open" @focusout="scheduleClose">
     <slot />
     <span
       v-if="show && hasContent"

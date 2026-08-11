@@ -60,6 +60,7 @@ export interface TenancyService {
     workspaceId: string,
     payload: UpdateWorkspacePayload,
   ): Promise<AuthorizedWorkspaceDto>
+  deleteWorkspace(organizationId: string, workspaceId: string): Promise<void>
 }
 
 export const tenancyService: TenancyService = {
@@ -93,6 +94,11 @@ export const tenancyService: TenancyService = {
     return apiClient.patch<AuthorizedWorkspaceDto>(
       `/api/v1/organizations/${encodeURIComponent(organizationId)}/workspaces/${encodeURIComponent(workspaceId)}`,
       payload,
+    )
+  },
+  async deleteWorkspace(organizationId, workspaceId) {
+    await apiClient.delete<void>(
+      `/api/v1/organizations/${encodeURIComponent(organizationId)}/workspaces/${encodeURIComponent(workspaceId)}`,
     )
   },
 }
