@@ -52,7 +52,11 @@ const datasetOptions = computed(() =>
 )
 const fileOptions = computed(() =>
   uploadedFiles.value
-    .filter((item) => item.status === 'ready' && item.extension.toLowerCase() === '.csv')
+    .filter(
+      (item) =>
+        item.status === 'ready' &&
+        ['.csv', '.xlsx'].includes(item.extension.toLowerCase()),
+    )
     .map((item) => ({ value: item.id, label: `${item.original_filename} (${Math.ceil(item.size_bytes / 1024)} KB)` })),
 )
 const connectionOptions = computed(() =>
@@ -165,7 +169,7 @@ function chooseFile(event: Event) {
   file.value = (event.target as HTMLInputElement).files?.[0] ?? null
   if (file.value && !objectName.value) {
     objectName.value = file.value.name
-      .replace(/\.csv$/i, '')
+      .replace(/\.(csv|xlsx)$/i, '')
       .toLowerCase()
       .replace(/[^a-z0-9_]/g, '_')
   }
@@ -180,7 +184,7 @@ async function uploadAndRegister() {
     const uploaded = await platformInfrastructure.upload(file.value)
     await registerFile(uploaded.id)
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'The CSV could not be registered.'
+    error.value = cause instanceof Error ? cause.message : 'The file could not be registered.'
   } finally {
     loading.value = false
   }
@@ -203,9 +207,9 @@ async function registerFile(fileId: string) {
     const registered = datasets.value.find((item) => item.name === (displayName.value || objectName.value))
     sourceType.value = 'dataset'
     if (registered) await selectDataset(registered.id)
-    else message.value = 'CSV registered. Select it from the dataset list.'
+    else message.value = 'File registered. Select it from the dataset list.'
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'The CSV could not be registered.'
+    error.value = cause instanceof Error ? cause.message : 'The file could not be registered.'
   } finally {
     loading.value = false
   }
@@ -295,7 +299,7 @@ onMounted(async () => {
         >Register selected file</VipButton
       >
       <label class="source__file-label" for="pipeline-source-file">CSV file</label>
-      <input id="pipeline-source-file" class="source__file" type="file" accept=".csv,text/csv" @change="chooseFile" />
+      <input id="pipeline-source-file" class="source__file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" @change="chooseFile" />
       <VipButton
         :loading="loading"
         :disabled="!file || !connectionId || !schemaName || !objectName"

@@ -75,6 +75,10 @@ function uploadContentType(file: File): string {
     json: 'application/json',
     pdf: 'application/pdf',
     png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    txt: 'text/plain',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   }
   return known[extension ?? ''] ?? (file.type || 'application/octet-stream')
 }

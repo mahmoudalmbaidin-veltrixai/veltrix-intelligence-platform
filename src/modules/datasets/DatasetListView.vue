@@ -22,6 +22,13 @@ import VipTable, { type Column } from '@/shared/ui/VipTable.vue'
 import VipMenu from '@/shared/ui/VipMenu.vue'
 import VipConfirmDialog from '@/shared/ui/VipConfirmDialog.vue'
 import { safeErrorText } from '@/shared/lib/safeError'
+import { platformInfrastructure } from '@/shared/services/platformInfrastructure'
+import {
+  isLegacyXlsFilename,
+  isXlsxFilename,
+  loadFileFormatCapabilities,
+  tabularAcceptAttribute,
+} from '@/shared/lib/fileFormats'
 
 const router = useRouter()
 const platform = usePlatformStore()
@@ -51,6 +58,19 @@ const csvImport = reactive({
 })
 const csvFileName = ref('')
 const csvFileInput = ref<HTMLInputElement>()
+/** Binary workbook selected for server-side XLSX ingest (not pasted into the textarea). */
+const xlsxFile = ref<File | null>(null)
+const tabularAccept = ref(tabularAcceptAttribute())
+
+onMounted(() => {
+  void loadFileFormatCapabilities()
+    .then((capabilities) => {
+      tabularAccept.value = tabularAcceptAttribute(capabilities)
+    })
+    .catch(() => {
+      /* keep CSV/XLSX defaults when capabilities cannot be loaded */
+    })
+})
 
 function triggerCsvFilePicker(): void {
   csvFileInput.value?.click()
@@ -61,17 +81,41 @@ async function onCsvFileSelected(event: Event): Promise<void> {
   const file = input.files?.[0]
   if (!file) return
   discoverError.value = ''
+  xlsxFile.value = null
   const name = file.name
   const lower = name.toLowerCase()
-  const hasDelimitedTextExtension = lower.endsWith('.csv') || lower.endsWith('.tsv') || lower.endsWith('.txt')
-  const isExcel =
-    lower.endsWith('.xlsx') ||
-    lower.endsWith('.xls') ||
-    (!hasDelimitedTextExtension && (file.type.includes('spreadsheetml') || file.type === 'application/vnd.ms-excel'))
-  if (isExcel) {
-    input.value = '' // allow re-selecting the same file
+  if (isLegacyXlsFilename(name)) {
+    input.value = ''
     discoverError.value =
-      'Excel workbooks are not parsed in the browser. In Excel, choose File → Save As → CSV UTF-8, then upload the .csv file.'
+      'Legacy .xls workbooks are not supported. Save as .xlsx or CSV UTF-8, then upload again.'
+    return
+  }
+  if (isXlsxFilename(name) || file.type.includes('spreadsheetml')) {
+    if (file.size > 5 * 1024 * 1024) {
+      input.value = ''
+      discoverError.value = 'Interactive XLSX import is limited to 5 MB.'
+      return
+    }
+    xlsxFile.value = file
+    csvImport.content = ''
+    csvFileName.value = name
+    const base = name.replace(/\.[^.]+$/, '')
+    if (!csvImport.displayName.trim()) csvImport.displayName = base
+    if (!csvImport.table.trim()) {
+      csvImport.table =
+        base
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .slice(0, 60) || 'imported_table'
+    }
+    input.value = ''
+    return
+  }
+  const hasDelimitedTextExtension = lower.endsWith('.csv') || lower.endsWith('.tsv') || lower.endsWith('.txt')
+  if (!hasDelimitedTextExtension) {
+    input.value = ''
+    discoverError.value = 'Supported tabular uploads are CSV, TSV, TXT, and XLSX.'
     return
   }
   if (file.size > 10 * 1024 * 1024) {
@@ -146,6 +190,7 @@ function openCsvImport(): void {
   csvImport.description = ''
   csvImport.content = ''
   csvFileName.value = ''
+  xlsxFile.value = null
   discoverError.value = ''
   discoverOpen.value = true
 }
@@ -156,30 +201,46 @@ async function discover(): Promise<void> {
     discoverError.value = 'Select a connection.'
     return
   }
+  if (dialogMode.value === 'csv' && !xlsxFile.value && !csvImport.content.trim()) {
+    discoverError.value = 'Upload a CSV/TSV/TXT/XLSX file or paste CSV data.'
+    return
+  }
   discoverBusy.value = true
   discoverError.value = ''
   try {
-    const result =
-      dialogMode.value === 'csv'
-        ? await datasetService.ingestCsv({
-            connectionId: csvImport.connectionId,
-            schema: csvImport.schema.trim(),
-            table: csvImport.table.trim(),
-            displayName: csvImport.displayName.trim(),
-            description: csvImport.description.trim(),
-            csvContent: csvImport.content,
-          })
-        : await datasetService.discover({
-            connectionId: discovery.connectionId,
-            schemas: discovery.schemas
-              .split(',')
-              .map((item) => item.trim())
-              .filter(Boolean),
-            includeNames: discovery.names
-              .split(',')
-              .map((item) => item.trim())
-              .filter(Boolean),
-          })
+    let result: { discovered: number; persisted: number; warnings: string[] }
+    if (dialogMode.value === 'csv' && xlsxFile.value) {
+      const uploaded = await platformInfrastructure.upload(xlsxFile.value)
+      result = await datasetService.ingestFile({
+        fileId: uploaded.id,
+        connectionId: csvImport.connectionId,
+        schema: csvImport.schema.trim(),
+        table: csvImport.table.trim(),
+        displayName: csvImport.displayName.trim(),
+        description: csvImport.description.trim(),
+      })
+    } else if (dialogMode.value === 'csv') {
+      result = await datasetService.ingestCsv({
+        connectionId: csvImport.connectionId,
+        schema: csvImport.schema.trim(),
+        table: csvImport.table.trim(),
+        displayName: csvImport.displayName.trim(),
+        description: csvImport.description.trim(),
+        csvContent: csvImport.content,
+      })
+    } else {
+      result = await datasetService.discover({
+        connectionId: discovery.connectionId,
+        schemas: discovery.schemas
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean),
+        includeNames: discovery.names
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean),
+      })
+    }
     await refetch()
     discoverOpen.value = false
     ui.pushToast({
@@ -508,28 +569,34 @@ async function confirmLifecycle() {
           <VipInput v-model="csvImport.description" label="Description" />
           <div class="csv-upload">
             <VipButton type="button" variant="secondary" icon="upload" @click="triggerCsvFilePicker">
-              Upload CSV file…
+              Upload CSV or XLSX…
             </VipButton>
             <span v-if="csvFileName" class="csv-upload__name"
               ><VipIcon name="check" :size="14" /> {{ csvFileName }}</span
             >
-            <span v-else class="csv-upload__hint">Choose a .csv or .tsv file from your device, or paste below.</span>
+            <span v-else class="csv-upload__hint"
+              >Choose a .csv, .tsv, .txt, or .xlsx file from your device, or paste CSV below.</span
+            >
             <input
               ref="csvFileInput"
               type="file"
-              accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"
+              :accept="tabularAccept"
               class="csv-upload__input"
-              aria-label="Upload CSV file from your device"
+              aria-label="Upload CSV or XLSX file from your device"
               @change="onCsvFileSelected"
             />
           </div>
           <VipTextarea
+            v-if="!xlsxFile"
             v-model="csvImport.content"
             label="CSV data"
             :rows="10"
-            required
+            :required="!xlsxFile"
             help="Uploaded file contents appear here. The first row must contain unique field names."
           />
+          <p v-else class="csv-upload__hint">
+            XLSX selected — the first worksheet will be imported server-side after malware scan.
+          </p>
         </template>
         <p v-if="discoverError" role="alert">{{ discoverError }}</p>
       </div>

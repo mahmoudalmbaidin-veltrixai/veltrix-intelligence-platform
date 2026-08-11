@@ -631,8 +631,11 @@ CONNECTION_TYPES: tuple[ConnectionTypeDefinition, ...] = (
         auth_methods=("none",),
         capabilities=("upload", "read", "malware_scan"),
         deployment="cloud",
-        description="Upload CSV/TSV/Excel/JSON files directly from your device. "
-        "Validated and malware-scanned server-side.",
+        description=(
+            "Upload CSV/XLSX/JSON files directly from your device. "
+            "Validated and malware-scanned server-side. "
+            "Dataset registration supports CSV and XLSX (first sheet)."
+        ),
         requirements=("No network setup; files are validated, size-limited and scanned.",),
     ),
     _definition(

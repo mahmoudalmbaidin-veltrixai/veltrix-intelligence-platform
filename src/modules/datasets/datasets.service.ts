@@ -530,6 +530,7 @@ export interface DatasetService {
     table: string
     displayName: string
     description: string
+    sheetName?: string
   }): Promise<{ discovered: number; persisted: number; warnings: string[] }>
   get(id: string): Promise<Dataset | undefined>
   listFields(id: string): Promise<DatasetField[]>
@@ -1011,6 +1012,7 @@ const apiDatasetService: DatasetService = {
       source_name: input.table,
       display_name: input.displayName || null,
       description: input.description,
+      sheet_name: input.sheetName ?? null,
     })
     return {
       discovered: result.discovered_count,
