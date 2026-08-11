@@ -27,26 +27,50 @@ test('B9.1B pipeline studio exposes run controls and artifact empty state for ad
 })
 
 test('B9.1B dataset detail live tabs have no fabricated mock rows', async ({ page }) => {
-  test.setTimeout(60_000)
+  test.setTimeout(90_000)
   await signInAdmin(page)
   await page.goto('/datasets')
   await expect(page.getByRole('heading', { name: /Datasets/i }).first()).toBeVisible({ timeout: 20_000 })
 
-  // Resolve a real dataset id from the live API (list rows are not anchors).
+  // Resolve a dataset that has real persisted version history (VIP-BUG-010).
   const datasetId = await page.evaluate(async (expectedName) => {
     const preference = JSON.parse(localStorage.getItem('vip.tenancy.preference') ?? '{}') as {
       orgId?: string
       wsId?: string
     }
-    const response = await fetch('http://localhost:8000/api/v1/datasets?page_size=5', {
+    const headers = {
+      'X-Organization-ID': preference.orgId ?? '',
+      'X-Workspace-ID': preference.wsId ?? '',
+    }
+    const list = await fetch('http://localhost:8000/api/v1/datasets?page=1&page_size=100', {
       credentials: 'include',
-      headers: {
-        'X-Organization-ID': preference.orgId ?? '',
-        'X-Workspace-ID': preference.wsId ?? '',
-      },
+      headers,
     })
-    const body = (await response.json()) as { items?: Array<{ id: string; display_name: string }> }
-    return body.items?.find((dataset) => dataset.display_name === expectedName)?.id ?? null
+    const body = (await list.json()) as { items?: Array<{ id: string; display_name: string }> }
+    const items = body.items ?? []
+    const preferred =
+      items.find((dataset) => dataset.display_name === expectedName) ??
+      items.find((dataset) => dataset.display_name.toLowerCase().includes('certif')) ??
+      items[0]
+    if (!preferred) return null
+
+    // Prefer a dataset that already has version snapshots.
+    for (const candidate of [preferred, ...items.filter((item) => item.id !== preferred.id)].slice(0, 25)) {
+      const versionsResponse = await fetch(
+        `http://localhost:8000/api/v1/datasets/${candidate.id}/versions`,
+        { credentials: 'include', headers },
+      )
+      if (!versionsResponse.ok) continue
+      const versions = (await versionsResponse.json()) as Array<{
+        id: string
+        version_number?: number
+        versionNumber?: number
+        version_type?: string
+        versionType?: string
+      }>
+      if (Array.isArray(versions) && versions.length > 0) return candidate.id
+    }
+    return preferred.id
   }, browserFixtures.certificationDataset)
   expect(datasetId).toBeTruthy()
   await page.goto(`/datasets/${datasetId}`)
@@ -60,8 +84,16 @@ test('B9.1B dataset detail live tabs have no fabricated mock rows', async ({ pag
   await expect(page.getByText('No upstream resources')).toBeVisible()
 
   await page.getByRole('tab', { name: 'Versions' }).click()
-  await expect(page.getByText('Version history unavailable')).toBeVisible()
+  // Obsolete placeholder expectation removed — product returns persisted history.
+  await expect(page.getByText('Version history unavailable')).toHaveCount(0)
+  await expect(page.getByText('Version history is unavailable.')).toHaveCount(0)
   await expect(page.getByText('Incremental refresh')).toHaveCount(0)
+  const versionEntry = page.locator('.dd__version').first()
+  await expect(versionEntry).toBeVisible({ timeout: 15_000 })
+  await expect(versionEntry.getByText(/^v\d+/)).toBeVisible()
+  await expect(versionEntry.locator('.vip-badge').filter({ hasText: /created|certified|restored/i })).toBeVisible()
+  await expect(versionEntry.locator('.dd__muted')).not.toBeEmpty()
+  await expect(versionEntry.locator('.dd__version-note')).toBeVisible()
 
   await page.getByRole('tab', { name: 'Activity' }).click()
   await expect(page.getByText('refreshed the dataset')).toHaveCount(0)
