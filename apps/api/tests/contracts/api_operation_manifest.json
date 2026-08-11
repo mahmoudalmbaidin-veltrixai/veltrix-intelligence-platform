@@ -3,9 +3,9 @@
     "authenticated": 4,
     "platform": 32,
     "public": 6,
-    "workspace": 215
+    "workspace": 217
   },
-  "operation_count": 257,
+  "operation_count": 259,
   "operations": [
     {
       "authentication_level": "workspace",
@@ -467,6 +467,20 @@
       "method": "POST",
       "operation_id": "datasets_ingest_file_api_v1_datasets_ingest_file_post",
       "path": "/api/v1/datasets/ingest-file",
+      "tag": "datasets"
+    },
+    {
+      "authentication_level": "workspace",
+      "method": "GET",
+      "operation_id": "quality_incidents_overview_api_v1_datasets_quality_incidents_get",
+      "path": "/api/v1/datasets/quality/incidents",
+      "tag": "datasets"
+    },
+    {
+      "authentication_level": "workspace",
+      "method": "GET",
+      "operation_id": "quality_rules_overview_api_v1_datasets_quality_rules_get",
+      "path": "/api/v1/datasets/quality/rules",
       "tag": "datasets"
     },
     {
@@ -1807,6 +1821,6 @@
       "tag": "operations"
     }
   ],
-  "path_count": 199,
+  "path_count": 201,
   "schema_version": 1
 }
