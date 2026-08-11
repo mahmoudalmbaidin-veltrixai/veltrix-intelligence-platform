@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import ClientDisconnect
 
 from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
@@ -59,6 +60,16 @@ def response(item: PlatformFile) -> FileResponse:
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
+
+
+def _controlled_upload_failure(exc: Exception) -> Exception:
+    if isinstance(exc, ClientDisconnect):
+        return ApplicationError(
+            code="FILE_UPLOAD_INTERRUPTED",
+            message="The upload was interrupted before completion.",
+            status_code=400,
+        )
+    return exc
 
 
 async def upload_file(
@@ -203,12 +214,15 @@ async def upload_file(
         await db.refresh(item)
         return response(item)
     except Exception as exc:
+        controlled_exc = _controlled_upload_failure(exc)
         await db.rollback()
         persisted = await db.get(FileUpload, upload_id)
         if persisted is not None:
             persisted.status = "failed"
             persisted.safe_error_code = (
-                exc.code if isinstance(exc, ApplicationError) else "FILE_UPLOAD_FAILED"
+                controlled_exc.code
+                if isinstance(controlled_exc, ApplicationError)
+                else "FILE_UPLOAD_FAILED"
             )
             persisted.safe_error_message = "The upload could not be completed."
             persisted.scan_provider = scan_provider
@@ -232,6 +246,8 @@ async def upload_file(
                 },
             )
             await db.commit()
+        if controlled_exc is not exc:
+            raise controlled_exc from exc
         raise
     finally:
         if await asyncio.to_thread(temp_path.exists):

@@ -9,12 +9,14 @@ from typing import Any, cast
 from uuid import uuid4
 
 import pytest
+from starlette.requests import ClientDisconnect
 
 from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
 from vip_api.events.broker import PlatformEvent, RedisEventBroker
 from vip_api.events.routes import _subscription_rate_key
 from vip_api.files.scanning import ClamAvScanner, DefenderScanner
+from vip_api.files.services import _controlled_upload_failure
 from vip_api.files.storage import LocalStorageProvider, StorageProviderError
 from vip_api.files.validation import inspect_signature, sanitize_filename, validate_file_type
 from vip_api.governance.context import AuthorizationContext
@@ -71,6 +73,14 @@ def test_filename_validation_blocks_traversal_and_disallowed_types() -> None:
             ["image/png", "text/plain"],
         )
     assert mismatch.value.code == "FILE_CONTENT_TYPE_MISMATCH"
+
+
+def test_client_disconnect_is_a_controlled_upload_failure() -> None:
+    failure = _controlled_upload_failure(ClientDisconnect())
+
+    assert isinstance(failure, ApplicationError)
+    assert failure.code == "FILE_UPLOAD_INTERRUPTED"
+    assert failure.status_code == 400
 
 
 def test_renamed_executable_is_rejected_before_scanning(tmp_path: Path) -> None:
