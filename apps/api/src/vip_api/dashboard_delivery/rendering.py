@@ -502,6 +502,13 @@ class PdfDashboardRenderer:
         canvas.setTitle(document.dashboard_name)
         canvas.setAuthor("Veltrix Intelligence Platform")
         canvas.setSubject("Executive dashboard export")
+        # Declare the document natural language for assistive technology (screen
+        # readers use /Lang for correct pronunciation). This is genuine, safe
+        # accessibility metadata — it does NOT falsely claim the PDF is tagged.
+        from reportlab.pdfbase.pdfdoc import PDFString  # type: ignore[import-untyped]
+
+        language = (document.locale or "en-US").split(".")[0].replace("_", "-")
+        canvas._doc.Catalog.Lang = PDFString(language)
         canvas.setKeywords(
             json.dumps(_parity_manifest(document), ensure_ascii=False, separators=(",", ":"))
         )
