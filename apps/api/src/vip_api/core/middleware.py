@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import time
+from typing import ClassVar
 from uuid import UUID, uuid4
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -155,3 +156,56 @@ class RequestContextMiddleware:
                     },
                 )
             reset_request_context(tokens)
+
+
+class SecurityHeadersMiddleware:
+    """Adds a coherent, environment-aware set of browser/API security headers to
+    every HTTP response (VIP-BUG-005).
+
+    - Static hardening headers apply to all responses.
+    - A strict Content-Security-Policy applies to API/JSON responses; the docs UI
+      paths are exempt so Swagger/ReDoc keep working.
+    - HSTS is emitted ONLY in production (never over local HTTP development), so
+      it is never falsely asserted on non-HTTPS environments.
+    """
+
+    _DOCS_PREFIXES = ("/docs", "/redoc", "/openapi.json")
+    _STATIC_HEADERS: ClassVar[dict[str, str]] = {
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": (
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
+            "magnetometer=(), gyroscope=(), accelerometer=()"
+        ),
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+    }
+    _API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    _HSTS = "max-age=63072000; includeSubDomains; preload"
+
+    def __init__(self, app: ASGIApp, *, is_production: bool) -> None:
+        self.app = app
+        self.is_production = is_production
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        apply_csp = not any(path.startswith(prefix) for prefix in self._DOCS_PREFIXES)
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                from starlette.datastructures import MutableHeaders
+
+                headers = MutableHeaders(scope=message)
+                for name, value in self._STATIC_HEADERS.items():
+                    headers[name] = value
+                if apply_csp:
+                    headers["content-security-policy"] = self._API_CSP
+                if self.is_production:
+                    headers["strict-transport-security"] = self._HSTS
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)

@@ -11,10 +11,10 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from vip_api.api.router import register_routers
 from vip_api.auth.password import PasswordService
-from vip_api.core.config import Settings, get_settings
+from vip_api.core.config import AppEnvironment, Settings, get_settings
 from vip_api.core.errors import register_exception_handlers
 from vip_api.core.logging import configure_logging
-from vip_api.core.middleware import RequestContextMiddleware
+from vip_api.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from vip_api.database.session import Database
 from vip_api.redis.client import RedisClient
 
@@ -81,6 +81,10 @@ def create_application(settings: Settings | None = None) -> FastAPI:
         RequestContextMiddleware,
         organization_header=app_settings.TENANCY_ORGANIZATION_HEADER,
         workspace_header=app_settings.TENANCY_WORKSPACE_HEADER,
+    )
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        is_production=app_settings.APP_ENV is AppEnvironment.PRODUCTION,
     )
 
     register_exception_handlers(app)
