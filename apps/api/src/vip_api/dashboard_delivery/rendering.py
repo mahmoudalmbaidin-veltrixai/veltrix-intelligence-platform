@@ -91,6 +91,30 @@ def _wrap_text(value: object, max_width: float, measure: Any) -> list[str]:
     return lines or [""]
 
 
+def _wrap_cell(value: object, max_width: float, measure: Any, max_lines: int) -> list[str]:
+    """Wrap a pivot/table label or cell into at most ``max_lines`` display lines.
+
+    VIP-P6-001: replaces destructive fixed-length truncation of long Pivot row
+    and column labels. Full label content is preserved by wrapping across lines.
+    Only when a label genuinely cannot fit within ``max_lines`` (an extreme
+    outlier) is the final line ellipsised — a bounded, deterministic fallback
+    that still keeps every earlier line intact, rather than silently dropping the
+    differentiating suffix of every label.
+    """
+    if max_width <= 0 or max_lines <= 0:
+        return [_display_text(value)]
+    lines = _wrap_text(value, max_width, measure)
+    if len(lines) <= max_lines:
+        return lines
+    kept = lines[:max_lines]
+    last = kept[-1]
+    ellipsis = "…"
+    while last and measure(last + ellipsis) > max_width:
+        last = last[:-1]
+    kept[-1] = (last + ellipsis) if last else ellipsis
+    return kept
+
+
 def _register_pdf_fonts() -> tuple[str, str]:
     regular = _font_path()
     bold = _font_path(bold=True)
@@ -919,37 +943,69 @@ class PdfDashboardRenderer:
             canvas.setFillColor(HexColor(MUTED))
             canvas.drawString(x, y + height / 2, "No rows")
             return
-        row_height = 18
-        visible = min(len(rows), max(1, int((height - row_height) // row_height)))
+        # VIP-P6-001: wrap long labels/cells instead of truncating them. Header
+        # and row heights grow to fit the wrapped content so shared-prefix Pivot
+        # labels stay unambiguous and values remain aligned under their column.
         col_width = width / len(keys)
-        canvas.setFillColor(HexColor(BRAND_DARK))
-        canvas.rect(x, y + height - row_height, width, row_height, stroke=0, fill=1)
-        canvas.setFillColor(HexColor(WHITE))
-        canvas.setFont(PDF_FONT_BOLD, 7)
+        pad = 4.0
+        usable = max(1.0, col_width - 2 * pad)
+        line_h = 8.5
+        font_size = 7
+        header_measure = lambda line: stringWidth(line, PDF_FONT_BOLD, font_size)  # noqa: E731
+        body_measure = lambda line: stringWidth(line, PDF_FONT, font_size)  # noqa: E731
         labels = {_column_key(column): _column_label(column) for column in columns}
-        for index, key in enumerate(keys):
-            canvas.drawString(
-                x + index * col_width + 4,
-                y + height - 12,
-                _display_text(_text(labels.get(key, key), 20)),
-            )
-        canvas.setFont(PDF_FONT, 7)
-        for row_index, row in enumerate(rows[:visible]):
-            bottom = y + height - row_height * (row_index + 2)
-            canvas.setFillColor(HexColor(SURFACE if row_index % 2 else WHITE))
-            canvas.rect(x, bottom, width, row_height, stroke=0, fill=1)
-            canvas.setFillColor(HexColor(INK))
-            for index, key in enumerate(keys):
-                value = row.get(key)
-                canvas.setFillColor(HexColor(_conditional_color(value, widget, INK)))
+
+        header_cells = [_wrap_cell(labels.get(key, key), usable, header_measure, 4) for key in keys]
+        header_lines = max(len(cell) for cell in header_cells)
+        header_height = header_lines * line_h + 6
+
+        # Pre-compute wrapped body cells + per-row heights (bounded to what fits).
+        drawn_rows: list[tuple[list[list[str]], float, list[object]]] = []
+        used = header_height
+        for row in rows:
+            cells = [
+                _wrap_cell(_formatted_value(row.get(key), widget), usable, body_measure, 3)
+                for key in keys
+            ]
+            row_lines = max(len(cell) for cell in cells)
+            r_height = max(18.0, row_lines * line_h + 6)
+            if used + r_height > height and drawn_rows:
+                break
+            drawn_rows.append((cells, r_height, [row.get(key) for key in keys]))
+            used += r_height
+
+        # Header band.
+        canvas.setFillColor(HexColor(BRAND_DARK))
+        canvas.rect(x, y + height - header_height, width, header_height, stroke=0, fill=1)
+        canvas.setFillColor(HexColor(WHITE))
+        canvas.setFont(PDF_FONT_BOLD, font_size)
+        for index, cell in enumerate(header_cells):
+            for line_index, line in enumerate(cell):
                 canvas.drawString(
-                    x + index * col_width + 4,
-                    bottom + 6,
-                    _display_text(_formatted_value(value, widget)),
+                    x + index * col_width + pad,
+                    y + height - line_h - line_index * line_h,
+                    line,
                 )
-        if len(rows) > visible:
+
+        # Body rows, stacked downward with per-row heights.
+        canvas.setFont(PDF_FONT, font_size)
+        cursor = y + height - header_height
+        for row_index, (cells, r_height, raw_values) in enumerate(drawn_rows):
+            cursor -= r_height
+            canvas.setFillColor(HexColor(SURFACE if row_index % 2 else WHITE))
+            canvas.rect(x, cursor, width, r_height, stroke=0, fill=1)
+            for index, cell in enumerate(cells):
+                canvas.setFillColor(HexColor(_conditional_color(raw_values[index], widget, INK)))
+                for line_index, line in enumerate(cell):
+                    canvas.drawString(
+                        x + index * col_width + pad,
+                        cursor + r_height - line_h - line_index * line_h + 2,
+                        line,
+                    )
+        remaining = len(rows) - len(drawn_rows)
+        if remaining > 0:
             canvas.setFillColor(HexColor(MUTED))
-            canvas.drawRightString(x + width, y + 2, f"{len(rows) - visible:,} more rows")
+            canvas.drawRightString(x + width, y + 2, f"{remaining:,} more rows")
 
     @staticmethod
     def _chart(
@@ -1469,34 +1525,63 @@ class PngDashboardRenderer:
         if not keys:
             draw.text((x1 * scale, (y1 + 30) * scale), "No rows", font=font, fill=MUTED)
             return
+        # VIP-P6-001: wrap long labels/cells rather than truncating to a fixed
+        # character count, and grow header/row heights so no distinguishing label
+        # content is lost and values stay aligned under their column.
         col_width = (x2 - x1) / len(keys)
-        row_height = 30
-        draw.rectangle(
-            (x1 * scale, y1 * scale, x2 * scale, (y1 + row_height) * scale), fill=BRAND_DARK
-        )
+        pad = 7.0
+        usable = max(1.0, (col_width - 2 * pad) * scale)
+        line_h = 13.0
+        measure = lambda line: draw.textlength(line, font=font)  # noqa: E731
         labels = {_column_key(column): _column_label(column) for column in columns}
-        for index, key in enumerate(keys):
-            draw.text(
-                ((x1 + index * col_width + 7) * scale, (y1 + 7) * scale),
-                _display_text(_text(labels.get(key, key), 14)),
-                font=font,
-                fill=WHITE,
-            )
-        visible = max(1, int((y2 - y1 - row_height) / row_height))
-        for row_index, row in enumerate(rows[:visible]):
-            top = y1 + row_height * (row_index + 1)
+
+        header_cells = [_wrap_cell(labels.get(key, key), usable, measure, 4) for key in keys]
+        header_lines = max(len(cell) for cell in header_cells)
+        header_height = header_lines * line_h + 8
+
+        draw.rectangle(
+            (x1 * scale, y1 * scale, x2 * scale, (y1 + header_height) * scale), fill=BRAND_DARK
+        )
+        for index, cell in enumerate(header_cells):
+            for line_index, line in enumerate(cell):
+                draw.text(
+                    (
+                        (x1 + index * col_width + pad) * scale,
+                        (y1 + 4 + line_index * line_h) * scale,
+                    ),
+                    line,
+                    font=font,
+                    fill=WHITE,
+                )
+
+        cursor = y1 + header_height
+        for row_index, row in enumerate(rows):
+            cells = [
+                _wrap_cell(_formatted_value(row.get(key), widget), usable, measure, 3)
+                for key in keys
+            ]
+            row_lines = max(len(cell) for cell in cells)
+            r_height = max(30.0, row_lines * line_h + 8)
+            if cursor + r_height > y2 and row_index:
+                break
             if row_index % 2:
                 draw.rectangle(
-                    (x1 * scale, top * scale, x2 * scale, (top + row_height) * scale), fill=SURFACE
+                    (x1 * scale, cursor * scale, x2 * scale, (cursor + r_height) * scale),
+                    fill=SURFACE,
                 )
             for index, key in enumerate(keys):
                 value = row.get(key)
-                draw.text(
-                    ((x1 + index * col_width + 7) * scale, (top + 7) * scale),
-                    _display_text(_formatted_value(value, widget)),
-                    font=font,
-                    fill=_conditional_color(value, widget, INK),
-                )
+                for line_index, line in enumerate(cells[index]):
+                    draw.text(
+                        (
+                            (x1 + index * col_width + pad) * scale,
+                            (cursor + 4 + line_index * line_h) * scale,
+                        ),
+                        line,
+                        font=font,
+                        fill=_conditional_color(value, widget, INK),
+                    )
+            cursor += r_height
 
     @staticmethod
     def _draw_map(
