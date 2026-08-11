@@ -358,3 +358,91 @@ async def test_revoked_creator_access_fails_the_scheduled_run(settings: Settings
     finally:
         if org_id and user_id:
             await _cleanup(database, org_id, user_id)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_successful_dispatch_audits_only_after_enqueue(settings: Settings) -> None:
+    """VIP-BUG-006: a success audit is written only after create_run() succeeds,
+    and no failure audit is written on the happy path."""
+    from vip_api.governance.models import AuditEvent
+
+    database = Database(settings)
+    org_id = user_id = None
+    try:
+        async with database.session_factory() as db:
+            user_id, org_id, ws_id, dataset_id = await _seed(db, uuid4().hex[:8])
+            pid = await _publish(db, _context(user_id, org_id, ws_id), dataset_id)
+            db.add(_schedule(org_id, ws_id, pid, user_id, enabled=True, due=True))
+            await db.commit()
+
+        assert await dispatch_due_pipeline_schedules(database, settings, now=NOW) == 1
+
+        async with database.session_factory() as db:
+            events = list(
+                (
+                    await db.scalars(select(AuditEvent).where(AuditEvent.organization_id == org_id))
+                ).all()
+            )
+            dispatched = [e for e in events if e.event_type == "pipeline.schedule.dispatched"]
+            failed = [e for e in events if e.event_type == "pipeline.schedule.dispatch_failed"]
+            assert len(dispatched) == 1 and dispatched[0].outcome == "success"
+            assert failed == []
+            run = await db.scalar(select(PipelineRun).where(PipelineRun.pipeline_id == pid))
+            assert run is not None and run.trigger == "scheduled"
+            assert dispatched[0].event_metadata.get("run_id") == str(run.id)
+    finally:
+        if org_id and user_id:
+            await _cleanup(database, org_id, user_id)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_enqueue_failure_writes_no_false_success_audit(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """VIP-BUG-006: if enqueue (create_run) fails, there must be NO success audit —
+    only a truthful failure audit — and the schedule-run must be marked failed."""
+    import vip_api.pipelines.scheduler as scheduler_module
+    from vip_api.governance.models import AuditEvent
+
+    async def _boom(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("simulated enqueue failure")
+
+    monkeypatch.setattr(scheduler_module, "create_run", _boom)
+
+    database = Database(settings)
+    org_id = user_id = None
+    try:
+        async with database.session_factory() as db:
+            user_id, org_id, ws_id, dataset_id = await _seed(db, uuid4().hex[:8])
+            pid = await _publish(db, _context(user_id, org_id, ws_id), dataset_id)
+            db.add(_schedule(org_id, ws_id, pid, user_id, enabled=True, due=True))
+            await db.commit()
+
+        # Claim succeeds but enqueue fails -> not counted as dispatched.
+        assert await dispatch_due_pipeline_schedules(database, settings, now=NOW) == 0
+
+        async with database.session_factory() as db:
+            events = list(
+                (
+                    await db.scalars(select(AuditEvent).where(AuditEvent.organization_id == org_id))
+                ).all()
+            )
+            dispatched = [e for e in events if e.event_type == "pipeline.schedule.dispatched"]
+            failed = [e for e in events if e.event_type == "pipeline.schedule.dispatch_failed"]
+            # The core assertion: NO false success audit.
+            assert dispatched == [], "false-success audit recorded despite enqueue failure"
+            assert len(failed) == 1 and failed[0].outcome == "failure"
+            assert failed[0].reason_code == "PIPELINE_SCHEDULE_RUN_FAILED"
+            # No real pipeline run was created; the schedule-run is failed.
+            assert (
+                await db.scalar(select(PipelineRun).where(PipelineRun.pipeline_id == pid)) is None
+            )
+            srun = await db.scalar(
+                select(PipelineScheduleRun).where(PipelineScheduleRun.organization_id == org_id)
+            )
+            assert srun is not None and srun.status == "failed"
+    finally:
+        if org_id and user_id:
+            await _cleanup(database, org_id, user_id)

@@ -1,0 +1,4 @@
+# VIP Phase 2 — Discovered Issues (recorded, NOT fixed here)
+
+- **Pivot shaping gap (query layer):** `dashboards/query.py::_shape()` has explicit cases only for `kpi` and `table`; `pivot` falls into the generic chart-shaping branch (`categories`/`series`). It does not produce a dedicated pivot matrix (`row_dimensions` × `column_dimensions`). The export renderer nonetheless renders pivot from the flat `columns`/`rows` that `WidgetDataResponse` always carries, which is why pivot content DOES appear in exports for standard configs. A dedicated pivot matrix shape + renderer would be required to represent true pivot semantics (row/col dimensions, subtotals). Not implemented this phase.
+- **Unrelated (do NOT fix in Phase 2):** API operation-count drift (255 vs 256); "Weekly dashboard" appearing in the member role-select dropdown (source of that assignable option to be traced); XLSX ingestion; scheduler audit ordering.

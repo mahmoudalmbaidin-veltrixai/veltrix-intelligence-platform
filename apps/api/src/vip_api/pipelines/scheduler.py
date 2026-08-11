@@ -91,16 +91,11 @@ async def _claim_due(db: AsyncSession, *, now: datetime, limit: int) -> list[_Cl
         else:
             schedule.status = "scheduled"
         schedule.row_version += 1
-        await record_audit(
-            db,
-            "pipeline.schedule.dispatched",
-            actor_user_id=schedule.created_by_user_id,
-            organization_id=schedule.organization_id,
-            workspace_id=schedule.workspace_id,
-            resource_type="pipeline",
-            resource_id=schedule.pipeline_id,
-            metadata={"schedule_id": str(schedule.id), "schedule_run_id": str(run_record.id)},
-        )
+        # NB: the success audit is deliberately NOT recorded here. Claiming a due
+        # schedule is not the same as enqueueing its run — recording "dispatched"
+        # before create_run() succeeds produces a false-success audit (VIP-BUG-006).
+        # The truthful audit is emitted in _dispatch_slot after enqueue succeeds,
+        # and a failure audit is emitted when enqueue/access fails.
         slots.append(
             _ClaimedSlot(
                 schedule_run_id=run_record.id,
@@ -151,15 +146,32 @@ async def _actor_context(db: AsyncSession, slot: _ClaimedSlot) -> AuthorizationC
     return await resolve_authorization_context(db, tenant)
 
 
-async def _mark_failed(database: Database, schedule_run_id: UUID, code: str, message: str) -> None:
+async def _mark_failed(database: Database, slot: _ClaimedSlot, code: str, message: str) -> None:
+    """Record a truthful failure: mark the schedule-run failed AND emit a failure
+    audit in the same transaction. No success audit is ever written on this path."""
     async with database.session_factory() as db:
-        run = await db.get(PipelineScheduleRun, schedule_run_id)
+        run = await db.get(PipelineScheduleRun, slot.schedule_run_id)
         if run is not None:
             run.status = "failed"
             run.safe_error_code = code
             run.safe_error_message = message
             run.completed_at = utc_now()
-            await db.commit()
+        await record_audit(
+            db,
+            "pipeline.schedule.dispatch_failed",
+            actor_user_id=slot.created_by_user_id,
+            organization_id=slot.organization_id,
+            workspace_id=slot.workspace_id,
+            outcome="failure",
+            reason_code=code,
+            resource_type="pipeline",
+            resource_id=slot.pipeline_id,
+            metadata={
+                "schedule_id": str(slot.schedule_id),
+                "schedule_run_id": str(slot.schedule_run_id),
+            },
+        )
+        await db.commit()
 
 
 async def _dispatch_slot(database: Database, settings: Settings, slot: _ClaimedSlot) -> bool:
@@ -169,7 +181,7 @@ async def _dispatch_slot(database: Database, settings: Settings, slot: _ClaimedS
     except PermissionError:
         await _mark_failed(
             database,
-            slot.schedule_run_id,
+            slot,
             "PIPELINE_ACCESS_REVOKED",
             "The schedule creator no longer has access to run this pipeline.",
         )
@@ -187,18 +199,34 @@ async def _dispatch_slot(database: Database, settings: Settings, slot: _ClaimedS
         logger.warning("Pipeline schedule dispatch failed", exc_info=error)
         await _mark_failed(
             database,
-            slot.schedule_run_id,
+            slot,
             "PIPELINE_SCHEDULE_RUN_FAILED",
             "The scheduled pipeline run could not be enqueued.",
         )
         return False
+    # Enqueue succeeded: only now is it truthful to record the run and the
+    # success audit, together in one transaction (VIP-BUG-006).
     async with database.session_factory() as db:
         record = await db.get(PipelineScheduleRun, slot.schedule_run_id)
         if record is not None:
             record.run_id = run.id
             record.status = "dispatched"
             record.completed_at = utc_now()
-            await db.commit()
+        await record_audit(
+            db,
+            "pipeline.schedule.dispatched",
+            actor_user_id=slot.created_by_user_id,
+            organization_id=slot.organization_id,
+            workspace_id=slot.workspace_id,
+            resource_type="pipeline",
+            resource_id=slot.pipeline_id,
+            metadata={
+                "schedule_id": str(slot.schedule_id),
+                "schedule_run_id": str(slot.schedule_run_id),
+                "run_id": str(run.id),
+            },
+        )
+        await db.commit()
     return True
 
 
