@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, Text, Uuid, text
+from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Index, String, Text, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from vip_api.database.base import Base
@@ -75,6 +75,12 @@ class User(Base):
     department: Mapped[str | None] = mapped_column(String(150))
     phone: Mapped[str | None] = mapped_column(String(50))
     avatar_url: Mapped[str | None] = mapped_column(String(1024))
+    # Self-service UI preferences (theme, density, reduced motion, date/time
+    # format, etc.). A single JSON bag keeps personalization additive without a
+    # migration per preference. locale/timezone remain first-class columns above.
+    preferences: Mapped[dict[str, object]] = mapped_column(
+        JSON, nullable=False, default=dict, server_default=text("'{}'")
+    )
     failed_login_count: Mapped[int] = mapped_column(default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

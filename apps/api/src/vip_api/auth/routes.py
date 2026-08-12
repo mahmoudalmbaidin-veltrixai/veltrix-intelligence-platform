@@ -5,11 +5,15 @@ from __future__ import annotations
 import logging
 from hashlib import sha256
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Header, Request, Response, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import StreamingResponse
 
 from vip_api.auth.authentication import authenticate_login
+from vip_api.auth.avatar import delete_avatar, read_avatar, store_avatar
 from vip_api.auth.cookies import clear_auth_cookies, set_auth_cookies
 from vip_api.auth.csrf import validate_csrf
 from vip_api.auth.dependencies import AuthenticatedContext, get_current_session, require_csrf
@@ -49,7 +53,11 @@ from vip_api.schemas.auth import (
     LogoutResponse,
     PasswordResetConfirm,
     PasswordResetRequest,
+    ProfileUpdateRequest,
+    RevokeSessionsResponse,
     SessionInfo,
+    SessionListResponse,
+    SessionSummary,
 )
 from vip_api.schemas.error import ErrorResponse
 
@@ -131,6 +139,272 @@ async def login(
 async def me(
     context: Annotated[AuthenticatedContext, Depends(get_current_session)],
 ) -> AuthenticationResponse:
+    return auth_response(context.user, context.session)
+
+
+@router.patch(
+    "/me",
+    response_model=AuthenticationResponse,
+    dependencies=[Depends(require_csrf)],
+    summary="Update the signed-in user's own profile and preferences",
+    description=(
+        "Self-service update of personal profile fields (display name, job title, department, "
+        "phone, locale, time zone) and the UI preferences bag. Username, email and status are "
+        "administrator/system managed and cannot be changed here."
+    ),
+    responses={
+        403: {"model": ErrorResponse, "description": "CSRF validation failed"},
+        422: {"model": ErrorResponse, "description": "Invalid profile fields"},
+    },
+)
+async def update_me(
+    payload: ProfileUpdateRequest,
+    context: Annotated[AuthenticatedContext, Depends(get_current_session)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> AuthenticationResponse:
+    user = context.user
+    fields = payload.model_dump(exclude_unset=True)
+    # Empty strings clear an optional field; preferences are shallow-merged so a
+    # partial update never drops unrelated preference keys.
+    changed: list[str] = []
+    for name in ("display_name", "job_title", "department", "phone", "locale", "timezone"):
+        if name not in fields:
+            continue
+        value = fields[name]
+        if name == "display_name":
+            if not value or not str(value).strip():
+                continue  # display name cannot be blanked
+            value = str(value).strip()
+        elif isinstance(value, str) and value.strip() == "":
+            value = None
+        setattr(user, name, value)
+        changed.append(name)
+    if "preferences" in fields and fields["preferences"] is not None:
+        merged = dict(user.preferences or {})
+        merged.update(fields["preferences"])
+        user.preferences = merged
+        changed.append("preferences")
+    if changed:
+        user.updated_by = user.id
+        await record_audit(
+            db,
+            "auth.profile_updated",
+            actor_user_id=user.id,
+            organization_id=None,
+            resource_type="user",
+            resource_id=user.id,
+            metadata={"fields": sorted(changed)},
+            commit=False,
+        )
+        await db.commit()
+        await db.refresh(user)
+    return auth_response(user, context.session)
+
+
+@router.get(
+    "/sessions",
+    response_model=SessionListResponse,
+    summary="List the signed-in user's active sessions",
+    description=(
+        "Returns the caller's own non-revoked, non-expired sessions with timestamps and a "
+        "current-session marker. Sessions store no device or location metadata, so only "
+        "timing information is available."
+    ),
+)
+async def list_sessions(
+    context: Annotated[AuthenticatedContext, Depends(get_current_session)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> SessionListResponse:
+    now = utc_now()
+    rows = (
+        await db.scalars(
+            select(AuthSession)
+            .where(
+                AuthSession.user_id == context.user.id,
+                AuthSession.revoked_at.is_(None),
+                AuthSession.refresh_expires_at > now,
+            )
+            .order_by(AuthSession.last_seen_at.desc())
+        )
+    ).all()
+    summaries = [
+        SessionSummary(
+            id=item.id,
+            created_at=item.created_at,
+            last_seen_at=item.last_seen_at,
+            access_expires_at=item.access_expires_at,
+            refresh_expires_at=item.refresh_expires_at,
+            current=item.id == context.session.id,
+        )
+        for item in rows
+    ]
+    return SessionListResponse(sessions=summaries, current_session_id=context.session.id)
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    response_model=RevokeSessionsResponse,
+    dependencies=[Depends(require_csrf)],
+    summary="Revoke one of the signed-in user's sessions",
+    description=(
+        "Revokes a single session owned by the caller. A session belonging to another user is "
+        "never revealed or affected (returns not-found)."
+    ),
+    responses={
+        403: {"model": ErrorResponse, "description": "CSRF validation failed"},
+        404: {"model": ErrorResponse, "description": "Session not found"},
+    },
+)
+async def revoke_session_route(
+    session_id: UUID,
+    context: Annotated[AuthenticatedContext, Depends(get_current_session)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> RevokeSessionsResponse:
+    target = await db.get(AuthSession, session_id)
+    # Ownership check prevents cross-user session tampering / IDOR. A missing or
+    # foreign session is reported identically so existence is not disclosed.
+    if target is None or target.user_id != context.user.id or target.revoked_at is not None:
+        raise ApplicationError(
+            code="NOT_FOUND", message="The session was not found.", status_code=404
+        )
+    await revoke_session(target, "user_revoked")
+    await record_audit(
+        db,
+        "auth.session_revoked",
+        actor_user_id=context.user.id,
+        organization_id=None,
+        resource_type="auth_session",
+        resource_id=target.id,
+        commit=False,
+    )
+    await db.commit()
+    return RevokeSessionsResponse(revoked=1)
+
+
+@router.post(
+    "/sessions/revoke-others",
+    response_model=RevokeSessionsResponse,
+    dependencies=[Depends(require_csrf)],
+    summary="Sign out all other sessions",
+    description="Revokes every active session for the caller except the current one.",
+    responses={403: {"model": ErrorResponse, "description": "CSRF validation failed"}},
+)
+async def revoke_other_sessions_route(
+    context: Annotated[AuthenticatedContext, Depends(get_current_session)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> RevokeSessionsResponse:
+    now = utc_now()
+    others = (
+        await db.scalars(
+            select(AuthSession).where(
+                AuthSession.user_id == context.user.id,
+                AuthSession.id != context.session.id,
+                AuthSession.revoked_at.is_(None),
+            )
+        )
+    ).all()
+    for item in others:
+        await revoke_session(item, "user_revoked_others")
+    if others:
+        await record_audit(
+            db,
+            "auth.session_revoked",
+            actor_user_id=context.user.id,
+            organization_id=None,
+            resource_type="user",
+            resource_id=context.user.id,
+            metadata={"scope": "others", "count": len(others), "at": now.isoformat()},
+            commit=False,
+        )
+    await db.commit()
+    return RevokeSessionsResponse(revoked=len(others))
+
+
+@router.post(
+    "/me/avatar",
+    response_model=AuthenticationResponse,
+    dependencies=[Depends(require_csrf)],
+    summary="Upload the signed-in user's avatar",
+    description=(
+        "Accepts a PNG or JPEG image, validated by extension, declared MIME type, and magic-byte "
+        "signature, and stored under a per-user key. Only the formats the platform can verify are "
+        "accepted."
+    ),
+    responses={
+        403: {"model": ErrorResponse, "description": "CSRF validation failed"},
+        413: {"model": ErrorResponse, "description": "Image too large"},
+        415: {"model": ErrorResponse, "description": "Unsupported image type"},
+    },
+)
+async def upload_avatar(
+    request: Request,
+    context: Annotated[AuthenticatedContext, Depends(get_current_session)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    filename: Annotated[str, Header(alias="X-File-Name", min_length=1, max_length=255)],
+    content_type: Annotated[str, Header(alias="Content-Type")],
+) -> AuthenticationResponse:
+    await store_avatar(request.stream(), filename, content_type, context.user, settings)
+    await record_audit(
+        db,
+        "auth.avatar_updated",
+        actor_user_id=context.user.id,
+        organization_id=None,
+        resource_type="user",
+        resource_id=context.user.id,
+        commit=False,
+    )
+    await db.commit()
+    await db.refresh(context.user)
+    return auth_response(context.user, context.session)
+
+
+@router.get(
+    "/me/avatar",
+    summary="Stream the signed-in user's avatar",
+    description="Streams the caller's stored avatar image, or 404 when none is set.",
+    responses={404: {"model": ErrorResponse, "description": "No avatar set"}},
+)
+async def get_avatar(
+    context: Annotated[AuthenticatedContext, Depends(get_current_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> StreamingResponse:
+    result = await read_avatar(context.user, settings)
+    if result is None:
+        raise ApplicationError(code="NOT_FOUND", message="No avatar is set.", status_code=404)
+    stream, content_type = result
+    return StreamingResponse(
+        stream,
+        media_type=content_type,
+        headers={"Cache-Control": "private, max-age=0, must-revalidate"},
+    )
+
+
+@router.delete(
+    "/me/avatar",
+    response_model=AuthenticationResponse,
+    dependencies=[Depends(require_csrf)],
+    summary="Remove the signed-in user's avatar",
+    responses={403: {"model": ErrorResponse, "description": "CSRF validation failed"}},
+)
+async def remove_avatar(
+    context: Annotated[AuthenticatedContext, Depends(get_current_session)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AuthenticationResponse:
+    removed = await delete_avatar(context.user, settings)
+    if removed:
+        await record_audit(
+            db,
+            "auth.avatar_removed",
+            actor_user_id=context.user.id,
+            organization_id=None,
+            resource_type="user",
+            resource_id=context.user.id,
+            commit=False,
+        )
+    await db.commit()
+    await db.refresh(context.user)
     return auth_response(context.user, context.session)
 
 

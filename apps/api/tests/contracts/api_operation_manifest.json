@@ -1,11 +1,11 @@
 {
   "authentication_levels": {
-    "authenticated": 4,
+    "authenticated": 11,
     "platform": 32,
     "public": 6,
     "workspace": 217
   },
-  "operation_count": 259,
+  "operation_count": 266,
   "operations": [
     {
       "authentication_level": "workspace",
@@ -1786,6 +1786,34 @@
       "tag": "authentication"
     },
     {
+      "authentication_level": "authenticated",
+      "method": "PATCH",
+      "operation_id": "update_me_auth_me_patch",
+      "path": "/auth/me",
+      "tag": "authentication"
+    },
+    {
+      "authentication_level": "authenticated",
+      "method": "DELETE",
+      "operation_id": "remove_avatar_auth_me_avatar_delete",
+      "path": "/auth/me/avatar",
+      "tag": "authentication"
+    },
+    {
+      "authentication_level": "authenticated",
+      "method": "GET",
+      "operation_id": "get_avatar_auth_me_avatar_get",
+      "path": "/auth/me/avatar",
+      "tag": "authentication"
+    },
+    {
+      "authentication_level": "authenticated",
+      "method": "POST",
+      "operation_id": "upload_avatar_auth_me_avatar_post",
+      "path": "/auth/me/avatar",
+      "tag": "authentication"
+    },
+    {
       "authentication_level": "public",
       "method": "POST",
       "operation_id": "password_reset_confirm_auth_password_reset_confirm_post",
@@ -1807,6 +1835,27 @@
       "tag": "authentication"
     },
     {
+      "authentication_level": "authenticated",
+      "method": "GET",
+      "operation_id": "list_sessions_auth_sessions_get",
+      "path": "/auth/sessions",
+      "tag": "authentication"
+    },
+    {
+      "authentication_level": "authenticated",
+      "method": "POST",
+      "operation_id": "revoke_other_sessions_route_auth_sessions_revoke_others_post",
+      "path": "/auth/sessions/revoke-others",
+      "tag": "authentication"
+    },
+    {
+      "authentication_level": "authenticated",
+      "method": "DELETE",
+      "operation_id": "revoke_session_route_auth_sessions__session_id__delete",
+      "path": "/auth/sessions/{session_id}",
+      "tag": "authentication"
+    },
+    {
       "authentication_level": "public",
       "method": "GET",
       "operation_id": "health_health_get",
@@ -1821,6 +1870,6 @@
       "tag": "operations"
     }
   ],
-  "path_count": 201,
+  "path_count": 205,
   "schema_version": 1
 }
