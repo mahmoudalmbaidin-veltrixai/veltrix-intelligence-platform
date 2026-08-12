@@ -425,6 +425,32 @@ function errorMessage(error: unknown): string {
 function initialsColor(): string {
   return platform.user.avatarColor || '#6d5efc'
 }
+
+/** Best-effort friendly device label from a User-Agent (never fabricated). */
+function deviceLabel(ua: string | null): string {
+  if (!ua) return 'Browser session'
+  const browser = /Edg\//.test(ua)
+    ? 'Edge'
+    : /Chrome\//.test(ua)
+      ? 'Chrome'
+      : /Firefox\//.test(ua)
+        ? 'Firefox'
+        : /Safari\//.test(ua)
+          ? 'Safari'
+          : 'Browser'
+  const os = /Windows/.test(ua)
+    ? 'Windows'
+    : /Macintosh|Mac OS/.test(ua)
+      ? 'macOS'
+      : /Android/.test(ua)
+        ? 'Android'
+        : /iPhone|iPad|iOS/.test(ua)
+          ? 'iOS'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : ''
+  return os ? `${browser} on ${os}` : browser
+}
 </script>
 
 <template>
@@ -627,7 +653,7 @@ function initialsColor(): string {
                 <VipIcon name="monitor" :size="18" />
                 <div class="settings__session-meta">
                   <p class="settings__session-title">
-                    Browser session
+                    {{ deviceLabel(s.userAgent) }}
                     <VipBadge v-if="s.current" tone="success" size="sm" variant="soft">Current session</VipBadge>
                   </p>
                   <p class="settings__hint">

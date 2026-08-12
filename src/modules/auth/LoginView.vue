@@ -12,7 +12,8 @@ import VipLogo from '@/shared/ui/VipLogo.vue'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
-const expired = computed(() => route.query.expired === '1')
+const idleExpired = computed(() => route.query.reason === 'idle')
+const expired = computed(() => route.query.expired === '1' && !idleExpired.value)
 
 // Remember-me persists ONLY the email address — never the password.
 const rememberStore = new LocalStore<{ email: string }>('vip.auth.rememberedEmail')
@@ -157,7 +158,10 @@ async function submit() {
         <h1 class="login__title">Sign in to Veltrix Intelligence</h1>
         <p class="login__sub">Access your Veltrix Intelligence Platform workspace.</p>
 
-        <VipAlert v-if="expired" tone="warning" title="Session expired"
+        <VipAlert v-if="idleExpired" tone="warning" title="Session expired"
+          >You were signed out after 30 minutes of inactivity for security.</VipAlert
+        >
+        <VipAlert v-else-if="expired" tone="warning" title="Session expired"
           >Your session ended. Please sign in again to continue.</VipAlert
         >
         <VipAlert v-if="generalError" tone="danger" title="Sign-in failed">{{ generalError }}</VipAlert>

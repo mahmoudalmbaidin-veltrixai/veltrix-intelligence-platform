@@ -8,6 +8,9 @@ export function parseSession(value: unknown): Session {
   const dto = parseContract(authenticationResponseSchema, value, 'authentication session')
   return {
     expiresAt: dto.session.expires_at,
+    idleExpiresAt: dto.session.idle_expires_at ?? null,
+    idleTimeoutMinutes: dto.session.idle_timeout_minutes ?? null,
+    warningMinutes: dto.session.warning_minutes ?? null,
     user: {
       id: dto.user.id,
       username: dto.user.username,

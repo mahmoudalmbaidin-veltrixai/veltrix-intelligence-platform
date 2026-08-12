@@ -24,6 +24,7 @@ export interface ActiveSession {
   accessExpiresAt: string
   refreshExpiresAt: string
   current: boolean
+  userAgent: string | null
 }
 
 interface ApiSession {
@@ -33,6 +34,7 @@ interface ApiSession {
   access_expires_at: string
   refresh_expires_at: string
   current: boolean
+  user_agent: string | null
 }
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024
@@ -57,6 +59,7 @@ export const settingsService = {
       accessExpiresAt: s.access_expires_at,
       refreshExpiresAt: s.refresh_expires_at,
       current: s.current,
+      userAgent: s.user_agent ?? null,
     }))
   },
 
@@ -67,6 +70,20 @@ export const settingsService = {
   async revokeOtherSessions(): Promise<number> {
     const data = await apiClient.post<{ revoked: number }>('/auth/sessions/revoke-others')
     return data.revoked
+  },
+
+  /**
+   * Record genuine user activity and renew the server-side idle window. Used by
+   * the throttled idle pinger and the "Stay signed in" action. Marked as a
+   * non-refreshing request so a 401 (already expired) surfaces immediately.
+   */
+  async recordActivity(): Promise<Session> {
+    return parseSession(
+      await apiClient.post<unknown>('/auth/session/activity', undefined, {
+        skipAuthRefresh: true,
+        notifyOnUnauthorized: false,
+      }),
+    )
   },
 
   /** Validates client-side, then streams the raw image to the avatar endpoint. */

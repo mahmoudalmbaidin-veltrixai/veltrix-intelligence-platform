@@ -31,6 +31,10 @@ export interface AuthenticatedUser {
 export interface Session {
   expiresAt: string
   user: AuthenticatedUser
+  /** Sliding idle deadline (ISO) and warning window, for the idle-timeout UX. */
+  idleExpiresAt?: string | null
+  idleTimeoutMinutes?: number | null
+  warningMinutes?: number | null
 }
 
 /**

@@ -9,6 +9,7 @@ import ToastHost from '@/shared/ui/ToastHost.vue'
 import CommandPalette from '@/shared/ui/command/CommandPalette.vue'
 import AriaLive from '@/shared/ui/AriaLive.vue'
 import GlobalRefreshBar from '@/shared/ui/refresh/GlobalRefreshBar.vue'
+import SessionExpiryWarning from '@/shared/ui/SessionExpiryWarning.vue'
 import { announce } from '@/shared/composables/useAnnouncer'
 
 const route = useRoute()
@@ -42,5 +43,6 @@ watch(
   <component :is="layout" />
   <ToastHost />
   <CommandPalette />
+  <SessionExpiryWarning />
   <AriaLive />
 </template>

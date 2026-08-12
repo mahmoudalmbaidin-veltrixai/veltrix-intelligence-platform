@@ -69,7 +69,12 @@ export const authenticationResponseSchema = z.object({
     last_login_at: isoDate.nullable().optional(),
     password_changed_at: isoDate.nullable().optional(),
   }),
-  session: z.object({ expires_at: isoDate }),
+  session: z.object({
+    expires_at: isoDate,
+    idle_expires_at: isoDate.nullable().optional(),
+    idle_timeout_minutes: z.number().nullable().optional(),
+    warning_minutes: z.number().nullable().optional(),
+  }),
 })
 
 export const fieldErrorSchema = z.object({ field: z.string(), code: z.string().optional(), message: z.string() })
