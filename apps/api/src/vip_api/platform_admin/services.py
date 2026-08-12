@@ -487,6 +487,25 @@ async def add_org_member(
     )
 
 
+async def terminate_user_sessions(db: AsyncSession, actor: User, user_id: UUID) -> int:
+    """Revoke every active session for a user (admin-initiated). Returns the count."""
+    user = await db.get(User, user_id)
+    if user is None:
+        raise ApplicationError(code="USER_NOT_FOUND", message="User not found.", status_code=404)
+    revoked = await revoke_all_user_sessions(db, user.id, "admin_terminated")
+    await record_audit(
+        db,
+        "session.revoked_by_admin",
+        actor_user_id=actor.id,
+        organization_id=None,
+        resource_type="user",
+        resource_id=user.id,
+        metadata={"revoked": revoked},
+    )
+    await db.commit()
+    return revoked
+
+
 async def set_user_status(
     db: AsyncSession, actor: User, user_id: UUID, *, suspend: bool
 ) -> PlatformUserRow:
@@ -506,6 +525,11 @@ async def set_user_status(
             status_code=409,
         )
     user.status = UserStatus.SUSPENDED if suspend else UserStatus.ACTIVE
+    if suspend:
+        # Immediately revoke active sessions on suspension. The auth dependency
+        # already rejects non-active users on their next request; this also drops
+        # any long-lived refresh session so nothing survives the suspension.
+        await revoke_all_user_sessions(db, user.id, "admin_suspended")
     await record_audit(
         db,
         "platform.user.suspended" if suspend else "platform.user.activated",

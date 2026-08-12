@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from hashlib import sha256
 from typing import Annotated
 from uuid import UUID
@@ -80,10 +81,16 @@ def get_redis(request: Request) -> RedisClient:
     return redis_client
 
 
-def auth_response(user: User, session: AuthSession) -> AuthenticationResponse:
+def auth_response(user: User, session: AuthSession, settings: Settings) -> AuthenticationResponse:
+    idle_ttl = settings.AUTH_SESSION_IDLE_TTL_MINUTES
     return AuthenticationResponse(
         user=AuthenticatedUser.from_user(user),
-        session=SessionInfo(expires_at=session.access_expires_at),
+        session=SessionInfo(
+            expires_at=session.access_expires_at,
+            idle_expires_at=session.last_seen_at + timedelta(minutes=idle_ttl),
+            idle_timeout_minutes=idle_ttl,
+            warning_minutes=settings.AUTH_SESSION_IDLE_WARNING_MINUTES,
+        ),
     )
 
 
@@ -118,10 +125,15 @@ async def login(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         )
     user, auth_session, tokens = await authenticate_login(
-        db, payload.identifier, payload.password, settings, password_service
+        db,
+        payload.identifier,
+        payload.password,
+        settings,
+        password_service,
+        user_agent=request.headers.get("user-agent"),
     )
     set_auth_cookies(response, tokens, settings)
-    return auth_response(user, auth_session)
+    return auth_response(user, auth_session, settings)
 
 
 @router.get(
@@ -138,8 +150,33 @@ async def login(
 )
 async def me(
     context: Annotated[AuthenticatedContext, Depends(get_current_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> AuthenticationResponse:
-    return auth_response(context.user, context.session)
+    return auth_response(context.user, context.session, settings)
+
+
+@router.post(
+    "/session/activity",
+    response_model=AuthenticationResponse,
+    dependencies=[Depends(require_csrf)],
+    summary="Record genuine user activity and renew the idle window",
+    description=(
+        "Called by the client on real user interaction (throttled) and by the "
+        "'Stay signed in' action. Refreshes the sliding idle deadline ONLY if the "
+        "session is still valid; an already idle/revoked session is rejected so the "
+        "user is routed to sign-in. This is the single endpoint that extends idle "
+        "time — background traffic never does."
+    ),
+    responses={403: {"model": ErrorResponse, "description": "CSRF validation failed"}},
+)
+async def session_activity(
+    context: Annotated[AuthenticatedContext, Depends(get_current_session)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AuthenticationResponse:
+    context.session.last_seen_at = utc_now()
+    await db.commit()
+    return auth_response(context.user, context.session, settings)
 
 
 @router.patch(
@@ -161,6 +198,7 @@ async def update_me(
     payload: ProfileUpdateRequest,
     context: Annotated[AuthenticatedContext, Depends(get_current_session)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> AuthenticationResponse:
     user = context.user
     fields = payload.model_dump(exclude_unset=True)
@@ -198,7 +236,7 @@ async def update_me(
         )
         await db.commit()
         await db.refresh(user)
-    return auth_response(user, context.session)
+    return auth_response(user, context.session, settings)
 
 
 @router.get(
@@ -235,6 +273,7 @@ async def list_sessions(
             access_expires_at=item.access_expires_at,
             refresh_expires_at=item.refresh_expires_at,
             current=item.id == context.session.id,
+            user_agent=item.user_agent,
         )
         for item in rows
     ]
@@ -356,7 +395,7 @@ async def upload_avatar(
     )
     await db.commit()
     await db.refresh(context.user)
-    return auth_response(context.user, context.session)
+    return auth_response(context.user, context.session, settings)
 
 
 @router.get(
@@ -405,7 +444,7 @@ async def remove_avatar(
         )
     await db.commit()
     await db.refresh(context.user)
-    return auth_response(context.user, context.session)
+    return auth_response(context.user, context.session, settings)
 
 
 @router.post(
@@ -455,7 +494,13 @@ async def refresh(
         raise authentication_error("INVALID_REFRESH_SESSION")
     ensure_active_user(user)
     await revoke_session(old_session, "rotated")
-    new_session, tokens = await create_session(db, user, settings, rotated_from=old_session.id)
+    new_session, tokens = await create_session(
+        db,
+        user,
+        settings,
+        rotated_from=old_session.id,
+        user_agent=request.headers.get("user-agent") or old_session.user_agent,
+    )
     await db.commit()
     set_auth_cookies(response, tokens, settings)
     logger.info(
@@ -467,7 +512,7 @@ async def refresh(
             "session_id": str(new_session.id),
         },
     )
-    return auth_response(user, new_session)
+    return auth_response(user, new_session, settings)
 
 
 @router.post(

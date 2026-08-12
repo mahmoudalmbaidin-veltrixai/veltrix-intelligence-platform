@@ -79,6 +79,11 @@ class AuthenticatedUser(BaseModel):
 
 class SessionInfo(BaseModel):
     expires_at: datetime
+    # Sliding idle deadline (last activity + idle TTL) and the client warning
+    # window, so the UI can count down and warn before automatic sign-out.
+    idle_expires_at: datetime | None = None
+    idle_timeout_minutes: int | None = None
+    warning_minutes: int | None = None
 
 
 class AuthenticationResponse(BaseModel):
@@ -158,6 +163,9 @@ class SessionSummary(BaseModel):
     access_expires_at: datetime
     refresh_expires_at: datetime
     current: bool = False
+    # Raw User-Agent (client parses into a friendly device/browser label). No
+    # location is stored, so the UI must not fabricate one.
+    user_agent: str | None = None
 
 
 class SessionListResponse(BaseModel):

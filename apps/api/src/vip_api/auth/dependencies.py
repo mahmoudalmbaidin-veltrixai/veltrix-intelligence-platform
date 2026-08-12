@@ -1,7 +1,6 @@
 """Reusable typed dependencies for authenticated users and sessions."""
 
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -14,10 +13,12 @@ from vip_api.auth.sessions import (
     ensure_active_user,
     find_access_session,
     load_user,
+    revoke_session,
     session_idle,
 )
 from vip_api.core.config import Settings
 from vip_api.database.session import get_db_session
+from vip_api.governance.audit import record_audit
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,15 +39,29 @@ async def get_current_session(
     now = utc_now()
     if auth_session is None or auth_session.revoked_at is not None:
         raise authentication_error("SESSION_REVOKED")
-    if auth_session.access_expires_at <= now or session_idle(auth_session, settings):
+    # Authoritative sliding idle timeout. When exceeded, revoke the session so it
+    # is dead for every subsequent request and record a single security event
+    # (no per-request audit noise). The idle window is refreshed ONLY by genuine
+    # user activity via the dedicated activity endpoint — never by this read path,
+    # so background polling, SSE, and auto-refreshes cannot keep a session alive.
+    if session_idle(auth_session, settings):
+        await revoke_session(auth_session, "idle_timeout")
+        await record_audit(
+            db,
+            "session.expired_idle",
+            actor_user_id=auth_session.user_id,
+            organization_id=None,
+            resource_type="auth_session",
+            resource_id=auth_session.id,
+            commit=True,
+        )
+        raise authentication_error("SESSION_IDLE_TIMEOUT")
+    if auth_session.access_expires_at <= now:
         raise authentication_error("SESSION_EXPIRED")
     user = await load_user(db, auth_session.user_id)
     if user is None:
         raise authentication_error()
     ensure_active_user(user)
-    if auth_session.last_seen_at + timedelta(minutes=5) <= now:
-        auth_session.last_seen_at = now
-        await db.commit()
     return AuthenticatedContext(user=user, session=auth_session)
 
 

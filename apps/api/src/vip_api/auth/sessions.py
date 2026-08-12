@@ -38,6 +38,7 @@ async def create_session(
     settings: Settings,
     *,
     rotated_from: UUID | None = None,
+    user_agent: str | None = None,
 ) -> tuple[AuthSession, SessionTokens]:
     now = utc_now()
     tokens = generate_session_tokens()
@@ -49,6 +50,7 @@ async def create_session(
         access_expires_at=now + timedelta(minutes=settings.AUTH_ACCESS_SESSION_TTL_MINUTES),
         refresh_expires_at=now + timedelta(days=settings.AUTH_REFRESH_SESSION_TTL_DAYS),
         last_seen_at=now,
+        user_agent=(user_agent or None) and user_agent[:512],
         rotated_from_session_id=rotated_from,
     )
     db.add(auth_session)

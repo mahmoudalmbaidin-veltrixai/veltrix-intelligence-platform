@@ -114,6 +114,9 @@ class AuthSession(Base):
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    # Raw User-Agent captured at sign-in for honest device/browser display on the
+    # Sessions page. No IP/geolocation is stored, so location is never fabricated.
+    user_agent: Mapped[str | None] = mapped_column(String(512))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     revocation_reason: Mapped[str | None] = mapped_column(String(100))
     rotated_from_session_id: Mapped[UUID | None] = mapped_column(

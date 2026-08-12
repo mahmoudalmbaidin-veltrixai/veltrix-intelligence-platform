@@ -29,6 +29,7 @@ from vip_api.platform_admin.schemas import (
     UpdatePlatformUserRequest,
     UserAccessSummary,
 )
+from vip_api.schemas.auth import RevokeSessionsResponse
 
 router = APIRouter(prefix="/platform", tags=["platform-admin"])
 
@@ -165,6 +166,19 @@ async def activate_user(user_id: UUID, db: DbSession, admin: PlatformAdmin) -> P
 @router.get("/users/{user_id}/access-summary", response_model=UserAccessSummary)
 async def get_user_access(user_id: UUID, db: DbSession, _admin: PlatformAdmin) -> UserAccessSummary:
     return await services.get_access_summary(db, user_id)
+
+
+@router.post(
+    "/users/{user_id}/sessions/revoke",
+    response_model=RevokeSessionsResponse,
+    dependencies=[Depends(require_csrf)],
+    summary="Terminate all of a user's sessions (admin)",
+)
+async def revoke_user_sessions(
+    user_id: UUID, db: DbSession, admin: PlatformAdmin
+) -> RevokeSessionsResponse:
+    revoked = await services.terminate_user_sessions(db, admin, user_id)
+    return RevokeSessionsResponse(revoked=revoked)
 
 
 @router.patch(

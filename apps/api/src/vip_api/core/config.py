@@ -75,7 +75,12 @@ class Settings(BaseSettings):
 
     AUTH_ACCESS_SESSION_TTL_MINUTES: int = Field(default=15, ge=1, le=1440)
     AUTH_REFRESH_SESSION_TTL_DAYS: int = Field(default=14, ge=1, le=90)
-    AUTH_SESSION_IDLE_TTL_MINUTES: int = Field(default=60, ge=1, le=10080)
+    # Sliding idle window: a session is invalidated this long after the last
+    # genuine user activity (not background polling). Absolute lifetime is the
+    # refresh TTL above and is enforced independently.
+    AUTH_SESSION_IDLE_TTL_MINUTES: int = Field(default=30, ge=1, le=10080)
+    # How long before idle expiry the client shows the "session expiring" warning.
+    AUTH_SESSION_IDLE_WARNING_MINUTES: int = Field(default=5, ge=1, le=60)
     AUTH_MAX_ACTIVE_SESSIONS_PER_USER: int = Field(default=10, ge=1, le=100)
     AUTH_COOKIE_SECURE: bool = False
     AUTH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"

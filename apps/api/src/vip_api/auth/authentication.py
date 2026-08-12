@@ -32,6 +32,8 @@ async def authenticate_login(
     password: str,
     settings: Settings,
     password_service: PasswordService,
+    *,
+    user_agent: str | None = None,
 ) -> tuple[User, AuthSession, SessionTokens]:
     now = utc_now()
     # Accept the username (primary) or the email (legacy) as the login identifier.
@@ -101,7 +103,7 @@ async def authenticate_login(
     user.failed_login_count = 0
     user.locked_until = None
     user.last_login_at = now
-    auth_session, tokens = await create_session(db, user, settings)
+    auth_session, tokens = await create_session(db, user, settings, user_agent=user_agent)
     await db.commit()
     logger.info(
         "Login succeeded",

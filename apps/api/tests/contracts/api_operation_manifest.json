@@ -1,11 +1,11 @@
 {
   "authentication_levels": {
-    "authenticated": 11,
-    "platform": 32,
+    "authenticated": 12,
+    "platform": 33,
     "public": 6,
     "workspace": 217
   },
-  "operation_count": 266,
+  "operation_count": 268,
   "operations": [
     {
       "authentication_level": "workspace",
@@ -1466,6 +1466,13 @@
     {
       "authentication_level": "platform",
       "method": "POST",
+      "operation_id": "revoke_user_sessions_api_v1_platform_users__user_id__sessions_revoke_post",
+      "path": "/api/v1/platform/users/{user_id}/sessions/revoke",
+      "tag": "platform-admin"
+    },
+    {
+      "authentication_level": "platform",
+      "method": "POST",
       "operation_id": "suspend_user_api_v1_platform_users__user_id__suspend_post",
       "path": "/api/v1/platform/users/{user_id}/suspend",
       "tag": "platform-admin"
@@ -1836,6 +1843,13 @@
     },
     {
       "authentication_level": "authenticated",
+      "method": "POST",
+      "operation_id": "session_activity_auth_session_activity_post",
+      "path": "/auth/session/activity",
+      "tag": "authentication"
+    },
+    {
+      "authentication_level": "authenticated",
       "method": "GET",
       "operation_id": "list_sessions_auth_sessions_get",
       "path": "/auth/sessions",
@@ -1870,6 +1884,6 @@
       "tag": "operations"
     }
   ],
-  "path_count": 205,
+  "path_count": 207,
   "schema_version": 1
 }
