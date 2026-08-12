@@ -34,6 +34,14 @@ export interface UserProfile {
   timezone: string
   locale: string
   isPlatformAdmin: boolean
+  department?: string
+  phone?: string
+  avatarUrl?: string | null
+  accountType?: string
+  preferences?: Record<string, unknown>
+  createdAt?: string | null
+  lastLoginAt?: string | null
+  passwordChangedAt?: string | null
 }
 
 export type TenantStatus = 'trial' | 'active' | 'suspended' | 'archived' | 'deleted' | 'disabled' | 'pending-deletion'

@@ -672,7 +672,12 @@ const routes: RouteRecordRaw[] = [
     },
   },
 
-  // Settings
+  // Settings — legacy deep links redirect to the correct home so bookmarks
+  // never break. Organization/workspace settings now live in Admin; the personal
+  // Settings center owns only account-level sections.
+  { path: '/settings/personal', redirect: { name: 'settings', params: { section: 'profile' } } },
+  { path: '/settings/workspace', redirect: { name: 'admin-workspace' } },
+  { path: '/settings/organization', redirect: { name: 'admin-org' } },
   {
     path: '/settings/:section?',
     name: 'settings',

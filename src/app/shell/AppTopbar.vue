@@ -152,7 +152,7 @@ const createItems = computed(() =>
   })),
 )
 const userItems = [
-  { key: '/settings/personal', label: 'Profile & preferences', icon: 'settings' },
+  { key: '/settings/profile', label: 'Profile & preferences', icon: 'settings' },
   { key: 'appearance', label: 'Toggle appearance', icon: 'moon' },
   { key: '/settings/security', label: 'Security', icon: 'lock' },
   { key: 'divider', label: '', divider: true },

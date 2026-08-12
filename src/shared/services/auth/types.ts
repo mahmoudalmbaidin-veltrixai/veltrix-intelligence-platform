@@ -15,6 +15,17 @@ export interface AuthenticatedUser {
   isPlatformAdmin: boolean
   /** When true the user must complete a forced password change before continuing. */
   mustChangePassword: boolean
+  accountType?: string
+  jobTitle?: string | null
+  department?: string | null
+  phone?: string | null
+  locale?: string | null
+  timezone?: string | null
+  avatarUrl?: string | null
+  preferences?: Record<string, unknown>
+  createdAt?: string | null
+  lastLoginAt?: string | null
+  passwordChangedAt?: string | null
 }
 
 export interface Session {

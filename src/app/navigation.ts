@@ -453,38 +453,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Settings',
     items: [
       {
-        label: 'Personal Settings',
-        to: '/settings/personal',
+        // Personal account only. Organization and workspace administration live
+        // in the dedicated Admin navigation, never duplicated inside Settings.
+        label: 'Settings',
+        to: '/settings/profile',
         icon: 'settings',
-        description: 'Your profile, appearance and preferences.',
-      },
-      {
-        label: 'Workspace Settings',
-        to: '/settings/workspace',
-        icon: 'settings',
-        description: 'Defaults and options for this workspace.',
-        permission: 'workspace.update',
-      },
-      {
-        label: 'Organization Settings',
-        to: '/settings/organization',
-        icon: 'building',
-        description: 'Organization-level defaults and branding.',
-        permission: 'governance.read',
-      },
-      {
-        label: 'Developer Settings',
-        to: '/settings/developer',
-        icon: 'code',
-        description: 'API keys, tokens and developer options.',
-        permission: 'developer.read',
-        entitlement: 'developer_api',
-      },
-      {
-        label: 'Security',
-        to: '/settings/security',
-        icon: 'lock',
-        description: 'Password, sessions and multi-factor auth.',
+        description: 'Your profile, security, preferences and sessions.',
       },
     ],
   },

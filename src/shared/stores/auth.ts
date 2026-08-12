@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { authService, type Session } from '@/shared/services/auth'
 import { usePlatformStore } from '@/shared/stores/platform'
+import { useThemeStore } from '@/shared/stores/theme'
 import { ApiError } from '@/shared/types/api'
 
 export type AuthStatus = 'idle' | 'loading' | 'authenticated' | 'unauthenticated' | 'error'
@@ -33,6 +34,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function establishSession(value: Session, generation: number): Promise<boolean> {
     const platform = usePlatformStore()
     platform.hydrateAuthenticatedUser(value.user)
+    // Apply the user's server-stored appearance preferences on sign-in so theme,
+    // density and reduced-motion follow them across devices.
+    useThemeStore().hydrate(value.user.preferences)
     await platform.bootstrapTenancy(true)
     if (generation !== sessionGeneration) return false
     if (platform.status === 'error') {

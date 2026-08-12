@@ -4,17 +4,29 @@ import { apiClient } from '@/shared/lib/apiClient'
 import { ApiError } from '@/shared/types/api'
 import { authenticationResponseSchema, parseContract } from '@/shared/contracts/apiContracts'
 
-function parseSession(value: unknown): Session {
+export function parseSession(value: unknown): Session {
   const dto = parseContract(authenticationResponseSchema, value, 'authentication session')
   return {
     expiresAt: dto.session.expires_at,
     user: {
       id: dto.user.id,
+      username: dto.user.username,
       email: dto.user.email,
       displayName: dto.user.display_name,
       status: dto.user.status,
       isPlatformAdmin: dto.user.is_platform_admin,
       mustChangePassword: dto.user.must_change_password,
+      accountType: dto.user.account_type,
+      jobTitle: dto.user.job_title ?? null,
+      department: dto.user.department ?? null,
+      phone: dto.user.phone ?? null,
+      locale: dto.user.locale ?? null,
+      timezone: dto.user.timezone ?? null,
+      avatarUrl: dto.user.avatar_url ?? null,
+      preferences: dto.user.preferences ?? {},
+      createdAt: dto.user.created_at ?? null,
+      lastLoginAt: dto.user.last_login_at ?? null,
+      passwordChangedAt: dto.user.password_changed_at ?? null,
     },
   }
 }

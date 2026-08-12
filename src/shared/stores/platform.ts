@@ -223,6 +223,18 @@ export const usePlatformStore = defineStore('platform', () => {
       email: authenticatedUser.email ?? '',
       name: authenticatedUser.displayName,
       isPlatformAdmin: authenticatedUser.isPlatformAdmin,
+      jobTitle: authenticatedUser.jobTitle ?? user.value.jobTitle,
+      department: authenticatedUser.department ?? undefined,
+      phone: authenticatedUser.phone ?? undefined,
+      // Fall back to the browser defaults only when the server has no value yet.
+      timezone: authenticatedUser.timezone || user.value.timezone,
+      locale: authenticatedUser.locale || user.value.locale,
+      avatarUrl: authenticatedUser.avatarUrl ?? null,
+      accountType: authenticatedUser.accountType,
+      preferences: authenticatedUser.preferences ?? {},
+      createdAt: authenticatedUser.createdAt ?? null,
+      lastLoginAt: authenticatedUser.lastLoginAt ?? null,
+      passwordChangedAt: authenticatedUser.passwordChangedAt ?? null,
     }
   }
 

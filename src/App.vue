@@ -8,6 +8,7 @@ import BlankLayout from '@/app/layouts/BlankLayout.vue'
 import ToastHost from '@/shared/ui/ToastHost.vue'
 import CommandPalette from '@/shared/ui/command/CommandPalette.vue'
 import AriaLive from '@/shared/ui/AriaLive.vue'
+import GlobalRefreshBar from '@/shared/ui/refresh/GlobalRefreshBar.vue'
 import { announce } from '@/shared/composables/useAnnouncer'
 
 const route = useRoute()
@@ -37,6 +38,7 @@ watch(
 
 <template>
   <a href="#vip-main" class="vip-skip-link">Skip to main content</a>
+  <GlobalRefreshBar />
   <component :is="layout" />
   <ToastHost />
   <CommandPalette />
