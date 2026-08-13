@@ -19,7 +19,8 @@ export const useUiStore = defineStore('ui', () => {
   const mobileNavOpen = ref(false)
   const commandOpen = ref(false)
   const notificationDrawerOpen = ref(false)
-  const unreadNotifications = ref(4)
+  // Seeded from the backend unread-count on app bootstrap (never a fixed value).
+  const unreadNotifications = ref(0)
   const toasts = ref<Toast[]>([])
 
   function toggleSidebar() {

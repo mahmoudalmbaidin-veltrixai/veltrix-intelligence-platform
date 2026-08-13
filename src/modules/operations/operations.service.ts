@@ -487,6 +487,14 @@ function matches(a: AuditEvent, q?: AuditQuery): boolean {
  */
 export interface OperationsService {
   listNotifications(): Promise<Notification[]>
+  /** Authoritative unread count for the signed-in user (badge source of truth). */
+  unreadNotificationCount(): Promise<number>
+  /** Persist a single notification as read; returns the new unread count. */
+  markNotificationRead(id: string): Promise<number>
+  /** Remove a single notification's read marker; returns the new unread count. */
+  markNotificationUnread(id: string): Promise<number>
+  /** Persist all notifications as read; returns the new unread count (0). */
+  markAllNotificationsRead(): Promise<number>
   listActivity(): Promise<ActivityEvent[]>
   listAudit(params?: AuditQuery): Promise<AuditEvent[]>
   listUsage(): Promise<UsageMetric[]>
@@ -496,6 +504,33 @@ const mockOperationsService: OperationsService = {
   async listNotifications(): Promise<Notification[]> {
     await latency()
     return NOTIFICATIONS.map((n) => ({ ...n }))
+  },
+
+  async unreadNotificationCount(): Promise<number> {
+    await latency()
+    return NOTIFICATIONS.filter((n) => !n.read).length
+  },
+
+  async markNotificationRead(id: string): Promise<number> {
+    await latency()
+    const target = NOTIFICATIONS.find((n) => n.id === id)
+    if (target) target.read = true
+    return NOTIFICATIONS.filter((n) => !n.read).length
+  },
+
+  async markNotificationUnread(id: string): Promise<number> {
+    await latency()
+    const target = NOTIFICATIONS.find((n) => n.id === id)
+    if (target) target.read = false
+    return NOTIFICATIONS.filter((n) => !n.read).length
+  },
+
+  async markAllNotificationsRead(): Promise<number> {
+    await latency()
+    NOTIFICATIONS.forEach((n) => {
+      n.read = true
+    })
+    return 0
   },
 
   async listActivity(): Promise<ActivityEvent[]> {
@@ -520,6 +555,12 @@ const mockOperationsService: OperationsService = {
  */
 const apiOperationsService: OperationsService = {
   listNotifications: () => apiClient.get<Notification[]>('/notifications'),
+  unreadNotificationCount: () => apiClient.get<{ count: number }>('/notifications/unread-count').then((r) => r.count),
+  markNotificationRead: (id) =>
+    apiClient.post<{ count: number }>(`/notifications/${encodeURIComponent(id)}/read`).then((r) => r.count),
+  markNotificationUnread: (id) =>
+    apiClient.delete<{ count: number }>(`/notifications/${encodeURIComponent(id)}/read`).then((r) => r.count),
+  markAllNotificationsRead: () => apiClient.post<{ count: number }>('/notifications/read-all').then((r) => r.count),
   listActivity: () => apiClient.get<ActivityEvent[]>('/activity'),
   listAudit: (params) =>
     // Canonical audit route is /audit-events (the Audit Center uses it via

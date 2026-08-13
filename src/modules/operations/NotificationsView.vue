@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { useUiStore } from '@/shared/stores/ui'
+import { usePlatformStore } from '@/shared/stores/platform'
+import { settingsService } from '@/modules/settings/settings.service'
 import { relativeTime } from '@/shared/lib/format'
 import { operationsService, type Notification, type Severity } from './operations.service'
 import VipPageHeader from '@/shared/ui/VipPageHeader.vue'
@@ -87,31 +89,51 @@ const filtered = computed(() =>
 
 const unreadCount = computed(() => list.value.filter((n) => !n.read).length)
 
-function markRead(n: Notification) {
-  n.read = true
-  ui.unreadNotifications = unreadCount.value
+async function markRead(n: Notification) {
+  try {
+    ui.unreadNotifications = await operationsService.markNotificationRead(n.id)
+    n.read = true
+  } catch {
+    n.read = true
+    ui.unreadNotifications = unreadCount.value
+  }
 }
-function markUnread(n: Notification) {
-  n.read = false
-  ui.unreadNotifications = unreadCount.value
+async function markUnread(n: Notification) {
+  try {
+    ui.unreadNotifications = await operationsService.markNotificationUnread(n.id)
+    n.read = false
+  } catch {
+    n.read = false
+    ui.unreadNotifications = unreadCount.value
+  }
 }
-function markAllRead() {
-  items.value.forEach((n) => (n.read = true))
-  ui.unreadNotifications = 0
-  ui.pushToast({ kind: 'success', title: 'All notifications marked as read' })
+async function markAllRead() {
+  try {
+    ui.unreadNotifications = await operationsService.markAllNotificationsRead()
+    items.value.forEach((n) => (n.read = true))
+    ui.pushToast({ kind: 'success', title: 'All notifications marked as read' })
+  } catch (cause) {
+    ui.pushToast({
+      kind: 'error',
+      title: 'Could not mark all as read',
+      message: (cause as Error).message,
+    })
+  }
 }
 function archive(n: Notification) {
   items.value = items.value.filter((x) => x.id !== n.id)
   ui.unreadNotifications = unreadCount.value
   ui.pushToast({ kind: 'info', title: 'Notification archived', message: n.title })
 }
-function openResource(n: Notification) {
+async function openResource(n: Notification) {
   if (!n.resource) return
-  markRead(n)
+  await markRead(n)
   router.push(n.resource.to)
 }
 
-const preferences = reactive<Record<string, boolean>>({
+// ------- Notification preferences (persisted per-user) ------- //
+const platform = usePlatformStore()
+const PREF_DEFAULTS: Record<string, boolean> = {
   Pipelines: true,
   Datasets: true,
   Reports: true,
@@ -120,10 +142,41 @@ const preferences = reactive<Record<string, boolean>>({
   Developer: true,
   Automation: true,
   System: true,
-})
+}
+const preferences = reactive<Record<string, boolean>>({ ...PREF_DEFAULTS })
 const prefKeys = Object.keys(preferences)
-function savePreferences() {
-  ui.pushToast({ kind: 'success', title: 'Notification preferences saved' })
+const savingPreferences = ref(false)
+
+/** Hydrate from the user's persisted preferences (defaults never overwrite them). */
+function loadPreferences() {
+  const stored = platform.user.preferences?.notifications
+  if (stored && typeof stored === 'object') {
+    for (const key of prefKeys) {
+      const value = (stored as Record<string, unknown>)[key]
+      if (typeof value === 'boolean') preferences[key] = value
+    }
+  }
+}
+onMounted(loadPreferences)
+// Re-hydrate if the user changes (e.g., re-login) so saved values reappear.
+watch(() => platform.user.id, loadPreferences)
+
+async function savePreferences() {
+  if (savingPreferences.value) return
+  savingPreferences.value = true
+  try {
+    const session = await settingsService.updatePreferences({ notifications: { ...preferences } })
+    platform.hydrateAuthenticatedUser(session.user)
+    ui.pushToast({ kind: 'success', title: 'Notification preferences saved' })
+  } catch (cause) {
+    ui.pushToast({
+      kind: 'error',
+      title: 'Unable to save notification preferences',
+      message: (cause as Error).message || 'Please try again.',
+    })
+  } finally {
+    savingPreferences.value = false
+  }
 }
 </script>
 
@@ -213,7 +266,16 @@ function savePreferences() {
               <VipSwitch v-model="preferences[key]" size="sm" />
             </li>
           </ul>
-          <VipButton variant="secondary" size="sm" block @click="savePreferences"> Save preferences </VipButton>
+          <VipButton
+            variant="secondary"
+            size="sm"
+            block
+            :loading="savingPreferences"
+            :disabled="savingPreferences"
+            @click="savePreferences"
+          >
+            Save preferences
+          </VipButton>
         </VipCard>
       </aside>
     </div>

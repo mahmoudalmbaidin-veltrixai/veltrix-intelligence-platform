@@ -38,14 +38,32 @@ watch(
   { immediate: true },
 )
 
-function markAll() {
-  items.value = items.value.map((n) => ({ ...n, read: true }))
-  ui.unreadNotifications = 0
+async function markAll() {
+  // Persist server-side first, then reflect locally. The backend is the source
+  // of truth, so this survives refresh and logout/login.
+  try {
+    const count = await operationsService.markAllNotificationsRead()
+    items.value = items.value.map((n) => ({ ...n, read: true }))
+    ui.unreadNotifications = count
+  } catch (cause) {
+    ui.pushToast({
+      kind: 'error',
+      title: 'Could not mark all as read',
+      message: (cause as Error).message,
+    })
+  }
 }
-function open(n: Notification) {
-  n.read = true
-  ui.unreadNotifications = items.value.filter((x) => !x.read).length
+async function open(n: Notification) {
   ui.notificationDrawerOpen = false
+  try {
+    const count = await operationsService.markNotificationRead(n.id)
+    n.read = true
+    ui.unreadNotifications = count
+  } catch {
+    // Navigation should still proceed; the count reconciles on next load.
+    n.read = true
+    ui.unreadNotifications = items.value.filter((x) => !x.read).length
+  }
   if (n.resource) router.push(n.resource.to)
 }
 </script>

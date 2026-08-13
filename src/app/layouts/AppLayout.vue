@@ -5,6 +5,7 @@ import { usePlatformStore } from '@/shared/stores/platform'
 import { useUiStore } from '@/shared/stores/ui'
 import { invalidateQueries } from '@/shared/lib/query'
 import { platformInfrastructure } from '@/shared/services/platformInfrastructure'
+import { operationsService } from '@/modules/operations/operations.service'
 import AppSidebar from '@/app/shell/AppSidebar.vue'
 import AppTopbar from '@/app/shell/AppTopbar.vue'
 import MobileNav from '@/app/shell/MobileNav.vue'
@@ -15,6 +16,22 @@ const platform = usePlatformStore()
 const ui = useUiStore()
 const fullBleed = computed(() => route.meta.fullBleed === true)
 let eventsController: AbortController | undefined
+
+// Seed the notification badge from the authoritative backend unread-count once a
+// workspace is active, and re-seed on workspace switch. The badge is never a
+// fixed placeholder — it reflects the user's persisted read state.
+watch(
+  () => platform.workspace?.id,
+  async (workspaceId) => {
+    if (!workspaceId) return
+    try {
+      ui.unreadNotifications = await operationsService.unreadNotificationCount()
+    } catch {
+      // Non-fatal: the drawer reconciles the count when opened.
+    }
+  },
+  { immediate: true },
+)
 
 watch(
   () => [platform.organization?.id, platform.workspace?.id, platform.can('events.subscribe')] as const,
