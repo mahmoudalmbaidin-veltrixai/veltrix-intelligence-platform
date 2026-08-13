@@ -167,7 +167,7 @@ onBeforeUnmount(() => {
           placement="right"
         >
           <RouterLink
-            to="/developer"
+            to="/help"
             class="vip-sidebar__item"
             :aria-label="collapsed && !floating ? 'Help & docs' : undefined"
           >

@@ -672,6 +672,20 @@ const routes: RouteRecordRaw[] = [
     },
   },
 
+  // Help & Documentation
+  {
+    path: '/help',
+    name: 'help',
+    component: () => import('@/modules/help/HelpHomeView.vue'),
+    meta: { title: 'Help & Docs', requiresAuth: true },
+  },
+  {
+    path: '/help/:slug',
+    name: 'help-article',
+    component: () => import('@/modules/help/HelpArticleView.vue'),
+    meta: { title: 'Help & Docs', requiresAuth: true },
+  },
+
   // Settings — legacy deep links redirect to the correct home so bookmarks
   // never break. Organization/workspace settings now live in Admin; the personal
   // Settings center owns only account-level sections.
