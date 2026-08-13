@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated, Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
+from vip_api.auth.dependencies import require_csrf
 from vip_api.connections.models import Connection
 from vip_api.dashboards.models import Dashboard
 from vip_api.database.session import get_db_session
@@ -16,6 +20,7 @@ from vip_api.datasets.models import Dataset
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.dependencies import require_permission
 from vip_api.governance.models import AuditEvent
+from vip_api.home.models import NotificationRead
 from vip_api.home.schemas import (
     ActivityEntry,
     ActivityFeedEntry,
@@ -25,6 +30,7 @@ from vip_api.home.schemas import (
     NotificationEntry,
     NotificationResource,
     RecentResource,
+    UnreadCountResponse,
 )
 from vip_api.jobs.models import DeadLetterJob, Job
 from vip_api.pipelines.models import Pipeline, PipelineRun
@@ -62,12 +68,10 @@ def _scope(
     )
 
 
-@notifications_router.get("/notifications", response_model=list[NotificationEntry])
-async def notifications(
-    context: Annotated[AuthorizationContext, Depends(require_permission("workspace.read"))],
-    db: Annotated[AsyncSession, Depends(get_db_session)],
+async def _notification_feed(
+    db: AsyncSession, context: AuthorizationContext
 ) -> list[NotificationEntry]:
-    """Return tenant-scoped operational facts; never synthesize success states."""
+    """Build the tenant-scoped derived notification feed (without read state)."""
     rows = (
         await db.scalars(
             select(Job)
@@ -108,6 +112,118 @@ async def notifications(
             )
         )
     return result
+
+
+async def _read_ids(db: AsyncSession, context: AuthorizationContext) -> set[str]:
+    """The notification ids this user has already marked read (per-user state)."""
+    ids = await db.scalars(
+        select(NotificationRead.notification_id).where(NotificationRead.user_id == context.user_id)
+    )
+    return set(ids)
+
+
+@notifications_router.get("/notifications", response_model=list[NotificationEntry])
+async def notifications(
+    context: Annotated[AuthorizationContext, Depends(require_permission("workspace.read"))],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[NotificationEntry]:
+    """Return tenant-scoped operational facts with each user's persisted read state."""
+    feed = await _notification_feed(db, context)
+    read_ids = await _read_ids(db, context)
+    for entry in feed:
+        entry.read = entry.id in read_ids
+    return feed
+
+
+@notifications_router.get("/notifications/unread-count", response_model=UnreadCountResponse)
+async def unread_count(
+    context: Annotated[AuthorizationContext, Depends(require_permission("workspace.read"))],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> UnreadCountResponse:
+    """Authoritative unread count for the signed-in user — the badge source of truth."""
+    feed = await _notification_feed(db, context)
+    read_ids = await _read_ids(db, context)
+    return UnreadCountResponse(count=sum(1 for entry in feed if entry.id not in read_ids))
+
+
+async def _mark(db: AsyncSession, user_id: UUID, notification_ids: list[str]) -> None:
+    """Persist read markers for a user, ignoring ids already read (idempotent)."""
+    if not notification_ids:
+        return
+    now = datetime.now(UTC)
+    await db.execute(
+        pg_insert(NotificationRead)
+        .values(
+            [
+                {"user_id": user_id, "notification_id": nid, "read_at": now}
+                for nid in notification_ids
+            ]
+        )
+        .on_conflict_do_nothing(constraint="uq_notification_reads_user_notification")
+    )
+    await db.commit()
+
+
+@notifications_router.post(
+    "/notifications/{notification_id}/read",
+    response_model=UnreadCountResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def mark_notification_read(
+    notification_id: str,
+    context: Annotated[AuthorizationContext, Depends(require_permission("workspace.read"))],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> UnreadCountResponse:
+    """Persist a single notification as read for the signed-in user only.
+
+    Read state is keyed by the session user id, so a user can never change
+    another user's notification state. Only ids present in the caller's own
+    tenant-scoped feed are accepted.
+    """
+    feed = await _notification_feed(db, context)
+    if any(entry.id == notification_id for entry in feed):
+        await _mark(db, context.user_id, [notification_id])
+    read_ids = await _read_ids(db, context)
+    return UnreadCountResponse(count=sum(1 for entry in feed if entry.id not in read_ids))
+
+
+@notifications_router.delete(
+    "/notifications/{notification_id}/read",
+    response_model=UnreadCountResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def unmark_notification_read(
+    notification_id: str,
+    context: Annotated[AuthorizationContext, Depends(require_permission("workspace.read"))],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> UnreadCountResponse:
+    """Remove a single notification's read marker for the signed-in user only."""
+    await db.execute(
+        delete(NotificationRead).where(
+            NotificationRead.user_id == context.user_id,
+            NotificationRead.notification_id == notification_id,
+        )
+    )
+    await db.commit()
+    feed = await _notification_feed(db, context)
+    read_ids = await _read_ids(db, context)
+    return UnreadCountResponse(count=sum(1 for entry in feed if entry.id not in read_ids))
+
+
+@notifications_router.post(
+    "/notifications/read-all",
+    response_model=UnreadCountResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def mark_all_notifications_read(
+    context: Annotated[AuthorizationContext, Depends(require_permission("workspace.read"))],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> UnreadCountResponse:
+    """Persist every currently-unread notification as read for the signed-in user."""
+    feed = await _notification_feed(db, context)
+    read_ids = await _read_ids(db, context)
+    await _mark(db, context.user_id, [entry.id for entry in feed if entry.id not in read_ids])
+    return UnreadCountResponse(count=0)
 
 
 @notifications_router.get("/activity", response_model=list[ActivityFeedEntry])

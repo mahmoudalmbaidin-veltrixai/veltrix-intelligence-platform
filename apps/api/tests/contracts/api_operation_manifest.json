@@ -3,9 +3,9 @@
     "authenticated": 12,
     "platform": 33,
     "public": 6,
-    "workspace": 217
+    "workspace": 221
   },
-  "operation_count": 268,
+  "operation_count": 272,
   "operations": [
     {
       "authentication_level": "workspace",
@@ -1003,6 +1003,34 @@
     },
     {
       "authentication_level": "workspace",
+      "method": "POST",
+      "operation_id": "mark_all_notifications_read_api_v1_notifications_read_all_post",
+      "path": "/api/v1/notifications/read-all",
+      "tag": "notifications"
+    },
+    {
+      "authentication_level": "workspace",
+      "method": "GET",
+      "operation_id": "unread_count_api_v1_notifications_unread_count_get",
+      "path": "/api/v1/notifications/unread-count",
+      "tag": "notifications"
+    },
+    {
+      "authentication_level": "workspace",
+      "method": "DELETE",
+      "operation_id": "unmark_notification_read_api_v1_notifications__notification_id__read_delete",
+      "path": "/api/v1/notifications/{notification_id}/read",
+      "tag": "notifications"
+    },
+    {
+      "authentication_level": "workspace",
+      "method": "POST",
+      "operation_id": "mark_notification_read_api_v1_notifications__notification_id__read_post",
+      "path": "/api/v1/notifications/{notification_id}/read",
+      "tag": "notifications"
+    },
+    {
+      "authentication_level": "workspace",
       "method": "GET",
       "operation_id": "list_organizations_api_v1_organizations_get",
       "path": "/api/v1/organizations",
@@ -1884,6 +1912,6 @@
       "tag": "operations"
     }
   ],
-  "path_count": 207,
+  "path_count": 210,
   "schema_version": 1
 }

@@ -82,3 +82,9 @@ class NotificationEntry(BaseModel):
     ts: datetime
     read: bool = False
     resource: NotificationResource | None = None
+
+
+class UnreadCountResponse(BaseModel):
+    """The signed-in user's current unread notification count."""
+
+    count: int
