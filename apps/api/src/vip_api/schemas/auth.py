@@ -141,7 +141,19 @@ class ProfileUpdateRequest(BaseModel):
 
     @field_validator("preferences")
     @classmethod
-    def _flat_scalar_preferences(cls, value: dict[str, object] | None) -> dict[str, object] | None:
+    def _validate_preferences(cls, value: dict[str, object] | None) -> dict[str, object] | None:
+        # Each preference value is a JSON scalar, or a single flat object of
+        # scalars (e.g. a grouped set like `notifications: {Pipelines: false}`).
+        # Deeper nesting is rejected so the bag stays a small, predictable map.
+        def _is_scalar(v: object) -> bool:
+            return v is None or isinstance(v, (str, int, float, bool))
+
+        def _check_scalar(v: object) -> None:
+            if not _is_scalar(v):
+                raise ValueError("Preference values must be JSON scalars.")
+            if isinstance(v, str) and len(v) > 256:
+                raise ValueError("Preference value too long.")
+
         if value is None:
             return None
         if len(value) > 50:
@@ -149,10 +161,15 @@ class ProfileUpdateRequest(BaseModel):
         for key, item in value.items():
             if not isinstance(key, str) or len(key) > 64:
                 raise ValueError("Invalid preference key.")
-            if not isinstance(item, (str, int, float, bool)) and item is not None:
-                raise ValueError("Preference values must be JSON scalars.")
-            if isinstance(item, str) and len(item) > 256:
-                raise ValueError("Preference value too long.")
+            if isinstance(item, dict):
+                if len(item) > 50:
+                    raise ValueError("Preference group too large.")
+                for sub_key, sub_value in item.items():
+                    if not isinstance(sub_key, str) or len(sub_key) > 64:
+                        raise ValueError("Invalid preference key.")
+                    _check_scalar(sub_value)
+            else:
+                _check_scalar(item)
         return value
 
 

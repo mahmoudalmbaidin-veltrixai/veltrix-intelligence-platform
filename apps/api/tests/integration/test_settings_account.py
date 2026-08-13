@@ -130,6 +130,50 @@ def test_profile_update_and_preferences_merge(settings_client: tuple[TestClient,
 
 
 @pytest.mark.integration
+def test_nested_group_preferences_persist_and_merge(
+    settings_client: tuple[TestClient, Settings],
+) -> None:
+    """Notification-style grouped preferences (a flat object) persist and merge
+    without clobbering unrelated top-level preferences (BUG-NOTIF-002)."""
+    client, _ = settings_client
+    _login(client)
+    # Save appearance + a grouped notifications object.
+    first = client.patch(
+        "/auth/me",
+        headers=_csrf(client),
+        json={
+            "preferences": {"theme": "dark", "notifications": {"Pipelines": False, "System": True}}
+        },
+    )
+    assert first.status_code == 200, first.text
+    prefs = first.json()["user"]["preferences"]
+    assert prefs["notifications"] == {"Pipelines": False, "System": True}
+
+    # A later notifications-only save replaces that group but keeps theme intact.
+    second = client.patch(
+        "/auth/me",
+        headers=_csrf(client),
+        json={"preferences": {"notifications": {"Pipelines": True, "Marketplace": True}}},
+    )
+    assert second.status_code == 200
+    prefs2 = second.json()["user"]["preferences"]
+    assert prefs2["theme"] == "dark"  # untouched
+    assert prefs2["notifications"] == {"Pipelines": True, "Marketplace": True}
+
+    # Survives a fresh read (i.e. refresh / re-login).
+    reread = client.get("/auth/me").json()["user"]["preferences"]
+    assert reread["notifications"]["Pipelines"] is True
+
+    # Deep nesting is still rejected.
+    assert (
+        client.patch(
+            "/auth/me", headers=_csrf(client), json={"preferences": {"x": {"y": {"z": 1}}}}
+        ).status_code
+        == 422
+    )
+
+
+@pytest.mark.integration
 def test_profile_rejects_unknown_timezone_and_extra_fields(
     settings_client: tuple[TestClient, Settings],
 ) -> None:
