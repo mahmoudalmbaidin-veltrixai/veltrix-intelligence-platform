@@ -174,6 +174,73 @@ def test_nested_group_preferences_persist_and_merge(
 
 
 @pytest.mark.integration
+def test_new_user_preferences_default_to_empty_bag(
+    settings_client: tuple[TestClient, Settings],
+) -> None:
+    """A user who has never saved preferences reads back an empty bag (the
+    documented server-authoritative default), never another user's values."""
+    client, _ = settings_client
+    _login(client)
+    me = client.get("/auth/me")
+    assert me.status_code == 200
+    assert me.json()["user"]["preferences"] == {}
+
+
+@pytest.mark.integration
+def test_notification_preferences_are_user_scoped(
+    settings_client: tuple[TestClient, Settings],
+) -> None:
+    """Personal notification preferences are scoped to the authenticated user:
+    one user saving must never read or mutate another user's preferences (the
+    endpoint derives identity from the session, never a client-supplied id)."""
+    client, scoped = settings_client
+    # User A saves a notification preference set.
+    _login(client)
+    saved_a = client.patch(
+        "/auth/me",
+        headers=_csrf(client),
+        json={"preferences": {"notifications": {"Pipelines": False, "System": True}}},
+    )
+    assert saved_a.status_code == 200, saved_a.text
+
+    # A genuinely different user B.
+    other_email = "second-user@veltrix.local"
+    asyncio.run(_add_user(scoped, username="second-user", email=other_email))
+    with TestClient(create_application(scoped), raise_server_exceptions=False) as other:
+        _login(other, email=other_email)
+        # B does NOT inherit A's preferences.
+        assert other.get("/auth/me").json()["user"]["preferences"] == {}
+        # B saves its own, different preferences.
+        saved_b = other.patch(
+            "/auth/me",
+            headers=_csrf(other),
+            json={"preferences": {"notifications": {"Pipelines": True, "Marketplace": True}}},
+        )
+        assert saved_b.status_code == 200
+        assert saved_b.json()["user"]["preferences"]["notifications"] == {
+            "Pipelines": True,
+            "Marketplace": True,
+        }
+
+    # A's preferences are completely unaffected by B's write.
+    reread_a = client.get("/auth/me").json()["user"]["preferences"]
+    assert reread_a["notifications"] == {"Pipelines": False, "System": True}
+
+
+@pytest.mark.integration
+def test_preferences_require_authentication(
+    settings_client: tuple[TestClient, Settings],
+) -> None:
+    """Unauthenticated callers can neither read nor modify preferences: with no
+    session cookie, both the bootstrap read and the profile write are rejected."""
+    client, _ = settings_client
+    # No login → no session (and no CSRF) cookie has been issued.
+    assert client.get("/auth/me").status_code == 401
+    blocked = client.patch("/auth/me", json={"preferences": {"notifications": {"Pipelines": True}}})
+    assert blocked.status_code in (401, 403)
+
+
+@pytest.mark.integration
 def test_profile_rejects_unknown_timezone_and_extra_fields(
     settings_client: tuple[TestClient, Settings],
 ) -> None:
