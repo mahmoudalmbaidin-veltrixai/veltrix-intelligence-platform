@@ -89,11 +89,14 @@ async def _session_row(settings: Settings, user_id: UUID) -> AuthSession | None:
     database = Database(settings)
     try:
         async with database.session_factory() as db:
-            return await db.scalar(
+            # scalars(...).first() is typed ScalarResult[AuthSession].first() ->
+            # AuthSession | None, unlike scalar() which erases to Any.
+            result = await db.scalars(
                 select(AuthSession)
                 .where(AuthSession.user_id == user_id)
                 .order_by(AuthSession.created_at.desc())
             )
+            return result.first()
     finally:
         await database.dispose()
 
