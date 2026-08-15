@@ -10,26 +10,14 @@ from alembic import context
 from sqlalchemy import Connection, inspect, pool, text
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from vip_api.auth import models as auth_models  # noqa: F401
-from vip_api.connections import models as connection_models  # noqa: F401
 from vip_api.core.config import get_settings
-from vip_api.dashboard_delivery import models as dashboard_delivery_models  # noqa: F401
-from vip_api.dashboards import models as dashboard_models  # noqa: F401
-from vip_api.database.base import Base
-from vip_api.datasets import models as dataset_models  # noqa: F401
-from vip_api.files import models as file_models  # noqa: F401
-from vip_api.governance import models as governance_models  # noqa: F401
-from vip_api.jobs import models as job_models  # noqa: F401
-from vip_api.pipelines import models as pipeline_models  # noqa: F401
-from vip_api.semantic import models as semantic_models  # noqa: F401
-from vip_api.tenancy import models as tenancy_models  # noqa: F401
+from vip_api.database.metadata import target_metadata
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
-target_metadata = Base.metadata
 
 
 IncludeObject = Callable[[object, str | None, str, bool, object | None], bool]

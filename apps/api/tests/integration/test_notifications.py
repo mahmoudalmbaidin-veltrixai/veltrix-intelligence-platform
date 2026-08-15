@@ -11,7 +11,8 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.auth.models import User, UserStatus
 from vip_api.core.config import Settings
@@ -49,28 +50,28 @@ def _ctx(user: UUID, org: UUID, ws: UUID) -> AuthorizationContext:
     )
 
 
-async def _job(db: object, *, org: UUID, ws: UUID, user: UUID, name: str, status: str) -> None:
+async def _job(db: AsyncSession, *, org: UUID, ws: UUID, user: UUID, name: str, status: str) -> Job:
     suffix = uuid4().hex[:8]
-    db.add(  # type: ignore[attr-defined]
-        Job(
-            organization_id=org,
-            workspace_id=ws,
-            job_type="pipeline_run",
-            handler="noop",
-            name=name,
-            status=status,
-            idempotency_key=f"idem-{suffix}",
-            correlation_id=f"corr-{suffix}",
-            created_by_user_id=user,
-        )
+    job = Job(
+        organization_id=org,
+        workspace_id=ws,
+        job_type="pipeline_run",
+        handler="noop",
+        name=name,
+        status=status,
+        idempotency_key=f"idem-{suffix}",
+        correlation_id=f"corr-{suffix}",
+        created_by_user_id=user,
     )
+    db.add(job)
+    return job
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_notification_read_state_persists_and_is_isolated(settings: Settings) -> None:
     database = Database(settings)
-    org_id = ws_id = user_a = user_b = None
+    org_id = other_org_id = ws_id = user_a = user_b = None
     try:
         async with database.session_factory() as db:
             suffix = uuid4().hex[:8]
@@ -115,10 +116,53 @@ async def test_notification_read_state_persists_and_is_isolated(settings: Settin
             db.add(ws)
             await db.flush()
             ws_id = ws.id
+            other_ws = Workspace(
+                organization_id=org.id,
+                name="Other workspace",
+                slug="other",
+                status=WorkspaceStatus.ACTIVE,
+                is_default=False,
+                created_by_user_id=a.id,
+            )
+            other_org = Organization(
+                name="Other Notification Org",
+                slug=f"other-notif-{suffix}",
+                status=OrganizationStatus.ACTIVE,
+                created_by_user_id=a.id,
+            )
+            db.add_all((other_ws, other_org))
+            await db.flush()
+            other_org_id = other_org.id
+            other_org_ws = Workspace(
+                organization_id=other_org.id,
+                name="Default",
+                slug="default",
+                status=WorkspaceStatus.ACTIVE,
+                is_default=True,
+                created_by_user_id=a.id,
+            )
+            db.add(other_org_ws)
+            await db.flush()
             # A tenant-scoped feed of three surfaced jobs (shared by both users).
             await _job(db, org=org_id, ws=ws_id, user=a.id, name="Pipeline 1", status="succeeded")
             await _job(db, org=org_id, ws=ws_id, user=a.id, name="Pipeline 2", status="failed")
             await _job(db, org=org_id, ws=ws_id, user=a.id, name="Pipeline 3", status="running")
+            other_workspace_job = await _job(
+                db,
+                org=org_id,
+                ws=other_ws.id,
+                user=a.id,
+                name="Other workspace pipeline",
+                status="failed",
+            )
+            other_org_job = await _job(
+                db,
+                org=other_org.id,
+                ws=other_org_ws.id,
+                user=a.id,
+                name="Other organization pipeline",
+                status="failed",
+            )
             await db.commit()
 
         ctx_a = _ctx(user_a, org_id, ws_id)
@@ -145,6 +189,18 @@ async def test_notification_read_state_persists_and_is_isolated(settings: Settin
         # Marking a foreign / non-feed id is a harmless no-op.
         async with database.session_factory() as db:
             assert (await mark_notification_read("job:does-not-exist:9", ctx_a, db)).count == 2
+            cross_workspace_id = f"job:{other_workspace_job.id}:{other_workspace_job.row_version}"
+            cross_org_id = f"job:{other_org_job.id}:{other_org_job.row_version}"
+            assert (await mark_notification_read(cross_workspace_id, ctx_a, db)).count == 2
+            assert (await mark_notification_read(cross_org_id, ctx_a, db)).count == 2
+            assert not (
+                await db.scalars(
+                    select(NotificationRead).where(
+                        NotificationRead.user_id == user_a,
+                        NotificationRead.notification_id.in_([cross_workspace_id, cross_org_id]),
+                    )
+                )
+            ).all()
 
         # A marks all read → 0, and it stays 0 on refetch; B still sees 3.
         async with database.session_factory() as db:
@@ -167,14 +223,18 @@ async def test_notification_read_state_persists_and_is_isolated(settings: Settin
         async with database.session_factory() as db:
             assert (await unread_count(ctx_a, db)).count == 1
     finally:
-        if org_id is not None:
+        if org_id is not None and other_org_id is not None:
             async with database.session_factory() as db:
-                await db.execute(delete(Job).where(Job.organization_id == org_id))
+                await db.execute(delete(Job).where(Job.organization_id.in_([org_id, other_org_id])))
                 await db.execute(
                     delete(NotificationRead).where(NotificationRead.user_id.in_([user_a, user_b]))
                 )
-                await db.execute(delete(Workspace).where(Workspace.organization_id == org_id))
-                await db.execute(delete(Organization).where(Organization.id == org_id))
+                await db.execute(
+                    delete(Workspace).where(Workspace.organization_id.in_([org_id, other_org_id]))
+                )
+                await db.execute(
+                    delete(Organization).where(Organization.id.in_([org_id, other_org_id]))
+                )
                 await db.execute(delete(User).where(User.id.in_([user_a, user_b])))
                 await db.commit()
             await database.engine.dispose()
