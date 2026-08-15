@@ -1,5 +1,6 @@
 """B5 contract, compiler, limit, and injection safety tests."""
 
+from datetime import date
 from uuid import uuid4
 
 import pytest
@@ -265,3 +266,91 @@ def test_postgresql_compiler_emits_safe_ratio_metric() -> None:
         in compiled.statement
     )
     assert compiled.columns[0].data_type == "decimal"
+
+
+def test_postgresql_compiler_coerces_iso_date_range_parameters() -> None:
+    organization_id, workspace_id, dataset_id, model_id = (
+        uuid4(),
+        uuid4(),
+        uuid4(),
+        uuid4(),
+    )
+    dataset = Dataset(
+        id=dataset_id,
+        organization_id=organization_id,
+        workspace_id=workspace_id,
+        connection_id=uuid4(),
+        dataset_type="table",
+        source_schema="public",
+        source_name="sales",
+        source_key="date-range",
+        qualified_name="public.sales",
+        display_name="Sales",
+        source_object_type="table",
+    )
+    field = DatasetField(
+        id=uuid4(),
+        organization_id=organization_id,
+        workspace_id=workspace_id,
+        dataset_id=dataset_id,
+        source_name="order_date",
+        display_name="Order Date",
+        ordinal_position=1,
+        physical_data_type="date",
+        normalized_data_type="date",
+        is_nullable=False,
+    )
+    measure = SemanticMeasure(
+        id=uuid4(),
+        organization_id=organization_id,
+        workspace_id=workspace_id,
+        semantic_model_id=model_id,
+        dataset_id=dataset_id,
+        key="orders",
+        name="Orders",
+        aggregation="count",
+        data_type="integer",
+    )
+    metric = SemanticMetric(
+        id=uuid4(),
+        organization_id=organization_id,
+        workspace_id=workspace_id,
+        semantic_model_id=model_id,
+        key="order_count",
+        name="Order Count",
+        metric_type="measure",
+        base_measure_id=measure.id,
+    )
+    dimension = SemanticDimension(
+        id=uuid4(),
+        organization_id=organization_id,
+        workspace_id=workspace_id,
+        semantic_model_id=model_id,
+        dataset_id=dataset_id,
+        field_id=field.id,
+        key="order_date",
+        name="Order Date",
+        dimension_type="time",
+        data_type="date",
+    )
+    request = SemanticQueryRequest(
+        semantic_model_id=model_id,
+        metrics=["order_count"],
+        filters=[
+            QueryFilter(
+                field="order_date",
+                operator="between",
+                value=["2024-01-01", "2024-12-31"],
+            )
+        ],
+    )
+
+    compiled = PostgreSQLSemanticQueryCompiler().compile(
+        request,
+        dataset,
+        {"order_date": (dimension, field)},
+        {"order_count": (metric, measure, None)},
+    )
+
+    assert '"order_date" BETWEEN $1 AND $2' in compiled.statement
+    assert compiled.parameters[:2] == (date(2024, 1, 1), date(2024, 12, 31))

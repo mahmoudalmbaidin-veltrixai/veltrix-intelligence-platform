@@ -13,7 +13,7 @@ from vip_api.core.config import Settings
 from vip_api.core.errors import ApplicationError
 from vip_api.dashboard_delivery.cache import cache_key, read_cache, write_cache
 from vip_api.dashboards.models import DashboardVersion, DashboardWidget
-from vip_api.dashboards.schemas import WidgetDataRequest, WidgetDataResponse, WidgetInput
+from vip_api.dashboards.schemas import Scalar, WidgetDataRequest, WidgetDataResponse, WidgetInput
 from vip_api.dashboards.services import _access, get_dashboard
 from vip_api.dashboards.visual_contracts import (
     pivot_contract,
@@ -179,6 +179,7 @@ async def execute_widget(
         if cached is not None:
             return cached
     runtime_filters: list[QueryFilter] = []
+    runtime_filter_operators: dict[str, object] = {}
     allowed = {item.field for item in widget.query.filters} | set(widget.query.dimensions)
     if not payload.preview and version is not None:
         snapshot_filters = cast(list[dict[str, object]], version.snapshot.get("filters", []))
@@ -190,6 +191,7 @@ async def execute_widget(
                 dimension_key = item.get("dimension_key")
                 if isinstance(dimension_key, str):
                     allowed.add(dimension_key)
+                    runtime_filter_operators[dimension_key] = item.get("operator")
     for key, value in sorted(payload.filters.items()):
         if key not in allowed:
             raise ApplicationError(
@@ -197,9 +199,15 @@ async def execute_widget(
                 message="A runtime filter is not valid for this widget.",
                 status_code=422,
             )
+        operator = runtime_filter_operators.get(key)
+        if not isinstance(operator, str):
+            operator = "in" if isinstance(value, list) else "equals"
+        normalized_value: Scalar | list[Scalar] = value
+        if operator in {"in", "not_in"} and not isinstance(value, list):
+            normalized_value = [value]
         runtime_filters.append(
-            QueryFilter(
-                field=key, operator="in" if isinstance(value, list) else "equals", value=value
+            QueryFilter.model_validate(
+                {"field": key, "operator": operator, "value": normalized_value}
             )
         )
     query = SemanticQueryRequest(

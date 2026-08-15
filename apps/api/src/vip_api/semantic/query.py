@@ -143,6 +143,16 @@ class PostgreSQLSemanticQueryCompiler:
         parameters: list[object] = []
         where: list[str] = []
         all_fields = {key: pair[1] for key, pair in dimensions.items()}
+
+        def filter_value(field: DatasetField, value: object) -> object:
+            if not isinstance(value, str):
+                return value
+            if field.normalized_data_type == "date":
+                return date.fromisoformat(value)
+            if field.normalized_data_type in {"datetime", "timestamp", "timestamp_tz"}:
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return value
+
         for item in request.filters:
             field = all_fields[item.field]
             identifier = quote_identifier(field.source_name)
@@ -154,7 +164,7 @@ class PostgreSQLSemanticQueryCompiler:
                 assert isinstance(item.value, list)
                 placeholders = []
                 for value in item.value:
-                    parameters.append(value)
+                    parameters.append(filter_value(field, value))
                     placeholders.append(f"${len(parameters)}")
                 where.append(
                     f"{identifier} {'NOT ' if item.operator == 'not_in' else ''}IN "
@@ -162,7 +172,7 @@ class PostgreSQLSemanticQueryCompiler:
                 )
             elif item.operator == "between":
                 assert isinstance(item.value, list)
-                parameters.extend(item.value)
+                parameters.extend(filter_value(field, value) for value in item.value)
                 where.append(f"{identifier} BETWEEN ${len(parameters) - 1} AND ${len(parameters)}")
             elif item.operator in {"contains", "starts_with", "ends_with"}:
                 value = str(item.value)
@@ -175,7 +185,7 @@ class PostgreSQLSemanticQueryCompiler:
                 )
                 where.append(f"{identifier} LIKE ${len(parameters)}")
             else:
-                parameters.append(item.value)
+                parameters.append(filter_value(field, item.value))
                 where.append(f"{identifier} {_OPERATORS[item.operator]} ${len(parameters)}")
         # Only server-resolved metadata identifiers reach this compiler. Values remain parameters.
         source = (
