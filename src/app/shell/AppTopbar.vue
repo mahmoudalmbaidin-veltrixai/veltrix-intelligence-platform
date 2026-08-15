@@ -5,7 +5,7 @@ import { usePlatformStore } from '@/shared/stores/platform'
 import { useAuthStore } from '@/shared/stores/auth'
 import { useUiStore } from '@/shared/stores/ui'
 import { useThemeStore } from '@/shared/stores/theme'
-import { QUICK_CREATE } from '@/app/navigation'
+import { QUICK_CREATE, canExposeNavigationItem } from '@/app/navigation'
 import { config } from '@/shared/config/env'
 import { safeErrorText } from '@/shared/lib/safeError'
 import VipIcon from '@/shared/ui/VipIcon.vue'
@@ -145,7 +145,7 @@ async function submitWs(): Promise<void> {
   }
 }
 const createItems = computed(() =>
-  QUICK_CREATE.filter((i) => !i.permission || platform.can(i.permission)).map((i) => ({
+  QUICK_CREATE.filter((i) => canExposeNavigationItem(i, platform)).map((i) => ({
     key: i.to,
     label: i.label,
     icon: i.icon,

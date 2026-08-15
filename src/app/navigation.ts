@@ -5,6 +5,7 @@
  */
 import type { EntitlementKey, FeatureFlagKey, Permission } from '@/shared/types/identity'
 import { config, type ApiMode } from '@/shared/config/env'
+import { isProductionGatedFeature } from '@/app/featureAvailability'
 
 export interface NavItem {
   label: string
@@ -44,6 +45,11 @@ export function canExposeNavigationItem(
   apiMode: ApiMode = config.apiMode,
 ): boolean {
   if (item.developmentMockOnly && apiMode !== 'mock') return false
+  // Centralized V1 product gate: unfinished modules are hidden in production
+  // regardless of role/entitlement (a super admin cannot reveal them either).
+  if (isProductionGatedFeature({ entitlement: item.entitlement, path: item.to }, apiMode)) {
+    return false
+  }
   if (item.platformAdminOnly && !access.isPlatformAdmin) return false
   if (item.permission && !access.can(item.permission)) return false
   if (item.entitlement && !access.entitled(item.entitlement)) return false

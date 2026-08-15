@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useQuery } from '@/shared/lib/query'
 import { homeService } from './home.service'
 import { usePlatformStore } from '@/shared/stores/platform'
-import { QUICK_CREATE } from '@/app/navigation'
+import { QUICK_CREATE, canExposeNavigationItem } from '@/app/navigation'
 import { relativeTime } from '@/shared/lib/format'
 import VipCard from '@/shared/ui/VipCard.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
@@ -17,7 +17,7 @@ const router = useRouter()
 const platform = usePlatformStore()
 const { data, isLoading } = useQuery('home:summary', () => homeService.summary())
 
-const quickActions = QUICK_CREATE.filter((a) => !a.permission || platform.can(a.permission))
+const quickActions = QUICK_CREATE.filter((a) => canExposeNavigationItem(a, platform))
 const hour = new Date().getHours()
 const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 const roleLabel = computed(() => {
