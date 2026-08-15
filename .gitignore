@@ -67,6 +67,8 @@ pnpm-workspace.yaml
 /VIP_Complete_Platform_Feature_GTM_Inventory.xlsx
 /VIP_v1_Platform_and_UAT_Master_Workbook.xlsx
 /outputs/
+# Generated export artifacts (reproducible from local certification runs)
+/output/
 /reports/
 /docs/qa/platform-capability-and-uat/
 
