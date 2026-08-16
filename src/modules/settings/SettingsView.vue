@@ -15,6 +15,7 @@ import VipButton from '@/shared/ui/VipButton.vue'
 import VipCard from '@/shared/ui/VipCard.vue'
 import VipInput from '@/shared/ui/VipInput.vue'
 import VipSelect from '@/shared/ui/VipSelect.vue'
+import VipCombobox from '@/shared/ui/VipCombobox.vue'
 import VipSegmented from '@/shared/ui/VipSegmented.vue'
 import VipSwitch from '@/shared/ui/VipSwitch.vue'
 import VipBadge from '@/shared/ui/VipBadge.vue'
@@ -240,14 +241,20 @@ const localeOptions = [
   { value: 'de-DE', label: 'Deutsch (Deutschland)' },
   { value: 'es-ES', label: 'Español (España)' },
 ]
+// Cheap option list: the full supported IANA set as plain {value,label} pairs.
+// No per-zone Intl.DateTimeFormat construction here — VipCombobox renders only
+// the filtered/capped subset, so the heavy work never happens up front.
 const timezoneOptions = computed(() => {
   const intl = Intl as typeof Intl & { supportedValuesOf?: (key: 'timeZone') => string[] }
   const zones: string[] =
     typeof intl.supportedValuesOf === 'function'
       ? intl.supportedValuesOf('timeZone')
       : [platform.user.timezone || 'UTC']
-  return zones.map((zone: string) => ({ value: zone, label: `${zone} · ${offsetLabel(zone)}` }))
+  return zones.map((zone: string) => ({ value: zone, label: zone.replace(/_/g, ' ') }))
 })
+// Offset for the *selected* zone only — a single Intl call, shown as help text
+// so the user keeps the useful context without paying for every zone.
+const timezoneOffset = computed(() => offsetLabel(region.timezone))
 function offsetLabel(zone: string): string {
   try {
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -726,7 +733,13 @@ function deviceLabel(ua: string | null): string {
                 English is fully localized. Other languages set formatting and locale preferences; full interface
                 translation may be partial.
               </p>
-              <VipSelect v-model="region.timezone" :options="timezoneOptions" label="Time zone" />
+              <VipCombobox
+                v-model="region.timezone"
+                :options="timezoneOptions"
+                label="Time zone"
+                placeholder="Search timezone (e.g. Riyadh, Asia/, New York)…"
+                :help="timezoneOffset ? `Current offset: ${timezoneOffset}` : undefined"
+              />
               <div class="settings__form-row">
                 <VipSelect v-model="region.dateFormat" :options="dateFormatOptions" label="Date format" />
                 <VipSelect v-model="region.timeFormat" :options="timeFormatOptions" label="Time format" />
