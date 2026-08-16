@@ -92,6 +92,22 @@ if ($destination.Count -ne 1) {
 if ($destination[0].type.key -ne 'postgresql' -or $destination[0].health_status -ne 'healthy') {
     throw "Certification destination must be a healthy PostgreSQL connection."
 }
+function Get-VipCollection {
+    param($Response)
+    if ($null -eq $Response) { return @() }
+    if ($Response -is [System.Array]) { return @($Response) }
+    if ($null -ne $Response.PSObject.Properties['items']) { return @($Response.items) }
+    return @($Response)
+}
+
+function Get-VipPrimaryDatasetId {
+    param($Model)
+    if ($null -eq $Model) { return '' }
+    if ($Model.primary_dataset_id) { return [string]$Model.primary_dataset_id }
+    if ($Model.primary_dataset -and $Model.primary_dataset.id) { return [string]$Model.primary_dataset.id }
+    return ''
+}
+
 $datasetBody = @{
     connection_id = [string]$destination[0].id
     dataset_type = 'table'
@@ -106,7 +122,7 @@ $dataset = Invoke-RestMethod -Method Post -Uri "$apiRoot/api/v1/datasets" -WebSe
 if ($dataset.display_name -ne $env:VIP_E2E_CERTIFICATION_DATASET_NAME) {
     throw 'The exact browser certification dataset could not be resolved.'
 }
-$models = @(Invoke-RestMethod -Method Get -Uri "$apiRoot/api/v1/semantic-models" -WebSession $adminSession -Headers $tenantHeaders)
+$models = Get-VipCollection (Invoke-RestMethod -Method Get -Uri "$apiRoot/api/v1/semantic-models" -WebSession $adminSession -Headers $tenantHeaders)
 $model = @($models | Where-Object { $_.name -eq $env:VIP_E2E_CERTIFICATION_SEMANTIC_MODEL_NAME })[0]
 if (-not $model) {
     $modelBody = @{
@@ -119,14 +135,15 @@ if (-not $model) {
     } | ConvertTo-Json -Compress
     $model = Invoke-RestMethod -Method Post -Uri "$apiRoot/api/v1/semantic-models" -WebSession $adminSession -Headers $tenantHeaders -ContentType 'application/json' -Body $modelBody
 }
-if ([string]$model.primary_dataset_id -ne [string]$dataset.id) {
+$boundDatasetId = Get-VipPrimaryDatasetId $model
+if ($boundDatasetId -ne [string]$dataset.id) {
     throw 'The browser certification semantic model is not bound to the exact certification dataset.'
 }
 $deniedUsers = (Invoke-RestMethod -Method Get -Uri "$apiRoot/api/v1/platform/users?page=1&page_size=100&search=qa_explicitly_denied_user" -WebSession $session).items
 $deniedUser = @($deniedUsers | Where-Object { $_.username -eq 'qa_explicitly_denied_user' })[0]
 if (-not $deniedUser) { throw 'The explicit-deny QA persona is missing.' }
 [Environment]::SetEnvironmentVariable('VIP_E2E_GOVERNANCE_RESTRICTED_ID', [string]$deniedUser.id, 'Process')
-$entries = @(Invoke-RestMethod -Method Get -Uri "$apiRoot/api/v1/resources/semantic_model/$($model.id)/access" -WebSession $adminSession -Headers $tenantHeaders)
+$entries = Get-VipCollection (Invoke-RestMethod -Method Get -Uri "$apiRoot/api/v1/resources/semantic_model/$($model.id)/access" -WebSession $adminSession -Headers $tenantHeaders)
 $exactDeny = @($entries | Where-Object {
     $_.subject_type -eq 'user' -and [string]$_.subject_id -eq [string]$deniedUser.id -and $_.effect -eq 'deny'
 })
@@ -143,6 +160,8 @@ if ($exactDeny.Count -eq 0) {
 
 Push-Location $repo
 try {
+    $env:PLAYWRIGHT_REUSE_SERVER = if ($env:PLAYWRIGHT_REUSE_SERVER) { $env:PLAYWRIGHT_REUSE_SERVER } else { '1' }
+    Remove-Item Env:PLAYWRIGHT_BROWSERS_PATH -ErrorAction SilentlyContinue
     & node '.\node_modules\@playwright\test\cli.js' test @PlaywrightArgs
     exit $LASTEXITCODE
 }

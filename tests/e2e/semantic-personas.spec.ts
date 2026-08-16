@@ -1,5 +1,6 @@
 import { expect, resetClientState, signInAs, test } from './fixtures'
 import { browserFixtures, type BrowserPersona } from './personas'
+import { parseSemanticModelList } from './helpers/semanticModels'
 
 /**
  * Live Semantic Studio persona matrix (Phase B9.1C).
@@ -77,7 +78,7 @@ test('semantic personas render from backend-resolved effective access', async ({
   await expect(page.getByRole('link', { name: 'Semantic Models', exact: true })).toBeVisible()
   const adminList = await apiGet(page, '/semantic-models')
   expect(adminList.status).toBe(200)
-  const models = adminList.body as Array<{ id: string; name: string }>
+  const models = parseSemanticModelList(adminList.body)
   const modelId = models.find((model) => model.name === browserFixtures.certificationSemanticModel)?.id
   expect(modelId, `missing exact semantic fixture ${browserFixtures.certificationSemanticModel}`).toBeTruthy()
 
@@ -133,7 +134,8 @@ test('audit access and placeholder gating are persona-scoped', async ({ page }) 
   expect(context.status).toBe(200)
   expect(context.body.entitlements).toContain('semantic_layer')
   expect(context.body.entitlements).toContain('advanced_audit')
-  // Placeholder modules are NOT granted, so their routes hit the upgrade wall.
+  // Placeholder modules are not granted. Direct routes fail closed to 404;
+  // they must not render the unfinished module surface or a /upgrade paywall.
   for (const gated of ['report_studio', 'insights', 'marketplace', 'billing']) {
     expect(context.body.entitlements).not.toContain(gated)
   }

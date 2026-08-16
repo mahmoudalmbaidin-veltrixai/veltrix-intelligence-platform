@@ -23,7 +23,6 @@ const routes = [
   '/dashboards/published',
   '/dashboards/deliveries',
   '/dashboards/new',
-  '/explore',
   '/notifications',
   '/operations/activity',
   '/audit',
@@ -33,9 +32,7 @@ const routes = [
   '/admin/members',
   '/admin/feature-flags',
   '/admin/governance',
-  '/settings/personal',
-  '/settings/workspace',
-  '/settings/organization',
+  '/settings/profile',
   '/settings/security',
   '/forbidden',
   '/upgrade',
@@ -75,35 +72,36 @@ async function waitForApplicationReady(page: Page, route: string): Promise<void>
       () =>
         page.evaluate(() => ({
           route: document.documentElement.dataset.vipRoute,
-          active: (window as typeof window & { __vipQueryActivity?: { active: number } }).__vipQueryActivity?.active ?? 0,
+          active:
+            (window as typeof window & { __vipQueryActivity?: { active: number } }).__vipQueryActivity?.active ?? 0,
         })),
       { message: `${route} should settle its route and server-state queries` },
     )
     .toEqual({ route: expectedPath, active: 0 })
 }
 
-test('disabled AI preview routes remain inaccessible in production navigation', async ({ authenticatedPage: page }) => {
+async function expectFailClosed404(page: Page, route: string): Promise<void> {
+  await page.goto(route)
+  await expect(page.getByRole('heading', { name: /page not found/i })).toBeVisible()
+  await expect(page).toHaveURL(/\/not-found$/)
+  await expect(page).not.toHaveURL(/\/upgrade/)
+  await expect(page.locator('#vip-main')).toBeVisible()
+  await expect(page.locator('#vip-main')).not.toBeEmpty()
+}
+
+test('disabled AI preview routes fail closed to 404, never /upgrade', async ({ authenticatedPage: page }) => {
+  test.setTimeout(120_000)
   for (const route of featureGatedRoutes) {
-    await page.goto(route)
-    await expect.poll(() => new URL(page.url()).pathname).not.toBe(route)
-    await expect(page).toHaveURL(/\/(?:upgrade\?.*|)$/)
+    await expectFailClosed404(page, route)
   }
 })
 
-test('placeholder modules never render their surface in live mode', async ({ authenticatedPage: page }) => {
-  for (const route of entitlementGatedRoutes) {
-    await page.goto(route)
-    // The router guard redirects a gated placeholder away from the module surface
-    // to a safe wall — /upgrade when the module is merely disabled (entitlement
-    // absent) or /forbidden when the persona also lacks the permission. Either
-    // way the empty/fake module surface is never shown.
-    await expect
-      .poll(() => new URL(page.url()).pathname)
-      .toMatch(/^\/(upgrade|forbidden)$/)
-    // The wall renders a real, non-blank surface (not a blank/placeholder page).
-    const main = page.locator('#vip-main')
-    await expect(main).toBeVisible()
-    await expect(main).not.toBeEmpty()
+test('placeholder modules fail closed to 404 and never render their surface', async ({ authenticatedPage: page }) => {
+  test.setTimeout(120_000)
+  // Deferred V1 modules are production-gated: hidden from navigation and blocked
+  // on direct URL. The fail-closed wall is 404/not-found, not a paywall at /upgrade.
+  for (const route of [...entitlementGatedRoutes, '/explore'] as const) {
+    await expectFailClosed404(page, route)
   }
 })
 
@@ -136,16 +134,13 @@ test('all router destinations render an intentional nonblank surface without run
   page.on('requestfailed', (request) => {
     // A route transition can cancel an in-flight read from the surface being left.
     const failure = request.failure()?.errorText ?? 'unknown'
-    if (
-      failure !== 'net::ERR_ABORTED' &&
-      !request.url().includes('/api/v1/') &&
-      !request.url().includes('/auth/')
-    ) {
+    if (failure !== 'net::ERR_ABORTED' && !request.url().includes('/api/v1/') && !request.url().includes('/auth/')) {
       networkFailures.push(`${failure} ${request.method()} ${request.url()}`)
     }
   })
   page.on('response', (response) => {
-    if (response.status() >= 400) failedResponses.push(`${response.status()} ${response.request().method()} ${response.url()}`)
+    if (response.status() >= 400)
+      failedResponses.push(`${response.status()} ${response.request().method()} ${response.url()}`)
   })
 
   const liveDetails = await page.evaluate(async () => {
@@ -167,11 +162,13 @@ test('all router destinations render an intentional nonblank surface without run
       read('/semantic-models'),
       read('/dashboards?limit=1'),
     ])
+    const modelItems = Array.isArray(models) ? models : Array.isArray(models?.items) ? models.items : []
+    const dashboardId = dashboards?.items?.[0]?.id ?? dashboards?.[0]?.id
     return [
       connections?.items?.[0]?.id ? `/connections/${connections.items[0].id}` : null,
       datasets?.items?.[0]?.id ? `/datasets/${datasets.items[0].id}` : null,
-      models?.[0]?.id ? `/semantic/${models[0].id}` : null,
-      dashboards?.[0]?.id ? `/dashboards/${dashboards[0].id}/edit` : null,
+      modelItems[0]?.id ? `/semantic/${modelItems[0].id}` : null,
+      dashboardId ? `/dashboards/${dashboardId}/edit` : null,
     ].filter((value): value is string => Boolean(value))
   })
   const routesToVisit = [...routes, ...liveDetails]

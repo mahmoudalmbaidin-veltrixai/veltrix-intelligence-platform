@@ -21,6 +21,7 @@ from vip_api.home.models import NotificationRead
 
 NOTIFICATION_REVISION = "20260808_0024"
 PRE_NOTIFICATION_REVISION = "20260808_0023"
+CURRENT_HEAD = "20260808_0025"
 
 
 def _config() -> Config:
@@ -193,8 +194,8 @@ def test_alembic_clean_upgrade_and_current_head() -> None:
         capture_output=True,
         text=True,
     )
-    assert heads == [NOTIFICATION_REVISION]
-    assert NOTIFICATION_REVISION in result.stdout
+    assert heads == [CURRENT_HEAD]
+    assert CURRENT_HEAD in result.stdout
     _assert_notification_schema(asyncio.run(_notification_schema()))
 
 
