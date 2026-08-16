@@ -8,7 +8,13 @@ const iconFor = { success: 'success', error: 'error', warning: 'warning', info: 
 
 <template>
   <Teleport to="body">
-    <div class="vip-toasts" role="region" aria-label="Notifications" aria-live="polite">
+    <!--
+      Landmark region only — NOT a live region. Screen-reader announcements are
+      the sole responsibility of the global announcer (AriaLive via announce()),
+      which composes one polite/assertive message per toast. Making this a second
+      aria-live region caused every toast to be announced twice (CERT-P2-004).
+    -->
+    <div class="vip-toasts" role="region" aria-label="Notifications">
       <TransitionGroup name="vip-toast">
         <div v-for="t in ui.toasts" :key="t.id" class="vip-toast" :class="`is-${t.kind}`">
           <VipIcon :name="iconFor[t.kind]" :size="18" class="vip-toast__icon" />

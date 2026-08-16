@@ -5,7 +5,7 @@ const { politeMessage, assertiveMessage } = useAnnouncerState()
 
 <template>
   <div class="vip-visually-hidden">
-    <div aria-live="polite" aria-atomic="true">{{ politeMessage }}</div>
-    <div aria-live="assertive" aria-atomic="true" role="alert">{{ assertiveMessage }}</div>
+    <div role="status" aria-live="polite" aria-atomic="true">{{ politeMessage }}</div>
+    <div role="alert" aria-live="assertive" aria-atomic="true">{{ assertiveMessage }}</div>
   </div>
 </template>
