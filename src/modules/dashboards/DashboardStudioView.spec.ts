@@ -77,6 +77,44 @@ function makeDashboard(id = 'db-1', version = 3): Dashboard {
   }
 }
 
+function makeWidget(over: Partial<DashboardWidget> & { type: DashboardWidget['type'] }): DashboardWidget {
+  return {
+    id: over.id ?? `w-${over.type}`,
+    type: over.type,
+    modelId: over.modelId,
+    pos: { x: 0, y: 0, w: 6, h: 5 },
+    wells: over.wells ?? {},
+    filters: [],
+    format: {
+      showTitle: true,
+      showLegend: true,
+      legendPosition: 'bottom',
+      showDataLabels: false,
+      showGridlines: true,
+      decimals: 0,
+      numberStyle: 'plain',
+      border: true,
+      padding: 12,
+      conditional: [],
+    },
+    interactions: { crossFilter: true, drillDown: false, tooltip: true, exportable: true },
+    general: { name: over.type, visible: true, locked: false },
+  } as DashboardWidget
+}
+const validKpi = () =>
+  makeWidget({
+    id: 'kpi-ok',
+    type: 'kpi',
+    modelId: 'model',
+    wells: { values: [{ fieldId: 'revenue', aggregation: 'sum' }] },
+  })
+const incompleteBar = () => makeWidget({ id: 'bar-bad', type: 'bar', modelId: 'model', wells: {} })
+function dashboardWith(widgets: DashboardWidget[]): Dashboard {
+  const d = makeDashboard()
+  d.pages[0]!.widgets = widgets
+  return d
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (reason: unknown) => void
@@ -182,7 +220,9 @@ describe('Dashboard Studio save coordinator behavior', () => {
   })
 
   it('stops publish when its prerequisite save fails', async () => {
-    const wrapper = await mountStudio()
+    // A publishable (fully configured) dashboard so publish gets past the
+    // readiness gate and actually depends on the save succeeding.
+    const wrapper = await mountStudio({ dashboard: dashboardWith([validKpi()]) })
     dirtyEdit(wrapper)
     mocks.save.mockRejectedValue(ApiError.fromStatus(500))
     await wrapper.vm.publish()
@@ -223,7 +263,7 @@ describe('Dashboard Studio save coordinator behavior', () => {
     expect(mocks.publish).not.toHaveBeenCalled()
     expect(wrapper.vm.editor.dashboard.pages[0]!.widgets[0]!.type).toBe('scatter')
     expect(mocks.pushToast).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('numeric Y field') }),
+      expect.objectContaining({ message: expect.stringContaining('numeric Y measure') }),
     )
   })
 
@@ -307,5 +347,72 @@ describe('Dashboard Studio save coordinator behavior', () => {
     expect(refreshed.vm.editor.dashboard.name).toBe('Persisted')
     expect(refreshed.vm.editor.dashboard.version).toBe(4)
     expect(refreshed.vm.editor.dirty.value).toBe(false)
+  })
+
+  // ---- CERT-P2-002: incomplete-widget / publish-readiness UX ----
+
+  it('blocks save for an incomplete non-scatter widget and never calls the API', async () => {
+    const wrapper = await mountStudio({ dashboard: dashboardWith([incompleteBar()]) })
+    dirtyEdit(wrapper)
+    expect(await wrapper.vm.save()).toBe(false)
+    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.pushToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'error',
+        title: 'Complete this widget before saving',
+        message: expect.stringContaining('Add at least one measure'),
+      }),
+    )
+  })
+
+  it('does not spam a validation toast during silent autosave', async () => {
+    const wrapper = await mountStudio({ dashboard: dashboardWith([incompleteBar()]) })
+    dirtyEdit(wrapper)
+    expect(await wrapper.vm.save({ notify: false })).toBe(false)
+    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.pushToast).not.toHaveBeenCalled()
+  })
+
+  it('blocks publishing an empty dashboard with a helpful message', async () => {
+    const wrapper = await mountStudio() // no widgets
+    await wrapper.vm.publish()
+    expect(mocks.publish).not.toHaveBeenCalled()
+    expect(mocks.pushToast).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'error', message: expect.stringContaining('at least one configured widget') }),
+    )
+  })
+
+  it('blocks publishing when a widget is incomplete', async () => {
+    const wrapper = await mountStudio({ dashboard: dashboardWith([incompleteBar()]) })
+    await wrapper.vm.publish()
+    expect(mocks.publish).not.toHaveBeenCalled()
+    expect(mocks.pushToast).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'error', message: expect.stringContaining('Finish configuring') }),
+    )
+  })
+
+  it('publishes a fully configured dashboard', async () => {
+    const wrapper = await mountStudio({ dashboard: dashboardWith([validKpi()]) })
+    dirtyEdit(wrapper)
+    mocks.save.mockResolvedValue({ ...dashboardWith([validKpi()]), name: 'Edited locally', version: 4 })
+    await wrapper.vm.publish()
+    expect(mocks.publish).toHaveBeenCalled()
+    expect(mocks.pushToast).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'success', title: 'Dashboard published' }),
+    )
+  })
+
+  it('translates an unexpected backend 422 into an incomplete-widget message', async () => {
+    const wrapper = await mountStudio({ dashboard: dashboardWith([validKpi()]) })
+    dirtyEdit(wrapper)
+    mocks.save.mockRejectedValue(ApiError.fromStatus(422))
+    expect(await wrapper.vm.save()).toBe(false)
+    expect(mocks.pushToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'error',
+        title: 'Dashboard was not saved',
+        message: expect.stringContaining('widgets are incomplete'),
+      }),
+    )
   })
 })

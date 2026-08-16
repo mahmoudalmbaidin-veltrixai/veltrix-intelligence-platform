@@ -3,6 +3,7 @@ import { computed, toRef } from 'vue'
 import type { Dashboard, DashboardWidget } from '@/shared/types/dashboard'
 import type { QueryFilter } from '@/shared/types/semantic'
 import { useWidgetData } from './useWidgetData'
+import { validateWidgetConfiguration } from './widgetValidation'
 import VisualRenderer from '@/shared/viz/VisualRenderer.vue'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipMenu from '@/shared/ui/VipMenu.vue'
@@ -31,6 +32,12 @@ const { result, loading, error } = useWidgetData(dashboardRef, widgetRef, filter
 const showChrome = computed(
   () => props.widget.format.showTitle && props.widget.type !== 'text' && props.widget.type !== 'image',
 )
+
+// In the editor, a data widget missing its model/measure is shown as an
+// intentional "needs configuration" call-to-action rather than a broken chart
+// (which would otherwise be saved and rejected by the backend with a 422).
+const validation = computed(() => validateWidgetConfiguration(props.widget))
+const incomplete = computed(() => Boolean(props.editable) && !validation.value.valid)
 
 const menuItems = [
   { key: 'edit', label: 'Edit visual', icon: 'settings' },
@@ -70,7 +77,14 @@ function onMenu(key: string) {
     </header>
 
     <div class="wframe__body">
+      <button v-if="incomplete" type="button" class="wframe__incomplete" @click="emit('edit')" @pointerdown.stop>
+        <VipIcon name="settings" :size="20" class="wframe__incomplete-icon" />
+        <span class="wframe__incomplete-title">Needs configuration</span>
+        <span class="wframe__incomplete-hint">{{ validation.missing.join(' · ') }}</span>
+        <span class="wframe__incomplete-cta">Configure widget</span>
+      </button>
       <VisualRenderer
+        v-else
         :widget="widget"
         :result="result"
         :loading="loading"
@@ -146,5 +160,47 @@ function onMenu(key: string) {
 .wframe__body {
   flex: 1;
   min-height: 0;
+}
+.wframe__incomplete {
+  width: 100%;
+  height: 100%;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vip-sp-2);
+  text-align: center;
+  padding: var(--vip-sp-4);
+  background: var(--vip-surface-2);
+  border: 1px dashed var(--vip-border-strong);
+  border-radius: var(--vip-radius-md);
+  color: var(--vip-text-secondary);
+  cursor: pointer;
+}
+.wframe__incomplete:hover {
+  border-color: var(--vip-brand-500);
+}
+.wframe__incomplete:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--vip-brand-soft);
+}
+.wframe__incomplete-icon {
+  color: var(--vip-text-muted);
+}
+.wframe__incomplete-title {
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-semibold);
+  color: var(--vip-text-primary);
+}
+.wframe__incomplete-hint {
+  font-size: var(--vip-fs-xs);
+  color: var(--vip-text-muted);
+}
+.wframe__incomplete-cta {
+  margin-top: var(--vip-sp-2);
+  font-size: var(--vip-fs-xs);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-brand-text);
 }
 </style>

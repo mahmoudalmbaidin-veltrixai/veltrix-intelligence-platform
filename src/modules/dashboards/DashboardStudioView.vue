@@ -16,7 +16,7 @@ import { semanticStudioService } from '@/modules/semantic/semantic.service'
 import { relativeTime } from '@/shared/lib/format'
 import { clone } from '@/shared/lib/mock'
 import { invalidateQueries } from '@/shared/lib/query'
-import { validateDashboardWidgets } from './widgetValidation'
+import { validateDashboardWidgets, canPublishDashboard } from './widgetValidation'
 import FieldsPanel from './FieldsPanel.vue'
 import DashboardGridCanvas from './DashboardGridCanvas.vue'
 import WidgetInspector from './WidgetInspector.vue'
@@ -164,18 +164,23 @@ async function save(options: { notify?: boolean } = {}): Promise<boolean> {
     return saveInFlight
   }
 
-  const configurationIssue = validateDashboardWidgets(editor.value.dashboard, models.value)[0]
-  if (configurationIssue) {
-    editor.value.selectedId.value = configurationIssue.widgetId
-    ui.pushToast({
-      kind: 'error',
-      title: 'Dashboard configuration is invalid',
-      message: `${configurationIssue.widgetName}: ${configurationIssue.message}`,
-    })
+  const notify = options.notify ?? true
+  const incomplete = validateDashboardWidgets(editor.value.dashboard, models.value)[0]
+  if (incomplete) {
+    // Guide the user to the incomplete widget instead of letting the backend
+    // reject the whole dashboard with a raw 422. Autosave (notify=false) stays
+    // silent — the dashboard simply remains dirty until the widget is finished.
+    editor.value.selectedId.value = incomplete.widgetId
+    if (notify) {
+      ui.pushToast({
+        kind: 'error',
+        title: 'Complete this widget before saving',
+        message: `${incomplete.widgetName}: ${incomplete.missing.join('; ')}`,
+      })
+    }
     return false
   }
 
-  const notify = options.notify ?? true
   const sourceEditor = editor.value
   const snapshot = clone(sourceEditor.dashboard as Dashboard)
   const snapshotJson = JSON.stringify(snapshot)
@@ -231,7 +236,11 @@ async function save(options: { notify?: boolean } = {}): Promise<boolean> {
         conflict.value = true
         window.clearTimeout(timer)
       } else if (notify) {
-        ui.pushToast({ kind: 'error', title: 'Dashboard was not saved', message: apiError.message })
+        const friendly =
+          apiError.status === 422 || apiError.kind === 'validation'
+            ? 'One or more widgets are incomplete. Open each widget and add the missing dataset or measure.'
+            : apiError.message
+        ui.pushToast({ kind: 'error', title: 'Dashboard was not saved', message: friendly })
       }
       return false
     } finally {
@@ -245,13 +254,36 @@ async function save(options: { notify?: boolean } = {}): Promise<boolean> {
 }
 async function publish() {
   if (!editor.value) return
+  // Publish readiness is authoritative and shared with the button's disabled
+  // state: an empty or partially configured dashboard is unpublishable (the
+  // backend would reject it with 422).
+  const readiness = canPublishDashboard(editor.value.dashboard as Dashboard, models.value)
+  if (!readiness.ok) {
+    ui.pushToast({ kind: 'error', title: 'Dashboard is not ready to publish', message: readiness.reason })
+    return
+  }
   const saved = await save()
   if (!saved || conflict.value || !editor.value) return
-  const p = await dashboardService.publish(editor.value.dashboard as Dashboard)
-  editor.value.dashboard.status = p.status
-  editor.value.dashboard.version = p.version
-  ui.pushToast({ kind: 'success', title: 'Dashboard published', message: `Version ${p.version} is live` })
+  try {
+    const p = await dashboardService.publish(editor.value.dashboard as Dashboard)
+    editor.value.dashboard.status = p.status
+    editor.value.dashboard.version = p.version
+    ui.pushToast({ kind: 'success', title: 'Dashboard published', message: `Version ${p.version} is live` })
+  } catch (error) {
+    const apiError = ApiError.from(error)
+    const friendly =
+      apiError.status === 422 || apiError.kind === 'validation'
+        ? 'Publishing needs at least one fully configured widget. Complete every widget and try again.'
+        : apiError.message
+    ui.pushToast({ kind: 'error', title: 'Dashboard was not published', message: friendly })
+  }
 }
+
+const publishReadiness = computed(() =>
+  editor.value
+    ? canPublishDashboard(editor.value.dashboard as Dashboard, models.value)
+    : ({ ok: false, reason: 'Loading…' } as const),
+)
 function openGovernance(event: MouseEvent) {
   if (editor.value?.dashboard.id !== 'new') {
     ;(event.currentTarget as HTMLElement).focus({ preventScroll: true })
@@ -491,7 +523,15 @@ defineExpose({ save, publish, editor, dirty, conflict })
           @click="openGovernance"
           >Share</VipButton
         >
-        <VipButton variant="primary" size="sm" icon="upload" :disabled="!canEdit" @click="publish">Publish</VipButton>
+        <VipButton
+          variant="primary"
+          size="sm"
+          icon="upload"
+          :disabled="!canEdit || !publishReadiness.ok"
+          :title="publishReadiness.ok ? 'Publish this dashboard' : publishReadiness.reason"
+          @click="publish"
+          >Publish</VipButton
+        >
         <VipButton
           variant="ghost"
           size="sm"
