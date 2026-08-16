@@ -23,10 +23,15 @@ from vip_api.datasets.models import Dataset, DatasetField
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.models import Role
 from vip_api.governance.seed import provision_organization_governance
-from vip_api.pipelines.models import PipelineRun, PipelineSchedule, PipelineScheduleRun
+from vip_api.pipelines.models import Pipeline, PipelineRun, PipelineSchedule, PipelineScheduleRun
 from vip_api.pipelines.scheduler import dispatch_due_pipeline_schedules
 from vip_api.pipelines.schemas import EdgeInput, NodeInput, PipelineCreate, PipelineEditorSave
-from vip_api.pipelines.services import create_pipeline, publish_pipeline, save_editor
+from vip_api.pipelines.services import (
+    archive_pipeline,
+    create_pipeline,
+    publish_pipeline,
+    save_editor,
+)
 from vip_api.tenancy.models import (
     MembershipStatus,
     Organization,
@@ -202,12 +207,12 @@ async def _seed(db: AsyncSession, suffix: str) -> tuple[UUID, UUID, UUID, UUID]:
     return user.id, org.id, ws.id, dataset.id
 
 
-async def _publish(db: AsyncSession, ctx: AuthorizationContext, dataset_id: UUID) -> UUID:
-    created = await create_pipeline(db, ctx, PipelineCreate(name="Scheduled"))
+async def _publish(
+    db: AsyncSession, ctx: AuthorizationContext, dataset_id: UUID, name: str = "Scheduled"
+) -> UUID:
+    created = await create_pipeline(db, ctx, PipelineCreate(name=name))
     pid = created.pipeline.id
-    saved = await save_editor(
-        db, ctx, pid, _graph("Scheduled", created.pipeline.row_version, dataset_id)
-    )
+    saved = await save_editor(db, ctx, pid, _graph(name, created.pipeline.row_version, dataset_id))
     await publish_pipeline(db, ctx, pid, saved.pipeline.row_version, "v1")
     return pid
 
@@ -443,6 +448,127 @@ async def test_enqueue_failure_writes_no_false_success_audit(
                 select(PipelineScheduleRun).where(PipelineScheduleRun.organization_id == org_id)
             )
             assert srun is not None and srun.status == "failed"
+    finally:
+        if org_id and user_id:
+            await _cleanup(database, org_id, user_id)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_archiving_pipeline_disables_its_schedules(settings: Settings) -> None:
+    """PIPE-P2-STALE-SCHEDULES: archiving a pipeline disables its schedules in the
+    same transaction and clears their due time, so the scheduler never fires them."""
+    database = Database(settings)
+    org_id = user_id = None
+    try:
+        async with database.session_factory() as db:
+            user_id, org_id, ws_id, dataset_id = await _seed(db, uuid4().hex[:8])
+            ctx = _context(user_id, org_id, ws_id)
+            pid = await _publish(db, ctx, dataset_id)
+            db.add(_schedule(org_id, ws_id, pid, user_id, enabled=True, due=True))
+            await db.commit()
+
+            pipe = await db.get(Pipeline, pid)
+            assert pipe is not None
+            await archive_pipeline(db, ctx, pid, pipe.row_version)
+
+        async with database.session_factory() as db:
+            sched = await db.scalar(
+                select(PipelineSchedule).where(PipelineSchedule.organization_id == org_id)
+            )
+            assert sched is not None
+            assert sched.enabled is False
+            assert sched.status == "archived"
+            assert sched.next_run_at is None
+
+        # A subsequent tick claims nothing and creates no run.
+        assert await dispatch_due_pipeline_schedules(database, settings, now=NOW) == 0
+        async with database.session_factory() as db:
+            assert (
+                await db.scalar(select(PipelineRun).where(PipelineRun.pipeline_id == pid)) is None
+            )
+    finally:
+        if org_id and user_id:
+            await _cleanup(database, org_id, user_id)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_scheduler_skips_enabled_schedule_of_archived_pipeline(settings: Settings) -> None:
+    """Defense-in-depth: even a legacy enabled+due schedule whose pipeline was
+    archived out-of-band is skipped by the scheduler — no run, no schedule-run."""
+    database = Database(settings)
+    org_id = user_id = None
+    try:
+        async with database.session_factory() as db:
+            user_id, org_id, ws_id, dataset_id = await _seed(db, uuid4().hex[:8])
+            ctx = _context(user_id, org_id, ws_id)
+            pid = await _publish(db, ctx, dataset_id)
+            db.add(_schedule(org_id, ws_id, pid, user_id, enabled=True, due=True))
+            await db.commit()
+            # Simulate a pre-fix orphan: archive the pipeline directly, leaving the
+            # schedule enabled and due (bypassing the lifecycle disable).
+            pipe = await db.get(Pipeline, pid)
+            assert pipe is not None
+            pipe.archived_at = NOW
+            pipe.status = "archived"
+            await db.commit()
+
+        assert await dispatch_due_pipeline_schedules(database, settings, now=NOW) == 0
+        async with database.session_factory() as db:
+            assert (
+                await db.scalar(select(PipelineRun).where(PipelineRun.pipeline_id == pid)) is None
+            )
+            # The guard skips the row entirely, so no schedule-run is even created.
+            assert (
+                await db.scalar(
+                    select(PipelineScheduleRun).where(PipelineScheduleRun.organization_id == org_id)
+                )
+                is None
+            )
+            # The stale schedule was not advanced by the skipped tick.
+            sched = await db.scalar(
+                select(PipelineSchedule).where(PipelineSchedule.organization_id == org_id)
+            )
+            assert sched is not None and sched.enabled is True
+    finally:
+        if org_id and user_id:
+            await _cleanup(database, org_id, user_id)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_archiving_one_pipeline_leaves_sibling_schedule_active(settings: Settings) -> None:
+    """Tenant/lifecycle isolation: archiving pipeline A must not disable pipeline
+    B's schedule; B still dispatches normally."""
+    database = Database(settings)
+    org_id = user_id = None
+    try:
+        async with database.session_factory() as db:
+            user_id, org_id, ws_id, dataset_id = await _seed(db, uuid4().hex[:8])
+            ctx = _context(user_id, org_id, ws_id)
+            pid_a = await _publish(db, ctx, dataset_id, name="Pipeline A")
+            pid_b = await _publish(db, ctx, dataset_id, name="Pipeline B")
+            db.add(_schedule(org_id, ws_id, pid_a, user_id, enabled=True, due=True))
+            db.add(_schedule(org_id, ws_id, pid_b, user_id, enabled=True, due=True))
+            await db.commit()
+
+            pipe_a = await db.get(Pipeline, pid_a)
+            assert pipe_a is not None
+            await archive_pipeline(db, ctx, pid_a, pipe_a.row_version)
+
+        # Only B is due against a live pipeline, so exactly one run dispatches.
+        assert await dispatch_due_pipeline_schedules(database, settings, now=NOW) == 1
+        async with database.session_factory() as db:
+            assert (
+                await db.scalar(select(PipelineRun).where(PipelineRun.pipeline_id == pid_a)) is None
+            )
+            run_b = await db.scalar(select(PipelineRun).where(PipelineRun.pipeline_id == pid_b))
+            assert run_b is not None and run_b.trigger == "scheduled"
+            sched_b = await db.scalar(
+                select(PipelineSchedule).where(PipelineSchedule.pipeline_id == pid_b)
+            )
+            assert sched_b is not None and sched_b.enabled is True
     finally:
         if org_id and user_id:
             await _cleanup(database, org_id, user_id)

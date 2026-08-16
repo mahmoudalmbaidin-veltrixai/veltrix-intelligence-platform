@@ -31,7 +31,7 @@ from vip_api.database.session import Database
 from vip_api.governance.audit import record_audit
 from vip_api.governance.context import AuthorizationContext
 from vip_api.governance.services import resolve_authorization_context
-from vip_api.pipelines.models import PipelineSchedule, PipelineScheduleRun
+from vip_api.pipelines.models import Pipeline, PipelineSchedule, PipelineScheduleRun
 from vip_api.pipelines.services import create_run
 from vip_api.tenancy.context import TenantContext
 from vip_api.tenancy.models import MembershipStatus, OrganizationMembership, WorkspaceMembership
@@ -51,6 +51,21 @@ class _ClaimedSlot:
 
 
 async def _claim_due(db: AsyncSession, *, now: datetime, limit: int) -> list[_ClaimedSlot]:
+    # Defense-in-depth lifecycle guard: only claim schedules whose pipeline still
+    # exists and is not archived. Schedules are also disabled when a pipeline is
+    # archived, but this correlated EXISTS makes the scheduler safe against any
+    # legacy/orphan enabled rows without a second round-trip and without adding the
+    # pipelines table to the FOR UPDATE lock (only pipeline_schedules is locked).
+    live_pipeline = (
+        select(Pipeline.id)
+        .where(
+            Pipeline.organization_id == PipelineSchedule.organization_id,
+            Pipeline.workspace_id == PipelineSchedule.workspace_id,
+            Pipeline.id == PipelineSchedule.pipeline_id,
+            Pipeline.archived_at.is_(None),
+        )
+        .exists()
+    )
     schedules = list(
         (
             await db.scalars(
@@ -59,9 +74,10 @@ async def _claim_due(db: AsyncSession, *, now: datetime, limit: int) -> list[_Cl
                     PipelineSchedule.enabled.is_(True),
                     PipelineSchedule.next_run_at.is_not(None),
                     PipelineSchedule.next_run_at <= now,
+                    live_pipeline,
                 )
                 .order_by(PipelineSchedule.next_run_at)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, of=PipelineSchedule)
                 .limit(limit)
             )
         ).all()

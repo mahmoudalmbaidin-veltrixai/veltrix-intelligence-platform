@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vip_api.auth.models import utc_now
@@ -27,6 +27,7 @@ from vip_api.pipelines.models import (
     PipelineOutboxEvent,
     PipelineRun,
     PipelineRunLog,
+    PipelineSchedule,
     PipelineVersion,
 )
 from vip_api.pipelines.schemas import (
@@ -638,6 +639,26 @@ async def archive_pipeline(
     item.archived_at = utc_now()
     item.status = "archived"
     item.row_version += 1
+    # Lifecycle consistency: disable this pipeline's schedules in the SAME
+    # transaction as the archive, and clear their due time so the scheduler can
+    # never claim them again. Keeping this atomic avoids a window where the
+    # pipeline is archived but its schedules still fire (PIPE-P2-STALE-SCHEDULES).
+    await db.execute(
+        update(PipelineSchedule)
+        .where(
+            PipelineSchedule.organization_id == item.organization_id,
+            PipelineSchedule.workspace_id == item.workspace_id,
+            PipelineSchedule.pipeline_id == item.id,
+            PipelineSchedule.enabled.is_(True),
+        )
+        .values(
+            enabled=False,
+            status="archived",
+            next_run_at=None,
+            updated_at=utc_now(),
+            row_version=PipelineSchedule.row_version + 1,
+        )
+    )
     await record_audit(
         db,
         "pipeline.archived",
