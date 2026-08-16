@@ -50,14 +50,16 @@ describe('isProductionGatedFeature', () => {
     }
   })
 
-  it('gates entitlement-less paths (Explore) by path in production', () => {
+  it('gates entitlement-less paths (Explore, Developer settings) by path in production', () => {
     expect(isProductionGatedFeature({ path: '/explore' }, 'live')).toBe(true)
+    expect(isProductionGatedFeature({ path: '/settings/developer' }, 'live')).toBe(true)
     expect(isProductionGatedFeature({ path: '/dashboards' }, 'live')).toBe(false)
   })
 
   it('is reversible: nothing is gated in development mock mode', () => {
     expect(isProductionGatedFeature({ entitlement: 'report_studio' }, 'mock')).toBe(false)
     expect(isProductionGatedFeature({ path: '/explore' }, 'mock')).toBe(false)
+    expect(isProductionGatedFeature({ path: '/settings/developer' }, 'mock')).toBe(false)
   })
 })
 

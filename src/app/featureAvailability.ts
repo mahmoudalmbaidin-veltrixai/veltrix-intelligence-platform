@@ -32,7 +32,7 @@ export const V1_GATED_ENTITLEMENTS: ReadonlySet<EntitlementKey> = new Set<Entitl
 ])
 
 /** V1-gated surfaces that carry no entitlement, matched by exact path or prefix. */
-export const V1_GATED_PATHS: readonly string[] = ['/explore']
+export const V1_GATED_PATHS: readonly string[] = ['/explore', '/settings/developer']
 
 /**
  * True when a navigation item or route points at a module that is gated out of

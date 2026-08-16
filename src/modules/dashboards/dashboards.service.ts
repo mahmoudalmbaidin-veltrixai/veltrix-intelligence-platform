@@ -549,6 +549,7 @@ const apiDashboardService: DashboardService = {
       canvas: {},
       widgets: page.widgets.map(widgetToApi),
     }))
+    const fallbackModelId = dashboard.pages.flatMap((page) => page.widgets).find((widget) => widget.modelId)?.modelId
     const filters: ApiDashboardFilter[] = dashboard.filters.flatMap((filter, position) => {
       const widgets = dashboard.pages
         .flatMap((page) => page.widgets)
@@ -559,7 +560,7 @@ const apiDashboardService: DashboardService = {
               filter.fieldId,
             ),
         )
-      const semanticModelId = widgets[0]?.modelId
+      const semanticModelId = widgets[0]?.modelId ?? fallbackModelId
       if (!semanticModelId) return []
       return [
         {

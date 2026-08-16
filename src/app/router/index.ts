@@ -714,8 +714,14 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Upgrade Required', layout: 'error' },
   },
   {
-    path: '/:pathMatch(.*)*',
+    path: '/not-found',
     name: 'not-found',
+    component: () => import('@/modules/errors/NotFoundView.vue'),
+    meta: { title: 'Not Found', layout: 'error' },
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found-catchall',
     component: () => import('@/modules/errors/NotFoundView.vue'),
     meta: { title: 'Not Found', layout: 'error' },
   },
@@ -787,17 +793,17 @@ router.beforeEach(async (to) => {
       return { name: 'forbidden', query: { from: to.fullPath, reason: 'authorization-unavailable' } }
     }
   }
+  // Centralized V1 product gate (BUG-CUR-004): a module gated out of this build
+  // is blocked on direct URL / deep link regardless of role, entitlement, or
+  // permission. Checked before the permission/upgrade paths so unfinished
+  // modules resolve to not-found — never a forbidden wall or paywall prompt.
+  if (isProductionGatedFeature({ entitlement: to.meta.entitlement, path: to.path })) {
+    return { name: 'not-found' }
+  }
   if (to.meta.permission && !authorization.can(to.meta.permission)) {
     return { name: 'forbidden', query: { from: to.fullPath } }
   }
   if (to.name === 'settings' && to.params.section === 'developer' && !platform.entitled('developer_api')) {
-    return { name: 'upgrade', query: { feature: 'developer_api', from: to.fullPath } }
-  }
-  // Centralized V1 product gate (BUG-CUR-004): a module gated out of this build
-  // is blocked on direct URL / deep link regardless of role or entitlement, so a
-  // super admin cannot reach an unfinished module. Checked before the entitlement
-  // upgrade path so gated modules resolve to not-found, never a paywall prompt.
-  if (isProductionGatedFeature({ entitlement: to.meta.entitlement, path: to.path })) {
     return { name: 'not-found' }
   }
   if (to.meta.entitlement && !platform.entitled(to.meta.entitlement)) {
