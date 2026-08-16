@@ -176,6 +176,24 @@ const connectionOptions = computed(() =>
     .filter((item) => item.status === 'active')
     .map((item) => ({ value: item.id, label: `${item.name} · ${item.type.name}` })),
 )
+// Safe default: preselect only when exactly ONE eligible connection exists. With
+// zero or multiple, selection stays empty so the user must choose explicitly —
+// never an implicit "first active connection" that depends on API ordering.
+function safeDefaultConnectionId(): string {
+  return connectionOptions.value.length === 1 ? connectionOptions.value[0].value : ''
+}
+const connectionHelp = computed(() => {
+  if (connectionOptions.value.length === 1) return 'Automatically selected — the only eligible connection.'
+  if (connectionOptions.value.length > 1) return 'Choose the connection to import into.'
+  return undefined
+})
+// Clear a selection that is no longer valid (workspace switch, or the connection
+// was deactivated) rather than silently importing against a different one.
+watch(connectionOptions, (options) => {
+  const ids = new Set(options.map((option) => option.value))
+  if (csvImport.connectionId && !ids.has(csvImport.connectionId)) csvImport.connectionId = ''
+  if (discovery.connectionId && !ids.has(discovery.connectionId)) discovery.connectionId = ''
+})
 const dialogConnectionId = computed({
   get: () => (dialogMode.value === 'csv' ? csvImport.connectionId : discovery.connectionId),
   set: (value: string) => {
@@ -186,14 +204,14 @@ const dialogConnectionId = computed({
 
 function openDiscovery(): void {
   dialogMode.value = 'discover'
-  discovery.connectionId = connectionOptions.value[0]?.value ?? ''
+  discovery.connectionId = safeDefaultConnectionId()
   discoverError.value = ''
   discoverOpen.value = true
 }
 
 function openCsvImport(): void {
   dialogMode.value = 'csv'
-  csvImport.connectionId = connectionOptions.value[0]?.value ?? ''
+  csvImport.connectionId = safeDefaultConnectionId()
   csvImport.schema = 'vip_data'
   csvImport.table = ''
   csvImport.displayName = ''
@@ -574,11 +592,17 @@ async function confirmLifecycle() {
       @close="discoverOpen = false"
     >
       <div class="discovery-form">
+        <p v-if="connectionOptions.length === 0" class="discovery-empty" role="alert">
+          No eligible connections available. Create or activate a connection before importing.
+        </p>
         <VipSelect
+          v-else
           v-model="dialogConnectionId"
           label="Connection"
           :options="connectionOptions"
           placeholder="Select a connection"
+          required
+          :help="connectionHelp"
         />
         <template v-if="dialogMode === 'discover'">
           <VipInput v-model="discovery.schemas" label="Schemas" help="Comma-separated schema names." />
@@ -633,7 +657,12 @@ async function confirmLifecycle() {
       </div>
       <template #footer>
         <VipButton variant="tertiary" @click="discoverOpen = false">Cancel</VipButton>
-        <VipButton variant="primary" :loading="discoverBusy" @click="discover">
+        <VipButton
+          variant="primary"
+          :loading="discoverBusy"
+          :disabled="connectionOptions.length === 0 || !dialogConnectionId"
+          @click="discover"
+        >
           {{ dialogMode === 'csv' ? 'Import and catalog' : 'Discover and persist' }}
         </VipButton>
       </template>
@@ -791,6 +820,13 @@ async function confirmLifecycle() {
 .discovery-form {
   display: grid;
   gap: var(--vip-sp-5);
+}
+.discovery-empty {
+  padding: var(--vip-sp-4) var(--vip-sp-5);
+  background: var(--vip-warning-soft);
+  color: var(--vip-warning-text);
+  border-radius: var(--vip-radius-md);
+  font-size: var(--vip-fs-sm);
 }
 .csv-upload {
   display: flex;
