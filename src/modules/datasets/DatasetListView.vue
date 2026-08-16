@@ -38,9 +38,20 @@ const data = ref<Dataset[]>([])
 const isLoading = ref(false)
 const listError = ref('')
 const page = ref(1)
-const pageSize = 50
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const
+const pageSize = ref(50)
+const pageSizeOptions = PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: `${n} / page` }))
+const pageSizeModel = computed<string>({
+  get: () => String(pageSize.value),
+  set: (value) => {
+    pageSize.value = Number(value)
+  },
+})
 const total = ref(0)
 let listRequest = 0
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
+const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize.value + 1))
+const rangeEnd = computed(() => Math.min(page.value * pageSize.value, total.value))
 const { data: connections } = useQuery('datasets:connections', async () => (await connectionService.list(1, 100)).items)
 const canDiscover = computed(() => platform.can('dataset.discover'))
 const discoverOpen = ref(false)
@@ -273,7 +284,7 @@ async function refetch(): Promise<void> {
             : statusFilter.value
     const result = await datasetService.listPage({
       page: page.value,
-      pageSize,
+      pageSize: pageSize.value,
       search: search.value,
       status,
     })
@@ -297,6 +308,11 @@ watch(search, () => {
   }, 300)
 })
 watch(statusFilter, () => {
+  if (page.value !== 1) page.value = 1
+  else void refetch()
+})
+// Changing page size re-anchors to page 1 so the visible window stays valid.
+watch(pageSize, () => {
   if (page.value !== 1) page.value = 1
   else void refetch()
 })
@@ -508,10 +524,26 @@ async function confirmLifecycle() {
       <div v-if="listError" class="dl__list-error" role="alert">
         {{ listError }} <button @click="refetch">Retry</button>
       </div>
-      <div class="dl__paging" aria-label="Dataset pages">
-        <VipButton size="xs" :disabled="page === 1 || isLoading" @click="page--">Previous</VipButton>
-        <span>Page {{ page }} of {{ Math.max(1, Math.ceil(total / pageSize)) }}</span>
-        <VipButton size="xs" :disabled="page * pageSize >= total || isLoading" @click="page++">Next</VipButton>
+      <div v-if="total > 0" class="dl__paging" role="navigation" aria-label="Dataset catalog pages">
+        <span class="dl__range" aria-live="polite">
+          Showing {{ rangeStart }}&ndash;{{ rangeEnd }} of {{ total }} datasets
+        </span>
+        <div class="dl__paging-controls">
+          <VipSelect
+            v-model="pageSizeModel"
+            :options="pageSizeOptions"
+            aria-label="Datasets per page"
+            size="sm"
+            class="dl__page-size"
+          />
+          <VipButton size="xs" :disabled="page === 1 || isLoading" aria-label="Previous page" @click="page--"
+            >Previous</VipButton
+          >
+          <span class="dl__page-of">Page {{ page }} of {{ totalPages }}</span>
+          <VipButton size="xs" :disabled="page >= totalPages || isLoading" aria-label="Next page" @click="page++"
+            >Next</VipButton
+          >
+        </div>
       </div>
     </VipCard>
 
@@ -645,6 +677,34 @@ async function confirmLifecycle() {
   font-size: var(--vip-fs-xs);
   color: var(--vip-text-muted);
   border-top: 1px solid var(--vip-border-subtle);
+}
+.dl__paging {
+  gap: var(--vip-sp-4);
+  flex-wrap: wrap;
+}
+.dl__paging-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--vip-sp-4);
+  flex-wrap: wrap;
+}
+.dl__page-size {
+  min-width: 96px;
+}
+.dl__page-of {
+  white-space: nowrap;
+}
+.dl__range {
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .dl__paging {
+    justify-content: center;
+  }
+  .dl__range {
+    width: 100%;
+    text-align: center;
+  }
 }
 .dl__list-error {
   justify-content: flex-start;
