@@ -194,7 +194,18 @@ async def test_dashboard_tables_persist_and_queries_are_tenant_qualified(
                 dashboard_id=created.id,
                 version_number=1,
                 version_type="published",
-                snapshot={"schema_version": 1, "pages": []},
+                snapshot={
+                    "schema_version": 1,
+                    "dashboard": {
+                        "id": str(created.id),
+                        "slug": created.slug,
+                        "name": created.name,
+                        "description": created.description,
+                        "tags": created.tags,
+                    },
+                    "pages": [],
+                    "filters": [],
+                },
                 created_by_user_id=user_id,
                 change_summary="Direct-share access test",
             )
@@ -205,8 +216,8 @@ async def test_dashboard_tables_persist_and_queries_are_tenant_qualified(
             dashboard.status = "published"
             await db.commit()
             published = await viewer(db, shared_context, created.id)
-            assert published["version"] == 1
-            assert published["access"] == {
+            assert published.version == 1
+            assert published.access.model_dump() == {
                 "can_view": True,
                 "can_interact": True,
                 "can_edit": True,

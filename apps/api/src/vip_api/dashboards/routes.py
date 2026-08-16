@@ -1,7 +1,7 @@
 """Live, governed Dashboard Studio APIs."""
 
 import json
-from typing import Annotated, cast
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -18,6 +18,7 @@ from vip_api.dashboards.schemas import (
     DashboardSummary,
     EditorResponse,
     EditorSave,
+    PublishedDashboardViewerResponse,
     ShareCreate,
     ShareResponse,
     SnapshotCreate,
@@ -169,12 +170,12 @@ async def delete_dashboard(
     return Response(status_code=204)
 
 
-@router.get("/{dashboard_id}/viewer")
+@router.get("/{dashboard_id}/viewer", response_model=PublishedDashboardViewerResponse)
 async def published_viewer(
     dashboard_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db_session)],
     context: Annotated[AuthorizationContext, Depends(dashboard_capability)],
-) -> dict[str, object]:
+) -> PublishedDashboardViewerResponse:
     return await viewer(db, context, dashboard_id)
 
 
@@ -298,20 +299,17 @@ async def snapshots_create(
     provider: Annotated[DatabaseEncryptedSecretProvider, Depends(get_secret_provider)],
 ) -> SnapshotResponse:
     published = await viewer(db, context, dashboard_id)
-    snapshot = cast(dict[str, object], published["snapshot"])
-    pages = cast(list[dict[str, object]], snapshot.get("pages", []))
-    version_number = int(cast(int, published["version"]))
+    version_number = published.version
     results: dict[str, object] = {}
-    for page in pages:
-        for widget in cast(list[dict[str, object]], page.get("widgets", [])):
-            widget_id = widget.get("id")
-            if widget_id is None or widget.get("semantic_model_id") is None or widget.get("hidden"):
+    for page in published.snapshot.pages:
+        for widget in page.widgets:
+            if widget.semantic_model_id is None or widget.hidden:
                 continue
             result = await execute_widget(
                 db,
                 context,
                 dashboard_id,
-                UUID(str(widget_id)),
+                widget.id,
                 WidgetDataRequest(
                     dashboard_version=version_number,
                     preview=False,
@@ -320,7 +318,7 @@ async def snapshots_create(
                 settings,
                 provider,
             )
-            results[str(widget_id)] = result.model_dump(mode="json")
+            results[str(widget.id)] = result.model_dump(mode="json")
     data_snapshot: dict[str, object] = {
         "schema_version": 1,
         "dashboard_version": version_number,

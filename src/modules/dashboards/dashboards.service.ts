@@ -2,14 +2,9 @@
 import { apiClient } from '@/shared/lib/apiClient'
 import { clone, isoAgo, LocalStore, nowIso } from '@/shared/lib/mock'
 import { defineService } from '@/shared/services/serviceFactory'
+import { z } from 'zod'
 import type { QueryFilter, QueryResult } from '@/shared/types/semantic'
-import {
-  toQuery,
-  type Dashboard,
-  type DashboardListItem,
-  type DashboardWidget,
-  type WidgetType,
-} from '@/shared/types/dashboard'
+import { toQuery, type Dashboard, type DashboardListItem, type DashboardWidget } from '@/shared/types/dashboard'
 import { semanticService } from '@/shared/services/semanticModels'
 import { SEED_DASHBOARDS } from './seed'
 
@@ -76,10 +71,134 @@ interface ApiEditor {
   version: number
   etag: string
 }
-interface ApiViewer {
-  dashboard: ApiSummary
-  version: number
-  snapshot: { pages: ApiPage[]; filters: ApiDashboardFilter[] }
+
+const apiFilterValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+])
+
+const apiViewerWidgetSchema = z
+  .object({
+    id: z.string().uuid(),
+    page_id: z.string().uuid(),
+    type: z.enum([
+      'kpi',
+      'metric-comparison',
+      'table',
+      'pivot',
+      'bar',
+      'stacked-bar',
+      'column',
+      'line',
+      'area',
+      'pie',
+      'donut',
+      'scatter',
+      'gauge',
+      'progress',
+      'text',
+      'rich-text',
+      'image',
+      'filter',
+      'date-filter',
+      'map',
+    ]),
+    title: z.string(),
+    description: z.string(),
+    semantic_model_id: z.string().uuid().nullable().optional(),
+    query: z
+      .object({
+        metrics: z.array(z.string()),
+        dimensions: z.array(z.string()),
+        filters: z.array(z.object({ field: z.string(), operator: z.string(), value: apiFilterValueSchema }).strict()),
+        order_by: z.array(z.object({ field: z.string(), direction: z.enum(['asc', 'desc']) }).strict()),
+        limit: z.number().int().positive(),
+      })
+      .strict(),
+    config: z.record(z.string(), z.unknown()),
+    layout: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).strict(),
+    filters: z.array(z.object({ field: z.string(), operator: z.string(), value: apiFilterValueSchema }).strict()),
+    interactions: z.record(z.string(), z.unknown()),
+    content: z.string().nullable().optional(),
+    hidden: z.boolean(),
+  })
+  .strict()
+
+const apiViewerPageSchema = z
+  .object({
+    id: z.string().uuid(),
+    key: z.string(),
+    name: z.string(),
+    description: z.string(),
+    position: z.number().int().nonnegative(),
+    canvas: z.record(z.string(), z.unknown()),
+    widgets: z.array(apiViewerWidgetSchema),
+  })
+  .strict()
+
+const apiViewerFilterSchema = z
+  .object({
+    id: z.string().uuid(),
+    key: z.string(),
+    label: z.string(),
+    type: z.enum(['select', 'multi_select', 'date', 'date_range', 'number', 'number_range', 'text']),
+    semantic_model_id: z.string().uuid(),
+    dimension_key: z.string(),
+    operator: z.string(),
+    default_value: apiFilterValueSchema,
+    widget_ids: z.array(z.string().uuid()),
+    position: z.number().int().nonnegative(),
+  })
+  .strict()
+
+const apiViewerIdentitySchema = z
+  .object({
+    id: z.string().uuid(),
+    slug: z.string(),
+    name: z.string(),
+    description: z.string(),
+    tags: z.array(z.string()),
+  })
+  .strict()
+
+export const publishedDashboardViewerSchema = z
+  .object({
+    dashboard: apiViewerIdentitySchema
+      .extend({
+        status: z.literal('published'),
+        owner_user_id: z.string().uuid(),
+        published_at: z.string().datetime({ offset: true }),
+      })
+      .strict(),
+    version: z.number().int().positive(),
+    snapshot: z
+      .object({
+        schema_version: z.literal(1),
+        dashboard: apiViewerIdentitySchema,
+        pages: z.array(apiViewerPageSchema),
+        filters: z.array(apiViewerFilterSchema),
+      })
+      .strict(),
+    access: z
+      .object({
+        can_view: z.boolean(),
+        can_interact: z.boolean(),
+        can_edit: z.boolean(),
+        can_publish: z.boolean(),
+        can_manage_sharing: z.boolean(),
+        can_snapshot: z.boolean(),
+      })
+      .strict(),
+  })
+  .strict()
+
+export type PublishedDashboardViewer = z.infer<typeof publishedDashboardViewerSchema>
+
+export function parsePublishedDashboardViewer(value: unknown): PublishedDashboardViewer {
+  return publishedDashboardViewerSchema.parse(value)
 }
 interface ApiWidgetData {
   columns: QueryResult['columns']
@@ -132,22 +251,35 @@ const operatorToApi: Record<string, string> = {
   lte: 'less_than_or_equal',
   starts: 'starts_with',
   ends: 'ends_with',
+  'is-null': 'is_null',
+  'is-not-null': 'is_not_null',
 }
 const operatorFromApi: Record<string, QueryFilter['operator']> = {
   equals: 'eq',
   not_equals: 'neq',
+  in: 'in',
   not_in: 'nin',
   greater_than: 'gt',
   greater_than_or_equal: 'gte',
   less_than: 'lt',
   less_than_or_equal: 'lte',
+  between: 'between',
+  contains: 'contains',
   starts_with: 'starts',
   ends_with: 'ends',
+  is_null: 'is-null',
+  is_not_null: 'is-not-null',
+}
+
+function filterOperatorFromApi(value: string): QueryFilter['operator'] {
+  const operator = operatorFromApi[value]
+  if (!operator) throw new Error(`Unsupported dashboard filter operator: ${value}`)
+  return operator
 }
 
 export function widgetFromApi(item: ApiWidget): DashboardWidget {
   const persistedFilters = item.filters.length ? item.filters : item.query.filters
-  const type = item.type as WidgetType
+  const type = apiViewerWidgetSchema.shape.type.parse(item.type)
   const values = item.query.metrics.map((fieldId) => ({ fieldId, aggregation: 'sum' as const }))
   const wells: DashboardWidget['wells'] = { values }
   if (['table', 'pivot', 'pie', 'donut', 'scatter'].includes(type)) {
@@ -164,8 +296,8 @@ export function widgetFromApi(item: ApiWidget): DashboardWidget {
     wells,
     filters: persistedFilters.map((filter) => ({
       fieldId: filter.field,
-      operator: operatorFromApi[filter.operator] ?? (filter.operator as QueryFilter['operator']),
-      value: filter.value as QueryFilter['value'],
+      operator: filterOperatorFromApi(filter.operator),
+      value: apiFilterValueSchema.parse(filter.value),
     })),
     sorts: item.query.order_by.map((sort) => ({ fieldId: sort.field, dir: sort.direction })),
     format: {
@@ -226,13 +358,41 @@ function dashboardFromApi(
     })),
     filters: filters.map((item) => ({
       fieldId: item.dimension_key,
-      operator: operatorFromApi[item.operator] ?? (item.operator as QueryFilter['operator']),
-      value: item.default_value as QueryFilter['value'],
+      operator: filterOperatorFromApi(item.operator),
+      value: apiFilterValueSchema.parse(item.default_value),
       label: item.label,
     })),
     updatedAt: summary.updated_at,
     favorite: false,
     freshness: summary.updated_at,
+  }
+}
+
+export function dashboardFromPublishedApi(response: PublishedDashboardViewer): Dashboard {
+  const { dashboard, snapshot, version } = response
+  return {
+    id: dashboard.id,
+    name: dashboard.name,
+    description: dashboard.description,
+    status: dashboard.status,
+    version,
+    owner: dashboard.owner_user_id,
+    tags: dashboard.tags,
+    pages: snapshot.pages.map((page) => ({
+      id: page.id,
+      name: page.name,
+      widgets: page.widgets.map(widgetFromApi),
+      filters: [],
+    })),
+    filters: snapshot.filters.map((item) => ({
+      fieldId: item.dimension_key,
+      operator: filterOperatorFromApi(item.operator),
+      value: apiFilterValueSchema.parse(item.default_value),
+      label: item.label,
+    })),
+    updatedAt: dashboard.published_at,
+    favorite: false,
+    freshness: dashboard.published_at,
   }
 }
 
@@ -364,8 +524,8 @@ const apiDashboardService: DashboardService = {
     return dashboardFromApi(result.dashboard, result.pages, result.version, result.filters)
   },
   async getPublished(id) {
-    const result = await apiClient.get<ApiViewer>(`/dashboards/${id}/viewer`)
-    return dashboardFromApi(result.dashboard, result.snapshot.pages, result.version, result.snapshot.filters)
+    const result = parsePublishedDashboardViewer(await apiClient.get<unknown>(`/dashboards/${id}/viewer`))
+    return dashboardFromPublishedApi(result)
   },
   async rowVersion(id) {
     return (await apiClient.get<ApiSummary>(`/dashboards/${id}`)).row_version

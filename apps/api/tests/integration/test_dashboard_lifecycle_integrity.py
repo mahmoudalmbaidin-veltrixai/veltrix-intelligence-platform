@@ -224,13 +224,13 @@ async def test_dashboard_lifecycle_widget_and_version_integrity(settings: Settin
             snap1_titles = _snapshot_overview_titles(version1.snapshot)
             assert snap1_titles == ["Card C", "Card A", "Card E", "Card C"]
             published_viewer = await viewer(db, ctx, dash_id)
-            assert published_viewer["version"] == version1.version_number
-            assert published_viewer["snapshot"] == version1.snapshot
+            assert published_viewer.version == version1.version_number
+            assert published_viewer.snapshot.model_dump(mode="json") == version1.snapshot
 
             # ---- edit again after publish, then confirm v1 snapshot is immutable ----
             save3 = EditorSave(
                 expected_version=(await editor(db, ctx, dash_id)).version,
-                name="Lifecycle Board",
+                name="Unpublished Lifecycle Draft",
                 pages=[
                     PageInput(
                         key="details",
@@ -258,6 +258,10 @@ async def test_dashboard_lifecycle_widget_and_version_integrity(settings: Settin
                 "Card E",
                 "Card C",
             ]  # unchanged (immutable)
+            published_viewer_after_draft = await viewer(db, ctx, dash_id)
+            assert published_viewer_after_draft.dashboard.name == "Lifecycle Board"
+            assert published_viewer_after_draft.snapshot.dashboard.name == "Lifecycle Board"
+            assert published_viewer_after_draft.dashboard.published_at == version1.published_at
 
             # ---- optimistic-lock conflict returns a clear error ----
             with pytest.raises(ApplicationError) as conflict:
@@ -535,7 +539,7 @@ async def test_all_widget_types_traverse_real_publish_and_export_contract(
             version = await db.get(DashboardVersion, published.id)
             assert version is not None
             published_view = await viewer(db, ctx, created.id)
-            assert published_view["snapshot"] == version.snapshot
+            assert published_view.snapshot.model_dump(mode="json") == version.snapshot
             page = cast(list[dict[str, object]], version.snapshot["pages"])[0]
             persisted_widgets = cast(list[dict[str, object]], page["widgets"])
             assert [item["type"] for item in persisted_widgets] == list(ALL_WIDGET_TYPES)

@@ -264,6 +264,66 @@ class DashboardDetail(DashboardSummary):
     access: dict[str, bool]
 
 
+class PublishedWidget(WidgetInput):
+    id: UUID
+    page_id: UUID
+
+
+class PublishedPage(StrictModel):
+    id: UUID
+    key: str
+    name: str
+    description: str
+    position: int
+    canvas: dict[str, object]
+    widgets: list[PublishedWidget]
+
+
+class PublishedDashboardFilter(DashboardFilterInput):
+    id: UUID
+
+
+class PublishedDashboardIdentity(StrictModel):
+    """Dashboard metadata captured inside an immutable publication snapshot."""
+
+    id: UUID
+    slug: str
+    name: str
+    description: str
+    tags: list[str]
+
+
+class PublishedDashboardMetadata(PublishedDashboardIdentity):
+    """Safe, publication-bound metadata displayed by the viewer."""
+
+    status: Literal["published"]
+    owner_user_id: UUID
+    published_at: datetime
+
+
+class PublishedDashboardSnapshot(StrictModel):
+    schema_version: Literal[1]
+    dashboard: PublishedDashboardIdentity
+    pages: list[PublishedPage]
+    filters: list[PublishedDashboardFilter]
+
+
+class DashboardViewerAccess(StrictModel):
+    can_view: bool
+    can_interact: bool
+    can_edit: bool
+    can_publish: bool
+    can_manage_sharing: bool
+    can_snapshot: bool
+
+
+class PublishedDashboardViewerResponse(StrictModel):
+    dashboard: PublishedDashboardMetadata
+    version: int = Field(ge=1)
+    snapshot: PublishedDashboardSnapshot
+    access: DashboardViewerAccess
+
+
 class EditorResponse(StrictModel):
     dashboard: DashboardDetail
     pages: list[PageInput]

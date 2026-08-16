@@ -841,8 +841,8 @@ async def test_all_twenty_widgets_traverse_every_real_delivery_format(
             published_view = await viewer(db, context, created.id)
             version = await db.get(DashboardVersion, published.id)
             assert version is not None
-            assert published_view["version"] == published.version_number
-            assert published_view["snapshot"] == version.snapshot
+            assert published_view.version == published.version_number
+            assert published_view.snapshot.model_dump(mode="json") == version.snapshot
             snapshot_pages = cast(list[dict[str, object]], version.snapshot["pages"])
             published_widgets = {
                 str(widget["type"]): widget

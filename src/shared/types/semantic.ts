@@ -89,12 +89,14 @@ export type FilterOperator =
   | 'contains'
   | 'starts'
   | 'ends'
+  | 'is-null'
+  | 'is-not-null'
   | 'relative-date'
 
 export interface QueryFilter {
   fieldId: string
   operator: FilterOperator
-  value: string | number | boolean | Array<string | number> | null
+  value: string | number | boolean | Array<string | number | boolean | null> | null
   /** Human label for chips. */
   label?: string
 }

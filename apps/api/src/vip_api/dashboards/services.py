@@ -30,6 +30,12 @@ from vip_api.dashboards.schemas import (
     EditorResponse,
     EditorSave,
     PageInput,
+    PublishedDashboardFilter,
+    PublishedDashboardIdentity,
+    PublishedDashboardMetadata,
+    PublishedDashboardSnapshot,
+    PublishedDashboardViewerResponse,
+    PublishedPage,
     ShareCreate,
     ShareResponse,
     SnapshotCreate,
@@ -735,7 +741,7 @@ async def versions(
 
 async def viewer(
     db: AsyncSession, context: AuthorizationContext, dashboard_id: UUID
-) -> dict[str, object]:
+) -> PublishedDashboardViewerResponse:
     dashboard = await get_dashboard(db, context, dashboard_id)
     access = await _access(db, context, dashboard)
     if not access["can_view"] or dashboard.published_version_id is None:
@@ -752,12 +758,37 @@ async def viewer(
     )
     if version is None:
         raise _not_found()
-    return {
-        "dashboard": (await detail(db, context, dashboard)).model_dump(mode="json"),
-        "version": version.version_number,
-        "snapshot": version.snapshot,
-        "access": access,
-    }
+    raw_metadata = cast(dict[str, object], version.snapshot.get("dashboard", {}))
+    snapshot_identity = PublishedDashboardIdentity(
+        id=dashboard.id,
+        slug=str(raw_metadata.get("slug", dashboard.slug)),
+        name=str(raw_metadata.get("name", dashboard.name)),
+        description=str(raw_metadata.get("description", dashboard.description)),
+        tags=cast(list[str], raw_metadata.get("tags", dashboard.tags)),
+    )
+    snapshot = PublishedDashboardSnapshot(
+        schema_version=cast(int, version.snapshot.get("schema_version", 1)),
+        dashboard=snapshot_identity,
+        pages=[
+            PublishedPage.model_validate(item)
+            for item in cast(list[object], version.snapshot.get("pages", []))
+        ],
+        filters=[
+            PublishedDashboardFilter.model_validate(item)
+            for item in cast(list[object], version.snapshot.get("filters", []))
+        ],
+    )
+    return PublishedDashboardViewerResponse(
+        dashboard=PublishedDashboardMetadata(
+            **snapshot_identity.model_dump(),
+            status="published",
+            owner_user_id=dashboard.owner_user_id,
+            published_at=version.published_at or version.created_at,
+        ),
+        version=version.version_number,
+        snapshot=snapshot,
+        access=access,
+    )
 
 
 async def restore(
