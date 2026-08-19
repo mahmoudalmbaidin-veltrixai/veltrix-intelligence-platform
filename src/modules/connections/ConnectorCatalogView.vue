@@ -72,7 +72,11 @@ const filtered = computed(() => {
   })
 })
 
-const availableCount = computed(() => (types.value ?? []).filter((t) => t.is_enabled).length)
+// Count genuinely-available connectors separately from beta so the summary never
+// implies beta connectors are GA. `is_enabled` covers available + beta (both can
+// be created/tested), but only `available` connectors are the supported V1 path.
+const availableCount = computed(() => (types.value ?? []).filter((t) => t.implementation_status === 'available').length)
+const betaCount = computed(() => (types.value ?? []).filter((t) => t.implementation_status === 'beta').length)
 
 function presentation(item: ConnectionType) {
   return CONNECTOR_STATUS[item.implementation_status] ?? CONNECTOR_STATUS.planned
@@ -107,7 +111,11 @@ function connect(item: ConnectionType) {
       <VipSelect v-model="deployment" label="" :options="deploymentOptions" />
     </div>
     <p class="catalog__count">
-      Showing {{ filtered.length }} of {{ types?.length ?? 0 }} connectors · {{ availableCount }} available now
+      Showing {{ filtered.length }} of {{ types?.length ?? 0 }} connectors · {{ availableCount }} available now<span
+        v-if="betaCount"
+      >
+        · {{ betaCount }} in beta</span
+      >
     </p>
 
     <div v-if="isLoading" class="catalog__loading">Loading connector catalog…</div>

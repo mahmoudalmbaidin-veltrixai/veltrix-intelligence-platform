@@ -133,14 +133,14 @@ async function openResource(n: Notification) {
 
 // ------- Notification preferences (persisted per-user) ------- //
 const platform = usePlatformStore()
+// Only categories for modules that actually exist in V1. Gated modules
+// (Reports, Billing, Marketplace, Developer, Automation) are intentionally not
+// offered here so the preferences list never implies a capability the customer
+// cannot use. Previously-saved values for other keys are preserved in the bag.
 const PREF_DEFAULTS: Record<string, boolean> = {
   Pipelines: true,
   Datasets: true,
-  Reports: true,
-  Billing: true,
-  Marketplace: false,
-  Developer: true,
-  Automation: true,
+  Dashboards: true,
   System: true,
 }
 const preferences = reactive<Record<string, boolean>>({ ...PREF_DEFAULTS })
