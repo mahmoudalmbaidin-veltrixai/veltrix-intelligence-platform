@@ -22,7 +22,11 @@ import VipEmptyState from '@/shared/ui/VipEmptyState.vue'
 const router = useRouter()
 const search = ref('')
 const category = ref('all')
-const status = ref('all')
+// Default to genuinely-available connectors so the catalog does not read as a
+// large set of live integrations. Beta/planned/roadmap remain one filter click
+// away (and each card is status-badged), so nothing is hidden — just not the
+// default first impression.
+const status = ref('available')
 const deployment = ref('all')
 const details = ref<ConnectionType | null>(null)
 

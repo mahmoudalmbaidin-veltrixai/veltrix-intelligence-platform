@@ -37,8 +37,6 @@ const ecosystem: { icon: string; label: string }[] = [
   { icon: 'workflow', label: 'Pipeline Studio' },
   { icon: 'database', label: 'Dataset & Semantic layer' },
   { icon: 'chart', label: 'Dashboard Studio' },
-  { icon: 'sparkles', label: 'AI Studio' },
-  { icon: 'activity', label: 'Automation' },
   { icon: 'shield', label: 'Governance & Security' },
 ]
 
@@ -130,7 +128,9 @@ async function submit() {
       <div class="login__aside-grid"></div>
       <div class="login__aside-inner">
         <VipLogo variant="full" size="lg" decorative />
-        <h2 class="login__aside-title">One enterprise platform for data, analytics, automation and AI.</h2>
+        <h2 class="login__aside-title">
+          One enterprise platform for connected data, governed analytics and dashboards.
+        </h2>
         <p class="login__aside-lede">
           Veltrix unifies connections, pipelines, governed semantics and dashboards behind role-based control — so teams
           move from raw data to trusted decisions on a single, secure foundation.

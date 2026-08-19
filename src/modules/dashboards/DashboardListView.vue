@@ -156,7 +156,6 @@ async function onMenu(dashboard: (typeof items.value)[number], key: string) {
   <div>
     <VipPageHeader title="Dashboards" description="Explore and author interactive analytics dashboards.">
       <template #actions>
-        <VipButton variant="tertiary" icon="layers" @click="router.push('/dashboards/templates')">Templates</VipButton>
         <VipButton variant="tertiary" icon="calendar" @click="router.push('/dashboards/deliveries')"
           >Deliveries</VipButton
         >

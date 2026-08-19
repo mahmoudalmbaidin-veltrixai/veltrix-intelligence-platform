@@ -66,7 +66,7 @@ const routes: RouteRecordRaw[] = [
     path: '/favorites',
     name: 'favorites',
     component: () => import('@/modules/home/FavoritesView.vue'),
-    meta: { title: 'Favorites', layout: 'app', requiresAuth: true },
+    meta: { title: 'Favorites', layout: 'app', requiresAuth: true, developmentMockOnly: true },
   },
   {
     path: '/activity',
@@ -269,6 +269,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       permission: 'dashboard.read',
       entitlement: 'dashboard_studio',
+      developmentMockOnly: true,
     },
   },
   {

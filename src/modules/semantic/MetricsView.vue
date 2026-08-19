@@ -100,7 +100,6 @@ const aggOptions = [
   { value: 'min', label: 'Minimum' },
   { value: 'max', label: 'Maximum' },
   { value: 'count', label: 'Count' },
-  { value: 'median', label: 'Median' },
 ]
 const formatOptions = [
   { value: 'plain', label: 'Plain number' },

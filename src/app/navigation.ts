@@ -74,6 +74,9 @@ export const NAV_GROUPS: NavGroup[] = [
         to: '/favorites',
         icon: 'star',
         description: 'Quick access to items you have starred.',
+        // Hidden from the customer V1 surface until a real Favorites backend
+        // exists (the page currently has no live data). Available in dev mock.
+        developmentMockOnly: true,
       },
       {
         label: 'Recent activity',
@@ -177,6 +180,9 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'dashboard.read',
         entitlement: 'dashboard_studio',
         keywords: ['starter', 'gallery'],
+        // Hidden from the customer V1 surface until "Use template" actually
+        // applies a template (currently static cards). Available in dev mock.
+        developmentMockOnly: true,
       },
       {
         label: 'Published Dashboards',
@@ -440,7 +446,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Feature Flags',
         to: '/admin/feature-flags',
         icon: 'flag',
-        description: 'Toggle capabilities and staged rollouts.',
+        description: 'Review effective feature flags and rollout status.',
         permission: 'governance.read',
         adminOnly: true,
       },
