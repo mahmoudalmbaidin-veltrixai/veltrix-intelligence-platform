@@ -3,10 +3,12 @@ import { ref, computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { authService } from '@/shared/services/auth'
 import { ApiError } from '@/shared/types/api'
+import AuthShell from './AuthShell.vue'
 import VipInput from '@/shared/ui/VipInput.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipAlert from '@/shared/ui/VipAlert.vue'
 import VipLogo from '@/shared/ui/VipLogo.vue'
+import VipIcon from '@/shared/ui/VipIcon.vue'
 
 const MIN_LENGTH = 12
 const route = useRoute()
@@ -54,94 +56,104 @@ async function submit() {
 </script>
 
 <template>
-  <div class="authpage">
-    <div class="authpage__card">
-      <VipLogo class="authpage__logo" />
-      <h1 class="authpage__title">Reset your password</h1>
+  <AuthShell>
+    <div class="authcard__brand"><VipLogo variant="full" size="lg" decorative /></div>
+    <h1 class="authcard__title">Reset your password</h1>
 
-      <VipAlert v-if="done" tone="success" title="Password updated">
-        Your password has been changed and all existing sessions were signed out. You can now sign in with your new
-        password.
-      </VipAlert>
+    <VipAlert v-if="done" tone="success" title="Password updated">
+      Your password has been changed and all existing sessions were signed out. You can now sign in with your new
+      password.
+    </VipAlert>
 
-      <VipAlert v-else-if="!token" tone="danger" title="Invalid link">
-        This password-reset link is missing or malformed. Request a new one to continue.
-      </VipAlert>
+    <VipAlert v-else-if="!token" tone="danger" title="Invalid link">
+      This password-reset link is missing or malformed. Request a new one to continue.
+    </VipAlert>
 
-      <template v-else>
-        <p class="authpage__lead">Choose a new password for your account.</p>
-        <VipAlert v-if="tokenError" tone="danger" title="Reset failed">{{ tokenError }}</VipAlert>
-        <form class="authpage__form" novalidate @submit.prevent="submit">
-          <VipInput
-            v-model="password"
-            label="New password"
-            type="password"
-            autocomplete="new-password"
-            :hint="`At least ${MIN_LENGTH} characters.`"
-            :error="passwordError"
-            :disabled="submitting"
-          />
-          <VipInput
-            v-model="confirm"
-            label="Confirm new password"
-            type="password"
-            autocomplete="new-password"
-            :error="confirmError"
-            :disabled="submitting"
-          />
-          <VipButton type="submit" variant="primary" size="lg" block :loading="submitting" :disabled="submitting">
-            Set new password
-          </VipButton>
-        </form>
-      </template>
+    <template v-else>
+      <p class="authcard__lead">Choose a new password for your account.</p>
+      <VipAlert v-if="tokenError" tone="danger" title="Reset failed">{{ tokenError }}</VipAlert>
+      <form class="authcard__form" novalidate @submit.prevent="submit">
+        <VipInput
+          v-model="password"
+          label="New password"
+          type="password"
+          autocomplete="new-password"
+          :help="`At least ${MIN_LENGTH} characters.`"
+          :error="passwordError"
+          :disabled="submitting"
+          required
+        />
+        <VipInput
+          v-model="confirm"
+          label="Confirm new password"
+          type="password"
+          autocomplete="new-password"
+          :error="confirmError"
+          :disabled="submitting"
+          required
+        />
+        <VipButton type="submit" variant="primary" size="lg" block :loading="submitting" :disabled="submitting">
+          {{ submitting ? 'Updating…' : 'Set new password' }}
+        </VipButton>
+      </form>
+    </template>
 
-      <RouterLink v-if="done || !token || tokenError" class="authpage__back" to="/forgot-password">
+    <div class="authcard__links">
+      <RouterLink v-if="done || !token || tokenError" class="authcard__back" to="/forgot-password">
         Request a new link
       </RouterLink>
-      <RouterLink class="authpage__back" to="/login">Back to sign in</RouterLink>
+      <RouterLink class="authcard__back" to="/login"
+        ><VipIcon name="chevronLeft" :size="14" /> Back to sign in</RouterLink
+      >
     </div>
-  </div>
+  </AuthShell>
 </template>
 
 <style scoped>
-.authpage {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: var(--space-6, 24px);
+.authcard__brand {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--vip-sp-7);
+  color: var(--vip-text-primary);
 }
-.authpage__card {
-  width: min(420px, 100%);
+.authcard__title {
+  font-size: var(--vip-fs-2xl);
+  font-weight: var(--vip-fw-semibold);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--vip-text-primary);
+}
+.authcard__lead {
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-md);
+  line-height: 1.6;
+  margin: var(--vip-sp-3) 0 var(--vip-sp-7);
+}
+.authcard__form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4, 16px);
-  padding: var(--space-6, 24px);
-  background: var(--surface-1, #fff);
-  border: 1px solid var(--border-subtle, #e2e8f0);
-  border-radius: var(--radius-lg, 12px);
+  gap: var(--vip-sp-6);
 }
-.authpage__logo {
-  height: 40px;
-}
-.authpage__title {
-  margin: 0;
-  font-size: var(--font-size-xl, 1.4rem);
-}
-.authpage__lead {
-  margin: 0;
-  color: var(--text-muted, #64748b);
-}
-.authpage__form {
+.authcard__links {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4, 16px);
+  gap: var(--vip-sp-3);
+  margin-top: var(--vip-sp-7);
 }
-.authpage__back {
-  text-align: center;
-  color: var(--brand-600, #2563eb);
+.authcard__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-brand-text);
   text-decoration: none;
+  border-radius: var(--vip-radius-xs);
 }
-.authpage__back:hover {
+.authcard__back:hover {
   text-decoration: underline;
+}
+.authcard__title + :deep(.vip-alert) {
+  margin-top: var(--vip-sp-6);
 }
 </style>

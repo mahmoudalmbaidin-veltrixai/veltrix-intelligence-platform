@@ -2,10 +2,12 @@
 import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { authService } from '@/shared/services/auth'
+import AuthShell from './AuthShell.vue'
 import VipInput from '@/shared/ui/VipInput.vue'
 import VipButton from '@/shared/ui/VipButton.vue'
 import VipAlert from '@/shared/ui/VipAlert.vue'
 import VipLogo from '@/shared/ui/VipLogo.vue'
+import VipIcon from '@/shared/ui/VipIcon.vue'
 
 const identifier = ref('')
 const submitting = ref(false)
@@ -36,77 +38,85 @@ async function submit() {
 </script>
 
 <template>
-  <div class="authpage">
-    <div class="authpage__card">
-      <VipLogo class="authpage__logo" />
-      <h1 class="authpage__title">Forgot your password?</h1>
+  <AuthShell>
+    <div class="authcard__brand"><VipLogo variant="full" size="lg" decorative /></div>
+    <h1 class="authcard__title">Reset your password</h1>
 
-      <VipAlert v-if="sent" tone="success" title="Check your email">
-        If an account matches that username or email, a password-reset link has been sent. The link expires shortly and
-        can be used once.
-      </VipAlert>
+    <VipAlert v-if="sent" tone="success" title="Check your email">
+      If an account matches that username or email, a secure password-reset link has been sent. The link expires shortly
+      and can be used once.
+    </VipAlert>
 
-      <template v-else>
-        <p class="authpage__lead">Enter your username or email and we'll send a link to reset your password.</p>
-        <form class="authpage__form" novalidate @submit.prevent="submit">
-          <VipInput
-            v-model="identifier"
-            label="Username or email"
-            type="text"
-            autocomplete="username"
-            :error="identifierError"
-            :disabled="submitting"
-          />
-          <VipButton type="submit" variant="primary" size="lg" block :loading="submitting" :disabled="submitting">
-            Send reset link
-          </VipButton>
-        </form>
-      </template>
+    <template v-else>
+      <p class="authcard__lead">
+        Enter your username or email and we'll send you a secure link to reset your password.
+      </p>
+      <form class="authcard__form" novalidate @submit.prevent="submit">
+        <VipInput
+          v-model="identifier"
+          label="Username or email"
+          type="text"
+          name="username"
+          autocomplete="username"
+          icon="users"
+          placeholder="your.username"
+          :error="identifierError"
+          :disabled="submitting"
+          required
+        />
+        <VipButton type="submit" variant="primary" size="lg" block :loading="submitting" :disabled="submitting">
+          {{ submitting ? 'Sending…' : 'Send reset link' }}
+        </VipButton>
+      </form>
+    </template>
 
-      <RouterLink class="authpage__back" to="/login">Back to sign in</RouterLink>
-    </div>
-  </div>
+    <RouterLink class="authcard__back" to="/login"
+      ><VipIcon name="chevronLeft" :size="14" /> Back to sign in</RouterLink
+    >
+  </AuthShell>
 </template>
 
 <style scoped>
-.authpage {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: var(--space-6, 24px);
+.authcard__brand {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--vip-sp-7);
+  color: var(--vip-text-primary);
 }
-.authpage__card {
-  width: min(420px, 100%);
+.authcard__title {
+  font-size: var(--vip-fs-2xl);
+  font-weight: var(--vip-fw-semibold);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--vip-text-primary);
+}
+.authcard__lead {
+  color: var(--vip-text-muted);
+  font-size: var(--vip-fs-md);
+  line-height: 1.6;
+  margin: var(--vip-sp-3) 0 var(--vip-sp-7);
+}
+.authcard__form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4, 16px);
-  padding: var(--space-6, 24px);
-  background: var(--surface-1, #fff);
-  border: 1px solid var(--border-subtle, #e2e8f0);
-  border-radius: var(--radius-lg, 12px);
+  gap: var(--vip-sp-6);
 }
-.authpage__logo {
-  height: 40px;
-}
-.authpage__title {
-  margin: 0;
-  font-size: var(--font-size-xl, 1.4rem);
-}
-.authpage__lead {
-  margin: 0;
-  color: var(--text-muted, #64748b);
-}
-.authpage__form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4, 16px);
-}
-.authpage__back {
-  text-align: center;
-  color: var(--brand-600, #2563eb);
+.authcard__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vip-sp-2);
+  margin-top: var(--vip-sp-7);
+  font-size: var(--vip-fs-sm);
+  font-weight: var(--vip-fw-medium);
+  color: var(--vip-brand-text);
   text-decoration: none;
+  border-radius: var(--vip-radius-xs);
 }
-.authpage__back:hover {
+.authcard__back:hover {
   text-decoration: underline;
+}
+/* Space the alert from the heading, and the back-link below it. */
+.authcard__title + :deep(.vip-alert) {
+  margin-top: var(--vip-sp-6);
 }
 </style>
