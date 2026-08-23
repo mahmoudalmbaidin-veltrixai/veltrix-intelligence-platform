@@ -1,0 +1,8 @@
+ M .github/workflows/quality-gate.yml
+ M .gitignore
+ M apps/api/.dockerignore
+?? .github/workflows/deploy-certified-release.yml
+?? VIP_FINAL_RECERTIFICATION_V2_EVIDENCE/
+?? VIP_GROK_ADVERSARIAL_CERT_EVIDENCE/
+?? docs/operations/
+?? infra/aws/
