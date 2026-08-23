@@ -1,0 +1,192 @@
+name: Deploy certified VIP release
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [staging, production]
+      release_sha:
+        description: Immutable certified application SHA
+        required: true
+        default: 4e97591845a93037d6e54b0237bcb3208d1b2696
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: vip-${{ inputs.environment }}-deployment
+  cancel-in-progress: false
+
+env:
+  CERTIFIED_SHA: 4e97591845a93037d6e54b0237bcb3208d1b2696
+  AWS_REGION: me-south-1
+
+jobs:
+  certify-staging-promotion:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Require the certified release in staging before production promotion
+        if: inputs.environment == 'production'
+        env:
+          STAGING_APP_HOSTNAME: ${{ vars.APP_HOSTNAME }}
+          STAGING_API_HOSTNAME: ${{ vars.API_HOSTNAME }}
+        run: |
+          curl --fail --silent --show-error "https://$STAGING_APP_HOSTNAME/healthz" | grep -q '^ok'
+          curl --fail --silent --show-error "https://$STAGING_API_HOSTNAME/api/v1/version" | \
+            jq -e --arg sha "$CERTIFIED_SHA" '.environment == "staging" and .commit_sha == $sha' >/dev/null
+
+  verify-and-build:
+    needs: certify-staging-promotion
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      api_image: ${{ steps.images.outputs.api_image }}
+      web_image: ${{ steps.images.outputs.web_image }}
+      build_timestamp: ${{ steps.images.outputs.build_timestamp }}
+    steps:
+      - name: Reject uncertified revisions
+        run: test "${{ inputs.release_sha }}" = "$CERTIFIED_SHA"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify certified application trees are unchanged
+        run: |
+          test -z "$(git status --porcelain)"
+          git cat-file -e "$CERTIFIED_SHA^{commit}"
+          changed="$(git diff --name-only "$CERTIFIED_SHA" HEAD -- \
+            apps/api src public index.html package.json package-lock.json \
+            tsconfig.app.json tsconfig.json tsconfig.node.json vite.config.ts \
+            ':!apps/api/.dockerignore')"
+          if test -n "$changed"; then
+            echo "Certified application content changed:" >&2
+            echo "$changed" >&2
+            exit 1
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build immutable images
+        env:
+          APP_HOSTNAME: ${{ vars.APP_HOSTNAME }}
+          API_HOSTNAME: ${{ vars.API_HOSTNAME }}
+          API_REPOSITORY: ${{ vars.API_ECR_REPOSITORY }}
+          WEB_REPOSITORY: ${{ vars.WEB_ECR_REPOSITORY }}
+        run: |
+          build_timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          api_tag="$API_REPOSITORY:$CERTIFIED_SHA-${{ inputs.environment }}"
+          web_tag="$WEB_REPOSITORY:$CERTIFIED_SHA-${{ inputs.environment }}"
+          docker build \
+            --pull \
+            --label "org.opencontainers.image.revision=$CERTIFIED_SHA" \
+            --label "org.opencontainers.image.created=$build_timestamp" \
+            --label "org.opencontainers.image.version=1.0.0" \
+            --tag "$api_tag" apps/api
+          docker build \
+            --pull \
+            --file infra/containers/web/Dockerfile \
+            --build-arg "VITE_APP_ENV=${{ inputs.environment }}" \
+            --build-arg "VITE_API_BASE_URL=https://$API_HOSTNAME/api/v1" \
+            --build-arg "API_ORIGIN=https://$API_HOSTNAME" \
+            --label "org.opencontainers.image.revision=$CERTIFIED_SHA" \
+            --label "org.opencontainers.image.created=$build_timestamp" \
+            --label "org.opencontainers.image.version=1.0.0" \
+            --tag "$web_tag" .
+          echo "api_tag=$api_tag" >> "$GITHUB_ENV"
+          echo "web_tag=$web_tag" >> "$GITHUB_ENV"
+          echo "build_timestamp=$build_timestamp" >> "$GITHUB_ENV"
+
+      - name: Scan API image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.api_tag }}
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: false
+
+      - name: Scan web image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.web_tag }}
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: false
+
+      - name: Push and resolve digests
+        id: images
+        run: |
+          docker push "$api_tag"
+          docker push "$web_tag"
+          api_digest="$(docker inspect --format='{{index .RepoDigests 0}}' "$api_tag")"
+          web_digest="$(docker inspect --format='{{index .RepoDigests 0}}' "$web_tag")"
+          echo "api_image=$api_digest" >> "$GITHUB_OUTPUT"
+          echo "web_image=$web_digest" >> "$GITHUB_OUTPUT"
+          echo "build_timestamp=$build_timestamp" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: verify-and-build
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconfirm certified application trees
+        run: |
+          test -z "$(git diff --name-only "$CERTIFIED_SHA" HEAD -- \
+            apps/api src public index.html package.json package-lock.json \
+            tsconfig.app.json tsconfig.json tsconfig.node.json vite.config.ts \
+            ':!apps/api/.dockerignore')"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy migration first, then services
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          API_IMAGE: ${{ needs.verify-and-build.outputs.api_image }}
+          WEB_IMAGE: ${{ needs.verify-and-build.outputs.web_image }}
+          ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+          PRIVATE_SUBNET_IDS: ${{ vars.PRIVATE_SUBNET_IDS }}
+          ECS_SECURITY_GROUP_ID: ${{ vars.ECS_SECURITY_GROUP_ID }}
+          RDS_IDENTIFIER: ${{ vars.RDS_IDENTIFIER }}
+        run: |
+          chmod +x infra/aws/scripts/deploy.sh
+          infra/aws/scripts/deploy.sh \
+            "${{ inputs.environment }}" \
+            "$ECS_CLUSTER" \
+            "$PRIVATE_SUBNET_IDS" \
+            "$ECS_SECURITY_GROUP_ID" \
+            "$RDS_IDENTIFIER" \
+            "$API_IMAGE" \
+            "$WEB_IMAGE" \
+            "https://${{ vars.APP_HOSTNAME }}" \
+            "https://${{ vars.API_HOSTNAME }}"
+
+      - name: Infrastructure smoke test
+        run: |
+          chmod +x infra/aws/scripts/smoke.sh
+          infra/aws/scripts/smoke.sh \
+            "${{ inputs.environment }}" \
+            "https://${{ vars.APP_HOSTNAME }}" \
+            "https://${{ vars.API_HOSTNAME }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vip-${{ inputs.environment }}-deployment-manifest
+          path: deployment-manifest.json
+          retention-days: 365
