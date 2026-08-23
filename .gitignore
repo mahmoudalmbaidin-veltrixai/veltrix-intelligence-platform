@@ -1,4 +1,13 @@
 node_modules
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.tfplan
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
 dist
 dist-ssr
 *.local
@@ -44,6 +53,7 @@ pnpm-workspace.yaml
 # repository root against re-accumulation of local report clutter)
 /*_REPORT.md
 /*_SUMMARY.md
+!/VIP_EXECUTIVE_MARKET_READINESS_SUMMARY.md
 /PRODUCTION_READINESS_CHECKLIST.md
 /RELEASE_CERTIFICATION_*.md
 /FRONTEND_BACKEND_INTEGRATION_BASELINE.md
@@ -59,6 +69,7 @@ pnpm-workspace.yaml
 /VIP_PHASE7B_EVIDENCE/
 /VIP_PHASE7C_EVIDENCE/
 /VIP_FINAL_RECERTIFICATION_EVIDENCE/
+/VIP_FINAL_RECERTIFICATION_V2_EVIDENCE/
 /VIP_PHASE2_EVIDENCE/after/
 /VIP_PHASE2_EVIDENCE/tests/
 /VIP_FINAL_FULL_PLATFORM_RECERTIFICATION.md
