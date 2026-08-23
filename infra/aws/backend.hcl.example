@@ -1,0 +1,6 @@
+bucket         = "vip-terraform-state-ACCOUNT-me-south-1"
+key            = "production/platform.tfstate"
+region         = "me-south-1"
+encrypt        = true
+kms_key_id     = "alias/vip-terraform-state"
+dynamodb_table = "vip-terraform-locks"

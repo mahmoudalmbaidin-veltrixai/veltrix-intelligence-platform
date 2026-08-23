@@ -1,0 +1,21 @@
+environment      = "production"
+aws_region       = "me-south-1"
+dr_region        = "me-central-1"
+ses_region       = "eu-central-1" # Bahrain and UAE have no SES SMTP sending endpoint.
+root_domain      = "example.com"
+hosted_zone_id   = "Z0000000000000000000"
+app_subdomain    = "app"
+api_subdomain    = "api"
+build_timestamp  = "2026-08-16T00:00:00Z"
+
+# Deployment automation replaces these with ECR digest references.
+api_image = "000000000000.dkr.ecr.me-south-1.amazonaws.com/vip-api@sha256:replace"
+web_image = "000000000000.dkr.ecr.me-south-1.amazonaws.com/vip-web@sha256:replace"
+
+alert_email     = "platform-ops@example.com"
+smtp_host       = "email-smtp.eu-central-1.amazonaws.com"
+# Store/replicate the SMTP credential secret in the workload region for ECS injection.
+smtp_secret_arn = "arn:aws:secretsmanager:me-south-1:000000000000:secret:vip/production/smtp-replace"
+
+# Obtain written customer approval before selecting a non-Saudi data region.
+# If contractual data residency requires KSA, do not deploy this regional stack.
