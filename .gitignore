@@ -78,6 +78,9 @@ pnpm-workspace.yaml
 /VIP_Complete_Platform_Feature_GTM_Inventory.xlsx
 /VIP_v1_Platform_and_UAT_Master_Workbook.xlsx
 /outputs/
+# Stage 4 spreadsheet tool inspection sidecars contain local workbook state.
+/demo-data/stage4/generated/*.inspect.ndjson
+/demo-data/stage4/generated/synthetic-data-manifest.json
 # Generated export artifacts (reproducible from local certification runs)
 /output/
 /reports/
