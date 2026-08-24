@@ -24,16 +24,16 @@ SENSITIVE_NAME = (
 # names rather than token shape, so a newly issued opaque cookie is covered even
 # though its value was never present in the process environment.
 STRUCTURAL_PATTERNS = (
-    re.compile(rf'(?i)(["\']?{SENSITIVE_NAME}["\']?\s*:\s*["\'])(.*?)(["\'])'),
+    re.compile(rf'(?i)(["\']?{SENSITIVE_NAME}["\']?\s*:\s*["\'])([^"\'\r\n]*)(["\'])'),
     re.compile(rf"(?im)^(\s*{SENSITIVE_NAME}\s*:\s*)([^\r\n]+)()"),
     re.compile(rf"(?i)({SENSITIVE_NAME}\s*=\s*)([^;\s\"\']+)()"),
     re.compile(rf'(?i)([?&]{SENSITIVE_NAME}=)([^&#\s"\']+)()'),
     re.compile(
-        rf'(?is)(["\']name["\']\s*:\s*["\']{SENSITIVE_NAME}["\']\s*,\s*'
-        rf'["\']value["\']\s*:\s*["\'])(.*?)(["\'])'
+        rf'(?i)(["\']name["\']\s*:\s*["\']{SENSITIVE_NAME}["\']\s*,\s*'
+        rf'["\']value["\']\s*:\s*["\'])([^"\'\r\n]*)(["\'])'
     ),
     re.compile(
-        rf'(?is)(["\']value["\']\s*:\s*["\'])(.*?)(["\']\s*,\s*'
+        rf'(?i)(["\']value["\']\s*:\s*["\'])([^"\'\r\n]*)(["\']\s*,\s*'
         rf'["\']name["\']\s*:\s*["\']{SENSITIVE_NAME}["\'])'
     ),
 )
