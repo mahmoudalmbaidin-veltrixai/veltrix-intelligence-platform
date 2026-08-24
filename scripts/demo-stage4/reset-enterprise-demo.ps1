@@ -12,4 +12,3 @@ if (-not $ConfirmNonProduction) { throw "Pass -ConfirmNonProduction after checki
     -VerifiedBackupPath $VerifiedBackupPath `
     -ConfirmNonProduction `
     -IncludeLegacyStage2Cleanup
-

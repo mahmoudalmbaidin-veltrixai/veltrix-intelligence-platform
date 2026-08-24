@@ -68,4 +68,3 @@ Recommended flagship: Northstar Sales & Commercial. Follow connect/upload → da
 V1 boundaries remain unchanged. Demonstrate authentication, tenancy, RBAC, PostgreSQL, CSV/XLSX ingestion, datasets, data quality, pipelines, semantic models, dashboards, publication, PDF/PNG exports, disabled schedules, notifications, audit, and help. Do not claim AI Studio, Automation, Billing, Marketplace, unsupported connectors, external transactional email delivery, or production hosting.
 
 If a live action fails, use the retained successful pipeline run and completed flagship export artifacts, then continue from the published dashboard. Do not modify a pipeline or dashboard live during a client meeting.
-

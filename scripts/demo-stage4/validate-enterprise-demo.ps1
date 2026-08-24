@@ -79,4 +79,3 @@ $summary=[ordered]@{generated_at=(Get-Date).ToUniversalTime().ToString("o");pass
 $summary|ConvertTo-Json -Depth 30|Set-Content -LiteralPath $evidencePath -Encoding utf8
 $summary|ConvertTo-Json -Depth 6
 if($summary.failed -gt 0){exit 1}
-

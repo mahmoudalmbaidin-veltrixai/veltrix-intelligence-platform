@@ -23,4 +23,3 @@ foreach ($organization in $configuration.organizations) {
         }
     }
 }
-
