@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "retainedOrganizationSlugs": [
+    "northstar-retail-group",
+    "crestline-telecom-services",
+    "meridian-facilities-solutions"
+  ],
+  "retainedUsernames": [
+    "vip.demo.platform.admin"
+  ],
+  "retainedUsernamePrefixes": [
+    "northstar.",
+    "crestline.",
+    "meridian."
+  ],
+  "approvedOrganizationSlugs": [
+    "343", "b8-alpha-80755853", "b8-beta-edbea00e", "client-contoso", "client-globex", "client-northwind",
+    "conn-org-d6eb9ee5", "deliv-org-533b326c", "demo-alpha", "demo-beta", "demo-gamma",
+    "e2e-client-012953", "e2e-client-026299", "e2e-client-063633", "e2e-client-064377", "e2e-client-114684",
+    "e2e-client-123150", "e2e-client-144402", "e2e-client-162136", "e2e-client-162811", "e2e-client-163226",
+    "e2e-client-181620", "e2e-client-186410", "e2e-client-208984", "e2e-client-210317", "e2e-client-238563",
+    "e2e-client-269891", "e2e-client-285481", "e2e-client-290541", "e2e-client-312519", "e2e-client-327283",
+    "e2e-client-370363", "e2e-client-378297", "e2e-client-380040", "e2e-client-386758", "e2e-client-406369",
+    "e2e-client-412807", "e2e-client-416035", "e2e-client-428597", "e2e-client-494827", "e2e-client-517095",
+    "e2e-client-537360", "e2e-client-552331", "e2e-client-602694", "e2e-client-604741", "e2e-client-608007",
+    "e2e-client-615398", "e2e-client-649595", "e2e-client-653097", "e2e-client-671588", "e2e-client-689649",
+    "e2e-client-695302", "e2e-client-700074", "e2e-client-713773", "e2e-client-716896", "e2e-client-752295",
+    "e2e-client-768754", "e2e-client-768905", "e2e-client-780399", "e2e-client-790368", "e2e-client-823243",
+    "e2e-client-840234", "e2e-client-862685", "e2e-client-883012", "e2e-client-909021", "e2e-client-921210",
+    "e2e-client-931559", "e2e-client-949995", "e2e-client-962972", "e2e-client-964947", "e2e-org-a",
+    "governance-demo", "ipt-powertech", "platform-made-org", "qa-enterprise-a-20260804", "qa-enterprise-b-20260804",
+    "shabakkat-ksa", "shabakkatksa", "uat-dataiku", "uat-floweus", "uat-joalpha", "veltrix-ai"
+  ],
+  "approvedUsernames": [
+    "admin", "b1-curl", "b1-e2e", "b8-test", "conn-4ee1f402", "deliv-533b326c",
+    "demo.executive.viewer", "demo.organization.admin", "demo.sales.editor", "e2e.member",
+    "governance-admin", "governance-editor", "governance-restricted", "governance-viewer",
+    "mahmoud.almbaidin", "mahmoudalmbaidin96", "noemail.user",
+    "qa_api_developer_user", "qa_archived_user", "qa_connection_administrator", "qa_connection_editor",
+    "qa_connection_secret_rotator", "qa_connection_tester", "qa_connection_use_only", "qa_cross_tenant_attacker",
+    "qa_custom_role_user", "qa_dashboard_editor", "qa_dashboard_interactive", "qa_dashboard_manager",
+    "qa_dashboard_viewer", "qa_dataset_certifier", "qa_dataset_editor", "qa_dataset_query_only",
+    "qa_direct_acl_user", "qa_expired_access_user", "qa_explicitly_denied_user", "qa_file_upload_user",
+    "qa_group_acl_user", "qa_group_role_user", "qa_organization_admin", "qa_organization_member",
+    "qa_pipeline_developer", "qa_pipeline_operator", "qa_pipeline_owner", "qa_pipeline_viewer",
+    "qa_platform_support_admin", "qa_report_consumer", "qa_scheduler_operator", "qa_semantic_query_user",
+    "qa_suspended_user", "qa_workspace_admin", "qa_workspace_editor", "qa_workspace_operator", "qa_workspace_viewer",
+    "ras-admin-8f0afdb9", "ras-member-68e85164", "review.editor", "tenant-a", "tenant-b", "tenant-c",
+    "uat_dataiku_finance_admin", "uat_dataiku_finance_analyst", "uat_dataiku_finance_viewer",
+    "uat_dataiku_hr_admin", "uat_dataiku_hr_analyst", "uat_dataiku_hr_viewer",
+    "uat_dataiku_operations_admin", "uat_dataiku_operations_analyst", "uat_dataiku_operations_viewer",
+    "uat_dataiku_operator", "uat_dataiku_org_admin", "uat_dataiku_sales_admin", "uat_dataiku_sales_analyst",
+    "uat_dataiku_sales_viewer", "uat_floweus_finance_admin", "uat_floweus_finance_analyst",
+    "uat_floweus_finance_viewer", "uat_floweus_hr_admin", "uat_floweus_hr_analyst", "uat_floweus_hr_viewer",
+    "uat_floweus_operations_admin", "uat_floweus_operations_analyst", "uat_floweus_operations_viewer",
+    "uat_floweus_operator", "uat_floweus_org_admin", "uat_floweus_sales_admin", "uat_floweus_sales_analyst",
+    "uat_floweus_sales_viewer", "uat_joalpha_finance_admin", "uat_joalpha_finance_analyst",
+    "uat_joalpha_finance_viewer", "uat_joalpha_hr_admin", "uat_joalpha_hr_analyst", "uat_joalpha_hr_viewer",
+    "uat_joalpha_operations_admin", "uat_joalpha_operations_analyst", "uat_joalpha_operations_viewer",
+    "uat_joalpha_operator", "uat_joalpha_org_admin", "uat_joalpha_sales_admin", "uat_joalpha_sales_analyst",
+    "uat_joalpha_sales_viewer"
+  ],
+  "legacyPlatformUsername": "qa_platform_super_admin",
+  "approvedSchemas": [
+    "uat_dataiku_finance", "uat_dataiku_hr", "uat_dataiku_operations", "uat_dataiku_sales",
+    "uat_floweus_finance", "uat_floweus_hr", "uat_floweus_operations", "uat_floweus_sales",
+    "uat_joalpha_finance", "uat_joalpha_hr", "uat_joalpha_operations", "uat_joalpha_sales", "vip_data"
+  ],
+  "approvedPublicTablePatterns": [
+    "^b85_ui_source_[0-9]+$",
+    "^vip_b5_b85_ui_source_[0-9]+$",
+    "^vip_b5_cert_dashboard_[0-9]+$",
+    "^vip_b5_cert_pipeline_[0-9]+$",
+    "^vip_b5_sales_demo$"
+  ]
+}

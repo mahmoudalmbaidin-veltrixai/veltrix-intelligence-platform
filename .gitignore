@@ -77,6 +77,8 @@ pnpm-workspace.yaml
 /VIP Credentials.xlsx
 /VIP_Complete_Platform_Feature_GTM_Inventory.xlsx
 /VIP_v1_Platform_and_UAT_Master_Workbook.xlsx
+/VIP_Enterprise_Demo_Environment_and_User_Access_Register.xlsx
+/VIP_Enterprise_Demo_Environment_and_User_Access_Register.xlsx.inspect.ndjson
 /outputs/
 # Stage 4 spreadsheet tool inspection sidecars contain local workbook state.
 /demo-data/stage4/generated/*.inspect.ndjson

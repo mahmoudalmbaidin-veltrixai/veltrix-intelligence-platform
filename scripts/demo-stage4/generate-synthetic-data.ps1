@@ -9,6 +9,8 @@ if (-not $OutputRoot) { $OutputRoot = Join-Path $repositoryRoot "demo-data\stage
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 
 $configuration = Get-Content -Raw -LiteralPath $scenarioPath | ConvertFrom-Json -Depth 40
+$pythonCommand = if ($env:VIP_DEMO_PYTHON) { $env:VIP_DEMO_PYTHON } else { (Get-Command python -ErrorAction Stop).Source }
+$xlsxConverter = Join-Path $PSScriptRoot "csv_to_xlsx.py"
 $regions = @(
     @{ Name = "Central"; Weight = 1.18 },
     @{ Name = "Western"; Weight = 1.12 },
@@ -34,7 +36,7 @@ function Get-ScenarioValues([string]$Key) {
 
 function New-ScenarioRows($Workspace) {
     $values = Get-ScenarioValues $Workspace.key
-    $rowTarget = if ($Workspace.flagship) { 600 } else { 260 }
+    $rowTarget = 600
     $rows = [System.Collections.Generic.List[object]]::new()
     for ($index = 1; $index -le $rowTarget; $index++) {
         $region = $regions[($index * 7 + $Workspace.key.Length) % $regions.Count]
@@ -80,13 +82,14 @@ function New-ScenarioRows($Workspace) {
         })
     }
 
-    # Controlled, deterministic quality issues for every workspace.
-    $rows[10].region_name = $null
-    $rows[50].region_name = $rows[50].region_name.ToLowerInvariant()
-    $rows[100].raw_record_id = $null
-    $rows[150].metric_value = -1
-    $rows.Add($rows[39].PSObject.Copy())
-    if ($Workspace.flagship) {
+    # Keep one deliberate "before analysis" quality scenario. The remaining
+    # workspaces stay presentation-clean so the demo does not look broadly dirty.
+    if ($Workspace.key -eq "sales-commercial") {
+        $rows[10].region_name = $null
+        $rows[50].region_name = $rows[50].region_name.ToLowerInvariant()
+        $rows[100].raw_record_id = $null
+        $rows[150].metric_value = -1
+        $rows.Add($rows[39].PSObject.Copy())
         $rows.Add($rows[219].PSObject.Copy())
         $rows.Add($rows[419].PSObject.Copy())
     }
@@ -100,6 +103,13 @@ foreach ($organization in $configuration.organizations) {
         $csvName = [System.IO.Path]::ChangeExtension($workspace.inputFile, ".csv")
         $csvPath = Join-Path $OutputRoot $csvName
         $rows | Export-Csv -LiteralPath $csvPath -NoTypeInformation -Encoding utf8
+        if ($workspace.sourceMode -eq "xlsx") {
+            $xlsxPath = Join-Path $OutputRoot $workspace.inputFile
+            & $pythonCommand $xlsxConverter $csvPath $xlsxPath
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $xlsxPath) -or (Get-Item -LiteralPath $xlsxPath).Length -lt 1KB) {
+                throw "Could not generate deterministic XLSX source: $xlsxPath"
+            }
+        }
         $manifest.files += [ordered]@{
             organization=$organization.slug
             workspace=$workspace.key

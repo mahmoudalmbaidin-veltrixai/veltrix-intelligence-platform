@@ -1,4 +1,4 @@
-.PHONY: backend-start backend-worker pipeline-worker backend-infra backend-migrate backend-migration backend-unit backend-integration backend-format backend-quality
+.PHONY: backend-start backend-worker pipeline-worker backend-infra backend-migrate backend-migration backend-unit backend-integration backend-format backend-quality demo-reset
 
 backend-start:
 	cd apps/api && uvicorn vip_api.main:app --reload --no-access-log
@@ -29,3 +29,6 @@ backend-format:
 
 backend-quality:
 	cd apps/api && python scripts/backend_quality.py
+
+demo-reset:
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/reset-demo-environment.ps1 -Mode Apply -ConfirmNonProduction -VerifiedBackupPath "$(BACKUP)"

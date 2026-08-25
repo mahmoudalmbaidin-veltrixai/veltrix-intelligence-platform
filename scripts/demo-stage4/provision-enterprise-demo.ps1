@@ -94,7 +94,7 @@ function Get-OrCreateCredentials {
         $platformSecret = Unprotect-Json $platformCredentialPath
     } else {
         if (-not $env:VIP_STAGE4_PLATFORM_PASSWORD) { throw "VIP_STAGE4_PLATFORM_PASSWORD is required for the initial secure setup." }
-        $platformSecret = [ordered]@{ username=if($env:VIP_STAGE4_PLATFORM_USERNAME){$env:VIP_STAGE4_PLATFORM_USERNAME}else{"qa_platform_super_admin"}; password=$env:VIP_STAGE4_PLATFORM_PASSWORD }
+        $platformSecret = [ordered]@{ username=if($env:VIP_STAGE4_PLATFORM_USERNAME){$env:VIP_STAGE4_PLATFORM_USERNAME}else{"vip.demo.platform.admin"}; password=$env:VIP_STAGE4_PLATFORM_PASSWORD }
         Protect-Json $platformSecret $platformCredentialPath
         $platformSecret = Unprotect-Json $platformCredentialPath
     }

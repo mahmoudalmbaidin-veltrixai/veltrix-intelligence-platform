@@ -44,7 +44,7 @@ Reset uses the same gates and exact targets:
 
 ## Synthetic data model
 
-The fixed seed is `240824`. Each workspace receives a scenario-specific source with deterministic dates, regions, locations, categories, status, quantity, primary value, cost, score, duration, SLA, risk, and an explicit synthetic-data marker. Flagships contain 603 rows and supporting sources 261 rows. Every source includes a blank identifier, negative primary value, missing region, lower-case region, and controlled duplicates. Flagship pipelines also join a five-row regional benchmark dataset.
+The fixed seed is `240824`. Each workspace receives a scenario-specific 600-row source with deterministic dates, regions, locations, categories, status, quantity, primary value, cost, score, duration, SLA, risk, and an explicit synthetic-data marker. The Northstar Sales & Commercial flagship contains 603 rows and is the single deliberate "before analysis" data-quality scenario: a blank identifier, negative primary value, missing region, lower-case region value, and controlled duplicates. The other eight sources remain clean. Across the nine raw business tables the environment contains 5,403 records; flagship pipelines also join a five-row regional benchmark dataset.
 
 Source coverage is balanced across PostgreSQL landing, CSV upload, and XLSX upload. XLSX files are canonical seed assets whose first worksheet is ingested through the supported governed file path. Every workspace has a tested PostgreSQL landing connection, raw and curated datasets, profiling, quality rules/evaluation, an executed pipeline, a published semantic model, and a published dashboard.
 
