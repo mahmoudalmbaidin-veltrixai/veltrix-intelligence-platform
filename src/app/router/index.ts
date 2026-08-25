@@ -74,6 +74,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/modules/home/ActivityView.vue'),
     meta: { title: 'Recent Activity', layout: 'app', requiresAuth: true },
   },
+  {
+    // Backend notifications deep-link to /jobs/:id ("Open job"). VIP has no
+    // standalone job-detail page in V1, so route the CTA to the activity /
+    // run-history center (a real supported destination) instead of a 404.
+    path: '/jobs/:id',
+    redirect: { name: 'activity' },
+  },
 
   // Connections
   {

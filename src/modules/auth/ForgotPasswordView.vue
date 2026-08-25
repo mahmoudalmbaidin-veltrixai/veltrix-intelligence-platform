@@ -42,14 +42,15 @@ async function submit() {
     <div class="authcard__brand"><VipLogo variant="full" size="lg" decorative /></div>
     <h1 class="authcard__title">Reset your password</h1>
 
-    <VipAlert v-if="sent" tone="success" title="Check your email">
-      If an account matches that username or email, a secure password-reset link has been sent. The link expires shortly
-      and can be used once.
+    <VipAlert v-if="sent" tone="success" title="Request received">
+      If an account matches that username or email, your password-reset request has been recorded. Please contact your
+      organization administrator to complete the reset.
     </VipAlert>
 
     <template v-else>
       <p class="authcard__lead">
-        Enter your username or email and we'll send you a secure link to reset your password.
+        Enter your username or email to request a password reset. Your organization administrator can help you complete
+        it.
       </p>
       <form class="authcard__form" novalidate @submit.prevent="submit">
         <VipInput
@@ -65,7 +66,7 @@ async function submit() {
           required
         />
         <VipButton type="submit" variant="primary" size="lg" block :loading="submitting" :disabled="submitting">
-          {{ submitting ? 'Sending…' : 'Send reset link' }}
+          {{ submitting ? 'Requesting…' : 'Request password reset' }}
         </VipButton>
       </form>
     </template>

@@ -5,6 +5,7 @@ import { NAV_GROUPS, canExposeNavigationItem, type NavGroup, type NavItem } from
 import { usePlatformStore } from '@/shared/stores/platform'
 import { useUiStore } from '@/shared/stores/ui'
 import { announce } from '@/shared/composables/useAnnouncer'
+import { config } from '@/shared/config/env'
 import VipIcon from '@/shared/ui/VipIcon.vue'
 import VipTooltip from '@/shared/ui/VipTooltip.vue'
 import VipLogo from '@/shared/ui/VipLogo.vue'
@@ -35,6 +36,11 @@ function isActive(to: string): boolean {
 // labels on hover/focus as a floating overlay.
 const collapsed = computed(() => ui.sidebarCollapsed)
 const expanded = computed(() => !collapsed.value || hovered.value)
+// Customer-facing footer label. No internal build/version/environment strings in
+// production; a neutral "Development" hint appears only in local mock mode.
+const productLabel = computed(() =>
+  config.apiMode === 'mock' ? 'Veltrix Intelligence Platform · Development' : 'Veltrix Intelligence Platform',
+)
 /** True only while temporarily floating over content (collapsed + hover/focus). */
 const floating = computed(() => collapsed.value && hovered.value)
 
@@ -175,7 +181,7 @@ onBeforeUnmount(() => {
             <span class="vip-sidebar__item-label" :hidden="!expanded">Help &amp; docs</span>
           </RouterLink>
         </VipTooltip>
-        <div class="vip-sidebar__version" :hidden="!expanded">VIP · v0.1.0 · hybrid local</div>
+        <div class="vip-sidebar__version" :hidden="!expanded">{{ productLabel }}</div>
       </div>
     </nav>
   </div>
