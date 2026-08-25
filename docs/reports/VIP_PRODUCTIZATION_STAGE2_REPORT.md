@@ -98,7 +98,7 @@ All names, personas, stories, and data are fictional and synthetic.
 | Viewer | 2 | `organization_member` + `viewer` | Published consumption; cannot create pipeline or export |
 | Platform administrator | 1 global | `is_platform_admin=true` | Provisions tenants/users; no shared tenant credential |
 
-The committed report contains no passwords. The 24 passwords are unique, hashed, and `must_change_password=true`; the platform password is separate. The ignored local register is ACL-restricted to the current operator, Administrators, and SYSTEM.
+The committed report contains no passwords. The 24 passwords are unique, hashed, and `must_change_password=false` for direct controlled-demo login; the platform password is separate. The ignored local register is ACL-restricted to the current operator, Administrators, and SYSTEM.
 
 ## E. Connections
 
@@ -197,7 +197,7 @@ The deterministic API suite passed 22/22:
 - editor membership administration: 403;
 - unauthorized workspace dataset: 404;
 - cross-organization dashboard ID: 404;
-- credential state: `24|24|24` for users, hashed passwords, and must-change status.
+- credential state: `24|24|0` for users, hashed passwords, and login-ready status.
 
 The browser suite repeated viewer authoring denial and cross-tenant 404 behavior through direct routes.
 
@@ -210,7 +210,7 @@ The browser suite repeated viewer authoring denial and cross-tenant 404 behavior
 | Backend total executed | 409 passed, 25 skipped |
 | Ruff | 289 files checked/formatted; pass |
 | Mypy | 177 source files; pass |
-| Frontend Vitest | 70 files, 425 passed |
+| Frontend Vitest | 70 files, 426 passed |
 | Frontend ESLint | Pass |
 | Frontend Prettier | Pass |
 | Frontend typecheck | Pass |
@@ -218,10 +218,10 @@ The browser suite repeated viewer authoring denial and cross-tenant 404 behavior
 | Chromium | 2/2 passed, retries 0 |
 | Firefox | 2/2 passed, retries 0 |
 | WebKit | 2/2 passed, retries 0 |
-| Cross-browser total | 6/6 passed in 3.2 minutes, retries 0 |
+| Cross-browser total | 6/6 passed in 5.1 minutes, retries 0 |
 | Browser artifact secret scan | 0 findings |
 
-With 5,403 source records, initial route rendering varied by browser. Certification uses a 30-second per-route readiness budget and no retries; final admin journeys completed in approximately 31–50 seconds and viewer journeys in approximately 10–21 seconds.
+With 5,403 source records, initial route rendering varied by browser. Certification uses a 30-second per-route readiness budget and no retries; this rerun completed the admin journeys in approximately 59–84 seconds and viewer journeys in approximately 15–25 seconds.
 
 ## R. Remaining Issues
 
@@ -258,7 +258,7 @@ Production infrastructure, DNS/TLS, transactional email, invitation delivery, SS
 | Dedicated demo schemas | 3 |
 | Recognized QA public source tables | 0 |
 
-All 24 demo users are active, have 24 distinct password hashes, and are `must_change_password=true`. The platform admin is active, separate, and not a tenant. Only the three fictional organizations exist.
+All 24 demo users are active, have 24 distinct password hashes, and are `must_change_password=false`. The platform admin is active, separate, and not a tenant. Only the three fictional organizations exist.
 
 ## T. Final Verdict
 

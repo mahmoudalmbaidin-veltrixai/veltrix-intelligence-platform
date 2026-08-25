@@ -53,7 +53,7 @@ Source coverage is balanced across PostgreSQL landing, CSV upload, and XLSX uplo
 - General demo-user credentials: `%LOCALAPPDATA%\Veltrix\VIP\stage4\demo-user-credentials.dpapi`
 - Platform operator credential: `%LOCALAPPDATA%\Veltrix\VIP\stage4\platform-operator.dpapi`
 - The two stores are separate and outside Git.
-- All 24 demo passwords are unique, hashed in PostgreSQL, temporary, and marked must-change.
+- All 24 demo passwords are unique, hashed in PostgreSQL, and login-ready for the controlled demo environment.
 - Use `show-demo-credentials.ps1 -AcknowledgeSensitiveOutput` only in a private, non-recorded session.
 - The Platform Super Admin password is never included in the general workbook.
 

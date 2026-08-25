@@ -37,6 +37,16 @@ export const useAuthStore = defineStore('auth', () => {
     // Apply the user's server-stored appearance preferences on sign-in so theme,
     // density and reduced-motion follow them across devices.
     useThemeStore().hydrate(value.user.preferences)
+    // Tenant APIs intentionally reject users whose temporary password must be
+    // changed. Establish the authenticated session first so the router can send
+    // them to the dedicated password-change screen without a misleading 403.
+    if (value.user.mustChangePassword === true) {
+      platform.clearContext()
+      if (generation !== sessionGeneration) return false
+      session.value = value
+      status.value = 'authenticated'
+      return true
+    }
     await platform.bootstrapTenancy(true)
     if (generation !== sessionGeneration) return false
     if (platform.status === 'error') {

@@ -68,7 +68,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Cross-browser demo certification failed." }
 } finally {
     foreach ($user in $enabledUsers) {
-        Platform-Api $platform Post "/api/v1/platform/users/$($user.id)/reset-password" @{ password=$secrets.($user.username); must_change_password=$true } | Out-Null
+        Platform-Api $platform Post "/api/v1/platform/users/$($user.id)/reset-password" @{ password=$secrets.($user.username); must_change_password=$false } | Out-Null
     }
     Remove-Item Env:VIP_STAGE4_ADMIN_PASSWORD -ErrorAction SilentlyContinue
     Remove-Item Env:VIP_STAGE4_VIEWER_PASSWORD -ErrorAction SilentlyContinue

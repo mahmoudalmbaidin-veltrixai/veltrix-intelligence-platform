@@ -63,6 +63,21 @@ describe('real authentication store', () => {
     expect(auth.isAuthenticated).toBe(false)
   })
 
+  it('establishes flagged sessions without calling password-protected tenant APIs', async () => {
+    const flaggedSession = {
+      ...session,
+      user: { ...session.user, mustChangePassword: true },
+    }
+    service.login.mockResolvedValue(flaggedSession)
+    service.bootstrap.mockResolvedValue(flaggedSession)
+    const auth = useAuthStore()
+
+    await expect(auth.login(flaggedSession.user.email, 'not-retained')).resolves.toBe(true)
+    expect(auth.isAuthenticated).toBe(true)
+    expect(auth.mustChangePassword).toBe(true)
+    expect(tenancy.listOrganizations).not.toHaveBeenCalled()
+  })
+
   it('records login failure and clears on unauthorized', async () => {
     service.login.mockRejectedValue(new Error('denied'))
     const auth = useAuthStore()

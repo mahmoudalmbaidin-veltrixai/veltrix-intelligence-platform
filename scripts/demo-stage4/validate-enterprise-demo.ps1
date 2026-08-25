@@ -42,7 +42,7 @@ $platform=New-Session $platformSecret.username $platformSecret.password
 $results=[System.Collections.Generic.List[object]]::new()
 $temporarilyEnabled=[System.Collections.Generic.List[object]]::new()
 try {
-    # Temporarily allow test sessions; finally restores the original temporary password and must-change flag.
+    # Reapply the operator-issued credentials and keep them login-ready after certification.
     foreach($organization in $manifest.organizations){
         foreach($user in $organization.users){
             $found=(Platform-Api $platform Get "/api/v1/platform/users?page=1&page_size=100&search=$($user.username)").items|Where-Object username -eq $user.username|Select-Object -First 1
@@ -70,11 +70,11 @@ try {
         Record "$($organization.key)-ORG-TAMPER" "Isolation" "Cross-organization dashboard ID is rejected" 404 (Invoke-Status $adminSession Get "/api/v1/dashboards/$($foreignWs.assets.dashboard.id)/viewer" $organization.id $flagship.id) $organization.name $flagship.name
     }
 } finally {
-    foreach($item in $temporarilyEnabled){Platform-Api $platform Post "/api/v1/platform/users/$($item.id)/reset-password" @{password=$userSecrets.($item.username);must_change_password=$true}|Out-Null}
+    foreach($item in $temporarilyEnabled){Platform-Api $platform Post "/api/v1/platform/users/$($item.id)/reset-password" @{password=$userSecrets.($item.username);must_change_password=$false}|Out-Null}
 }
 $databaseChecks=docker exec vip-postgres-1 psql -X -U vip -d vip -At -F '|' -c "SELECT count(*),count(*) FILTER(WHERE password_hash IS NOT NULL),count(*) FILTER(WHERE must_change_password) FROM users WHERE username LIKE 'northstar.%' OR username LIKE 'crestline.%' OR username LIKE 'meridian.%';"
 $parts=$databaseChecks.Trim() -split '\|'
-$results.Add([ordered]@{test_id="SEC-PASSWORD-HASH";organization="All";workspace="All";area="Credential Security";scenario="All demo passwords are hashed and marked must-change";expected="24|24|24";actual=$databaseChecks.Trim();status=if($databaseChecks.Trim()-eq "24|24|24"){"Passed"}else{"Failed"};verified_at=(Get-Date).ToUniversalTime().ToString("o")})
+$results.Add([ordered]@{test_id="SEC-PASSWORD-HASH";organization="All";workspace="All";area="Credential Security";scenario="All demo passwords are hashed and login-ready";expected="24|24|0";actual=$databaseChecks.Trim();status=if($databaseChecks.Trim()-eq "24|24|0"){"Passed"}else{"Failed"};verified_at=(Get-Date).ToUniversalTime().ToString("o")})
 $summary=[ordered]@{generated_at=(Get-Date).ToUniversalTime().ToString("o");passed=@($results|Where-Object status -eq "Passed").Count;failed=@($results|Where-Object status -eq "Failed").Count;results=$results}
 $summary|ConvertTo-Json -Depth 30|Set-Content -LiteralPath $evidencePath -Encoding utf8
 $summary|ConvertTo-Json -Depth 6

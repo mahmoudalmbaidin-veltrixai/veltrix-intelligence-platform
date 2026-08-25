@@ -31,7 +31,7 @@ Each organization has eight unique demo users:
 | Analyst/editor | 2 | `organization_member` plus `editor` in assigned workspaces; selected secondary scopes are viewer | Authoring without membership administration |
 | Viewer | 2 | `organization_member` plus `viewer` | Published-dashboard consumption only |
 
-All 24 passwords are unique and hashed. All 24 users are active and marked `must_change_password=true` outside the temporary browser-certification window. Plaintext credentials exist only in the ignored, access-restricted operator register `VIP_Enterprise_Demo_Environment_and_User_Access_Register.xlsx` and the current Windows user's DPAPI store.
+All 24 passwords are unique and hashed. All 24 users are active and remain `must_change_password=false` so the operator register works directly during controlled sales demonstrations. Plaintext credentials exist only in the ignored, access-restricted operator register `VIP_Enterprise_Demo_Environment_and_User_Access_Register.xlsx` and the current Windows user's DPAPI store.
 
 ## Data sources and datasets
 

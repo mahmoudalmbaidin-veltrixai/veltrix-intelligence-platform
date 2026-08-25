@@ -85,5 +85,5 @@ The command refuses production/non-local targets, a missing safety flag, a missi
 
 1. Close the private credential register.
 2. Reset/recreate the environment before the next external session if credentials were exposed.
-3. Confirm all 24 demo users are again marked `must_change_password=true`.
+3. Confirm all 24 demo users are active and remain `must_change_password=false` so operator-issued credentials are login-ready.
 4. Do not enable paused email schedules or configure external mail delivery as part of Stage 2.

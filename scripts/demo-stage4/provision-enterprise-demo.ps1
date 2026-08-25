@@ -403,8 +403,8 @@ foreach($organizationRow in $environment.organizations){
     Invoke-VipApi -Session $platformSession -Method Delete -Path "/api/v1/platform/organizations/$($organizationRow.id)/members/by-user/$($platformUser.id)" | Out-Null
 }
 
-# Final security posture: every generally shareable demo password is temporary and must be changed.
-foreach($orgDefinition in $configuration.organizations){foreach($userDefinition in $orgDefinition.users){$user=Get-PlatformUser $platformSession $userDefinition.username;Invoke-VipApi -Session $platformSession -Method Post -Path "/api/v1/platform/users/$($user.id)/reset-password" -Body @{password=$secrets.users.($userDefinition.username);must_change_password=$true} | Out-Null}}
+# Final demo posture: operator-issued credentials remain login-ready; secrets stay outside Git.
+foreach($orgDefinition in $configuration.organizations){foreach($userDefinition in $orgDefinition.users){$user=Get-PlatformUser $platformSession $userDefinition.username;Invoke-VipApi -Session $platformSession -Method Post -Path "/api/v1/platform/users/$($user.id)/reset-password" -Body @{password=$secrets.users.($userDefinition.username);must_change_password=$false} | Out-Null}}
 if($IncludeLegacyStage2Cleanup){foreach($username in $configuration.legacyStage2.usernames){$legacy=Get-PlatformUser $platformSession $username;if($legacy){Invoke-VipApi -Session $platformSession -Method Post -Path "/api/v1/platform/users/$($legacy.id)/suspend" | Out-Null}}}
 $environment | ConvertTo-Json -Depth 60 | Set-Content -LiteralPath $manifestPath -Encoding utf8
 Write-Output "organizations=$($environment.organizations.Count)"
