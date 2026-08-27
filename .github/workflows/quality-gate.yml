@@ -3,7 +3,6 @@ name: Platform quality gate
 on:
   pull_request:
   push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -15,6 +14,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Run redacted repository and history audit
+        run: >-
+          python scripts/certification/repository-security-audit.py
+          --scope all
+          --output "$RUNNER_TEMP/vip-repository-security-audit.json"
       - name: Secret, dependency, and IaC scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:

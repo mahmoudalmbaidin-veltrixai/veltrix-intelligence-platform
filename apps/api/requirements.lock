@@ -145,5 +145,5 @@ uvicorn==0.51.0
 aiomysql==0.3.2
 pymysql==1.2.0
 
-types-openpyxl==3.1.5
+types-openpyxl==3.1.5.20260807
     # via vip-api (pyproject.toml)

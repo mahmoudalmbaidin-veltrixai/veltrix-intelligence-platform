@@ -1,3 +1,7 @@
+# DEVELOPMENT ONLY. This stack uses local ports, bind mounts, reload mode,
+# unauthenticated Redis, and replaceable development credentials. Production
+# deployments must use externally managed secrets and the contract documented in
+# docs/deployment/PRODUCTION_DEPLOYMENT.md.
 name: vip
 
 services:

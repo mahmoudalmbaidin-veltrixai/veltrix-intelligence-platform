@@ -11,7 +11,6 @@ on:
       release_sha:
         description: Immutable certified application SHA
         required: true
-        default: 4e97591845a93037d6e54b0237bcb3208d1b2696
 
 permissions:
   contents: read
@@ -22,13 +21,14 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CERTIFIED_SHA: 4e97591845a93037d6e54b0237bcb3208d1b2696
   AWS_REGION: me-south-1
 
 jobs:
   certify-staging-promotion:
     runs-on: ubuntu-latest
     environment: staging
+    env:
+      CERTIFIED_SHA: ${{ vars.CERTIFIED_RELEASE_SHA }}
     steps:
       - name: Require the certified release in staging before production promotion
         if: inputs.environment == 'production'
@@ -44,22 +44,28 @@ jobs:
     needs: certify-staging-promotion
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    env:
+      CERTIFIED_SHA: ${{ vars.CERTIFIED_RELEASE_SHA }}
     outputs:
       api_image: ${{ steps.images.outputs.api_image }}
       web_image: ${{ steps.images.outputs.web_image }}
       build_timestamp: ${{ steps.images.outputs.build_timestamp }}
     steps:
       - name: Reject uncertified revisions
-        run: test "${{ inputs.release_sha }}" = "$CERTIFIED_SHA"
+        run: |
+          test -n "$CERTIFIED_SHA"
+          test "${{ inputs.release_sha }}" = "$CERTIFIED_SHA"
 
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.release_sha }}
 
       - name: Verify certified application trees are unchanged
         run: |
           test -z "$(git status --porcelain)"
           git cat-file -e "$CERTIFIED_SHA^{commit}"
+          test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA"
           changed="$(git diff --name-only "$CERTIFIED_SHA" HEAD -- \
             apps/api src public index.html package.json package-lock.json \
             tsconfig.app.json tsconfig.json tsconfig.node.json vite.config.ts \
@@ -138,10 +144,13 @@ jobs:
     needs: verify-and-build
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    env:
+      CERTIFIED_SHA: ${{ vars.CERTIFIED_RELEASE_SHA }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.release_sha }}
 
       - name: Reconfirm certified application trees
         run: |
