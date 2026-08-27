@@ -6,7 +6,7 @@
 **Reviewed SHA (pre-fix):** `fef21dbf4c47d7c777247c6a05018e0688f97353`  
 **PR:** [#5](https://github.com/mahmoudalmbaidin-veltrixai/veltrix-intelligence-platform/pull/5) → `frontend/enterprise-ui-enhancement`  
 **Rollback tag (unchanged):** `pre-phase-b9-enterprise-baseline` → `6254d60d445f9b3849fa88d5151bd56cd770f339`  
-**Security subagent:** [Security Review](fdec5b0d-e3d1-4e23-953a-05a513498aec) — no medium+ findings
+**Security review:** Internal historical review record — no medium+ findings reported for that revision
 
 ---
 
