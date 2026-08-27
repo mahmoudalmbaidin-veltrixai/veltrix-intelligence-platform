@@ -49,4 +49,6 @@ def test_stage4_provisioner_has_multiple_fail_closed_guards() -> None:
     assert "LIKE '%" not in source
     assert "vip_local_dev_only" not in source
     assert "VIP_STAGE4_POSTGRES_PASSWORD" in source
-    assert "must_change_password=$true" in source
+    # Demo credentials are intentionally login-ready for the certified browser
+    # journey; they remain operator-generated and stored outside Git.
+    assert "must_change_password=$false" in source

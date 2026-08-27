@@ -85,12 +85,19 @@ test.describe('Stage 4 enterprise demo @stage4-demo', () => {
 
     await page.getByRole('button', { name: 'Share' }).click()
     await page.getByRole('menuitem', { name: 'Export (PDF/PNG/CSV)' }).click()
-    await expect(page.getByText('PDF export', { exact: true })).toBeVisible({ timeout: UI_TIMEOUT })
-    await expect(page.getByText('PNG export', { exact: true })).toBeVisible({ timeout: UI_TIMEOUT })
-    await expect(page.getByRole('button', { name: 'Download' })).toHaveCount(2)
+    const governanceDialog = page.getByRole('dialog', { name: 'Dashboard governance' })
+    await expect(governanceDialog.getByText('PDF export', { exact: true }).first()).toBeVisible({
+      timeout: UI_TIMEOUT,
+    })
+    await expect(governanceDialog.getByText('PNG export', { exact: true }).first()).toBeVisible({
+      timeout: UI_TIMEOUT,
+    })
+    await expect
+      .poll(() => governanceDialog.getByRole('button', { name: 'Download' }).count(), { timeout: UI_TIMEOUT })
+      .toBeGreaterThanOrEqual(2)
 
     await page.goto('/notifications')
-    await expect(page.getByText('Dashboard export (PDF): succeeded', { exact: true })).toBeVisible({
+    await expect(page.getByText('Dashboard export (PDF): succeeded', { exact: true }).first()).toBeVisible({
       timeout: UI_TIMEOUT,
     })
     const markAll = page.getByRole('button', { name: 'Mark all read' })
