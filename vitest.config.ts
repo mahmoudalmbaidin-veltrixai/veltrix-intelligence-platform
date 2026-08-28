@@ -14,5 +14,17 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.{test,spec}.ts'],
     css: false,
+    // Unit tests must be hermetic even when a developer has copied the
+    // production-oriented .env.example to .env.
+    env: {
+      VITE_APP_ENV: 'development',
+      VITE_API_MODE: 'mock',
+      VITE_API_BASE_URL: '',
+      VITE_ENABLE_MOCK_LATENCY: 'false',
+    },
+    // Keep process pressure predictable on Windows workstations and small CI
+    // runners while retaining file-level parallelism.
+    minWorkers: 1,
+    maxWorkers: 4,
   },
 })
