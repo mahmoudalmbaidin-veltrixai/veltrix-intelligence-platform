@@ -53,7 +53,7 @@ const dialogMeta = computed(() => {
     case 'feature':
       return {
         title: 'Request a Feature',
-        description: 'Tell us what would make VIP more useful for you.',
+        description: 'Tell us what would make Veltrix One more useful for you.',
         submit: 'Copy request',
       }
     default:

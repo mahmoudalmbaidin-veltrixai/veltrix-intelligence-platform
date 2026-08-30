@@ -689,7 +689,7 @@ function deviceLabel(ua: string | null): string {
         <template v-else-if="active === 'appearance'">
           <VipCard title="Theme">
             <p class="settings__hint settings__hint--block">
-              Choose how VIP looks. System follows your device setting.
+              Choose how Veltrix One looks. System follows your device setting.
             </p>
             <VipSegmented
               :model-value="theme.mode"

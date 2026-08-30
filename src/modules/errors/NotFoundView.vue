@@ -7,7 +7,7 @@ const router = useRouter()
 
 <template>
   <div class="err">
-    <RouterLink to="/home" class="err__brand" aria-label="VIP home"
+    <RouterLink to="/home" class="err__brand" aria-label="Veltrix One home"
       ><VipLogo variant="full" size="md" decorative
     /></RouterLink>
     <div class="err__code">404</div>

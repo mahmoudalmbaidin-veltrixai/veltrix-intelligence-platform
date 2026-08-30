@@ -2,7 +2,7 @@ import type { HelpArticle } from './types'
 
 /**
  * Help articles. Content is deliberately concise and describes only capabilities
- * that genuinely exist in VIP today (Connections, Datasets incl. CSV/Excel
+ * that genuinely exist in Veltrix One today (Connections, Datasets incl. CSV/Excel
  * import, Pipelines, Dashboards incl. publish + PDF/PNG export, Workspaces,
  * members, data quality, run history). Placeholder/preview surfaces are not
  * documented as generally available.
@@ -11,14 +11,14 @@ import type { HelpArticle } from './types'
 const gettingStarted: HelpArticle[] = [
   {
     slug: 'welcome-to-vip',
-    title: 'Welcome to VIP',
-    description: 'A quick orientation to the Veltrix Intelligence Platform.',
+    title: 'Welcome to Veltrix One',
+    description: 'A quick orientation to Veltrix One.',
     category: 'getting-started',
     keywords: ['welcome', 'intro', 'overview', 'start'],
     body: [
       {
         kind: 'para',
-        text: 'Veltrix Intelligence Platform (VIP) helps your team connect to data, prepare it in pipelines, and turn it into interactive dashboards — all within a governed, multi-tenant workspace.',
+        text: 'Veltrix One helps your team connect to data, prepare it in pipelines, and turn it into interactive dashboards — all within a governed, multi-tenant workspace.',
       },
       {
         kind: 'para',
@@ -50,7 +50,7 @@ const gettingStarted: HelpArticle[] = [
     body: [
       {
         kind: 'para',
-        text: 'VIP is organized into organizations and workspaces. An organization is your company tenant; a workspace is an isolated area inside it where a team keeps its connections, datasets, pipelines, and dashboards.',
+        text: 'Veltrix One is organized into organizations and workspaces. An organization is your company tenant; a workspace is an isolated area inside it where a team keeps its connections, datasets, pipelines, and dashboards.',
       },
       { kind: 'subhead', text: 'Where things live' },
       {
@@ -100,13 +100,13 @@ const gettingStarted: HelpArticle[] = [
   {
     slug: 'connect-your-first-data-source',
     title: 'Connect Your First Data Source',
-    description: 'Register a connection so VIP can read your data.',
+    description: 'Register a connection so Veltrix One can read your data.',
     category: 'getting-started',
     keywords: ['connection', 'data source', 'database', 'connect'],
     body: [
       {
         kind: 'para',
-        text: 'A connection tells VIP how to reach your data. Once a connection is active, you can discover tables from it or upload files into it.',
+        text: 'A connection tells Veltrix One how to reach your data. Once a connection is active, you can discover tables from it or upload files into it.',
       },
       {
         kind: 'steps',
@@ -114,7 +114,7 @@ const gettingStarted: HelpArticle[] = [
           'Open Connections.',
           'Select New connection and choose a connector type.',
           'Enter the connection details (host, database, and credentials).',
-          'Run the connection test to confirm VIP can reach the source.',
+          'Run the connection test to confirm Veltrix One can reach the source.',
           'Save the connection.',
         ],
       },
@@ -134,7 +134,7 @@ const gettingStarted: HelpArticle[] = [
     body: [
       {
         kind: 'para',
-        text: 'A dataset is a governed table VIP can query. You can create one by discovering tables from a database connection, or by importing a CSV or Excel file.',
+        text: 'A dataset is a governed table Veltrix One can query. You can create one by discovering tables from a database connection, or by importing a CSV or Excel file.',
       },
       {
         kind: 'steps',
@@ -430,7 +430,7 @@ const troubleshooting: HelpArticle[] = [
     keywords: ['connection', 'test', 'failed', 'refused'],
     body: [
       { kind: 'subhead', text: 'Problem' },
-      { kind: 'para', text: 'Saving or testing a connection reports that VIP could not reach the source.' },
+      { kind: 'para', text: 'Saving or testing a connection reports that Veltrix One could not reach the source.' },
       { kind: 'subhead', text: 'Possible causes' },
       {
         kind: 'list',

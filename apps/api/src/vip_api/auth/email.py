@@ -26,7 +26,7 @@ def _reset_email_html(reset_url: str) -> str:
         "limited time and can be used once.</p>"
         f'<p><a href="{safe}">Reset your password</a></p>'
         "<p>If you did not request this, you can safely ignore this email.</p>"
-        "<p>Veltrix Intelligence Platform</p></body></html>"
+        "<p>Veltrix One</p></body></html>"
     )
 
 

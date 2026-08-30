@@ -55,7 +55,7 @@ def render_email_html(
         '<!doctype html><html><body style="font-family:Arial,sans-serif;color:#172033">'
         f"<h1>{safe_name}</h1><p>Published dashboard version {dashboard_version}</p>"
         f"<p>Generated {html.escape(generated_at)}</p>{link}"
-        "<p>Sent securely by Veltrix Intelligence Platform.</p></body></html>"
+        "<p>Sent securely by Veltrix One.</p></body></html>"
     )
 
 

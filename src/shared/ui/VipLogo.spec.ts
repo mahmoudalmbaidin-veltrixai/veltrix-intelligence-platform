@@ -3,18 +3,19 @@ import { mount } from '@vue/test-utils'
 import VipLogo from './VipLogo.vue'
 
 describe('VipLogo', () => {
-  it('renders the cube mark as inline SVG (no external image request)', () => {
+  it('renders the mark as inline SVG (no external image request)', () => {
     const wrapper = mount(VipLogo)
     const svg = wrapper.find('svg.vip-logo__mark')
     expect(svg.exists()).toBe(true)
-    // Three cube faces + hooks are inline paths — nothing to 404.
+    // The Veltrix One badge (rounded square + "V" chevron) is inline — nothing to 404.
     expect(wrapper.find('img').exists()).toBe(false)
-    expect(svg.findAll('path').length).toBeGreaterThanOrEqual(3)
+    expect(svg.find('rect').exists()).toBe(true)
+    expect(svg.findAll('path').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('shows the VIP wordmark for full/auto and hides it for icon', () => {
-    expect(mount(VipLogo, { props: { variant: 'full' } }).text()).toContain('VIP')
-    expect(mount(VipLogo, { props: { variant: 'auto' } }).text()).toContain('VIP')
+  it('shows the Veltrix One wordmark for full/auto and hides it for icon', () => {
+    expect(mount(VipLogo, { props: { variant: 'full' } }).text()).toContain('Veltrix One')
+    expect(mount(VipLogo, { props: { variant: 'auto' } }).text()).toContain('Veltrix One')
     expect(
       mount(VipLogo, { props: { variant: 'icon' } })
         .find('.vip-logo__word')
@@ -25,7 +26,7 @@ describe('VipLogo', () => {
   it('is a labeled image by default and decorative when asked', () => {
     const labeled = mount(VipLogo)
     expect(labeled.attributes('role')).toBe('img')
-    expect(labeled.attributes('aria-label')).toBe('Veltrix Intelligence Platform')
+    expect(labeled.attributes('aria-label')).toBe('Veltrix One')
 
     const decorative = mount(VipLogo, { props: { decorative: true } })
     expect(decorative.attributes('aria-hidden')).toBe('true')
@@ -54,12 +55,12 @@ describe('VipLogo', () => {
     expect(svg.attributes('width')).toBe('30')
   })
 
-  it('gives gradients unique ids for co-located instances (no def collisions)', () => {
-    // Two logos on one page must not share gradient ids (would cross-reference defs).
+  it('uses a flat, gradient-free mark that is safe to co-locate', () => {
+    // The Veltrix One mark is flat (no <defs>/gradient ids), so multiple logos on
+    // one page can never cross-reference shared definitions.
     const Host = { components: { VipLogo }, template: '<div><VipLogo /><VipLogo /></div>' }
     const wrapper = mount(Host)
-    const grads = wrapper.findAll('linearGradient')
-    expect(grads.length).toBe(6) // 3 gradients per logo
-    expect(grads[0].attributes('id')).not.toBe(grads[3].attributes('id'))
+    expect(wrapper.findAll('linearGradient').length).toBe(0)
+    expect(wrapper.findAll('svg.vip-logo__mark').length).toBe(2)
   })
 })

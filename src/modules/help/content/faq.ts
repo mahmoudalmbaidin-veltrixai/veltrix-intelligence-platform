@@ -1,6 +1,6 @@
 import type { FaqItem } from './types'
 
-/** Concise FAQs grounded in real VIP behavior. Answers avoid backend internals. */
+/** Concise FAQs grounded in real Veltrix One behavior. Answers avoid backend internals. */
 export const HELP_FAQ: FaqItem[] = [
   {
     id: 'org-vs-workspace',
@@ -27,7 +27,7 @@ export const HELP_FAQ: FaqItem[] = [
     id: 'data-sources',
     question: 'What data sources can I connect to?',
     answer:
-      'VIP connects to supported databases and to file uploads. Create a connection from the Connections module and run its test to confirm access before using it.',
+      'Veltrix One connects to supported databases and to file uploads. Create a connection from the Connections module and run its test to confirm access before using it.',
     keywords: ['connect', 'data source', 'database', 'sources'],
   },
   {

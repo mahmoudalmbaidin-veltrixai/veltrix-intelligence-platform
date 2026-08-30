@@ -27,7 +27,7 @@ const featureLabel = computed(() => {
 
 <template>
   <div class="err">
-    <RouterLink to="/home" class="err__brand" aria-label="VIP home"
+    <RouterLink to="/home" class="err__brand" aria-label="Veltrix One home"
       ><VipLogo variant="full" size="md" decorative
     /></RouterLink>
     <div class="err__icon"><VipIcon name="sparkles" :size="28" /></div>

@@ -81,7 +81,10 @@ async function submit() {
 
 <template>
   <div class="wizard">
-    <VipPageHeader title="New connection" description="Credentials are write-only and are never returned by VIP." />
+    <VipPageHeader
+      title="New connection"
+      description="Credentials are write-only and are never returned by Veltrix One."
+    />
     <VipAlert v-if="error" tone="danger" title="Creation failed">{{ error }}</VipAlert>
     <VipCard>
       <form class="wizard__form" autocomplete="off" @submit.prevent="submit">

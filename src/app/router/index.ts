@@ -827,7 +827,7 @@ router.beforeEach(async (to) => {
 })
 
 router.afterEach((to) => {
-  const base = 'VIP — Veltrix Intelligence Platform'
+  const base = 'Veltrix One'
   document.title = to.meta.title ? `${to.meta.title} · ${base}` : base
   document.documentElement.dataset.vipRoute = to.fullPath
   window.dispatchEvent(new CustomEvent('vip:route-settled', { detail: { path: to.fullPath } }))

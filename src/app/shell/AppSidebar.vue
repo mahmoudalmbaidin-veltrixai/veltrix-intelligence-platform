@@ -38,9 +38,7 @@ const collapsed = computed(() => ui.sidebarCollapsed)
 const expanded = computed(() => !collapsed.value || hovered.value)
 // Customer-facing footer label. No internal build/version/environment strings in
 // production; a neutral "Development" hint appears only in local mock mode.
-const productLabel = computed(() =>
-  config.apiMode === 'mock' ? 'Veltrix Intelligence Platform · Development' : 'Veltrix Intelligence Platform',
-)
+const productLabel = computed(() => (config.apiMode === 'mock' ? 'Veltrix One · Development' : 'Veltrix One'))
 /** True only while temporarily floating over content (collapsed + hover/focus). */
 const floating = computed(() => collapsed.value && hovered.value)
 
@@ -126,7 +124,7 @@ onBeforeUnmount(() => {
   >
     <nav class="vip-sidebar" aria-label="Primary navigation" :aria-expanded="expanded">
       <div class="vip-sidebar__brand">
-        <RouterLink to="/home" class="vip-sidebar__logo" aria-label="VIP home">
+        <RouterLink to="/home" class="vip-sidebar__logo" aria-label="Veltrix One home">
           <VipLogo :variant="expanded ? 'full' : 'icon'" size="sm" decorative />
         </RouterLink>
         <button

@@ -526,7 +526,7 @@ class PdfDashboardRenderer:
         width, height = pagesize
         canvas = Canvas(output, pagesize=pagesize, pageCompression=1)
         canvas.setTitle(document.dashboard_name)
-        canvas.setAuthor("Veltrix Intelligence Platform")
+        canvas.setAuthor("Veltrix One")
         canvas.setSubject("Executive dashboard export")
         # Declare the document natural language for assistive technology (screen
         # readers use /Lang for correct pronunciation). This is genuine, safe
@@ -569,7 +569,7 @@ class PdfDashboardRenderer:
             canvas.line(34, 28, width - 34, 28)
             canvas.setFillColor(HexColor(MUTED))
             canvas.setFont(PDF_FONT, 7.5)
-            canvas.drawString(34, 16, "Veltrix Intelligence Platform · Confidential")
+            canvas.drawString(34, 16, "Veltrix One · Confidential")
             canvas.drawRightString(
                 width - 34,
                 16,
@@ -1349,7 +1349,7 @@ class PngDashboardRenderer:
                 )
         draw.text(
             (40 * scale, (height - 38) * scale),
-            "Veltrix Intelligence Platform · Confidential",
+            "Veltrix One · Confidential",
             font=small,
             fill=MUTED,
         )

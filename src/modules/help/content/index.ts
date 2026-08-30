@@ -39,7 +39,7 @@ export const POPULAR_GUIDES: PopularGuide[] = [
   {
     slug: 'connect-a-data-source',
     title: 'Connect Your Data',
-    description: 'Learn how to create connections and bring data into VIP.',
+    description: 'Learn how to create connections and bring data into Veltrix One.',
     icon: 'database',
   },
   {

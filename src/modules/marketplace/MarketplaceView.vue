@@ -121,7 +121,7 @@ function openExtension(e: Extension) {
   <div class="mkt">
     <VipPageHeader
       title="Marketplace"
-      description="Extend VIP with connectors, pipeline nodes, widgets, AI tools and templates."
+      description="Extend Veltrix One with connectors, pipeline nodes, widgets, AI tools and templates."
     >
       <template #tabs>
         <VipSegmented v-model="category" :options="categoryOptions" size="sm" />

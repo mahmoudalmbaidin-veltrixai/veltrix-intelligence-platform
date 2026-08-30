@@ -120,7 +120,7 @@ const runs = await vip.pipelines.run('pl_revenue')`
   <div>
     <VipPageHeader
       title="Developer Portal"
-      description="API keys, webhooks, documentation and SDKs for building on VIP."
+      description="API keys, webhooks, documentation and SDKs for building on Veltrix One."
     />
     <VipTabs v-model="tab" :tabs="tabs" />
 

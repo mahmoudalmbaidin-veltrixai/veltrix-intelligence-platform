@@ -27,7 +27,7 @@ function isActive(to: string): boolean {
 
 <template>
   <VipDrawer :open="ui.mobileNavOpen" title="Navigation" side="left" :width="280" @close="ui.mobileNavOpen = false">
-    <RouterLink to="/home" class="mnav__brand" aria-label="VIP home" @click="ui.mobileNavOpen = false">
+    <RouterLink to="/home" class="mnav__brand" aria-label="Veltrix One home" @click="ui.mobileNavOpen = false">
       <VipLogo variant="full" size="md" decorative />
     </RouterLink>
     <div v-for="group in groups" :key="group.key" class="mnav__group">

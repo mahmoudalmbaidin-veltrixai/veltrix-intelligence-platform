@@ -155,8 +155,8 @@ async function submit() {
         <div class="login__brand">
           <VipLogo variant="full" size="lg" decorative />
         </div>
-        <h1 class="login__title">Sign in to Veltrix Intelligence</h1>
-        <p class="login__sub">Access your Veltrix Intelligence Platform workspace.</p>
+        <h1 class="login__title">Sign in to Veltrix One</h1>
+        <p class="login__sub">Access your Veltrix One workspace.</p>
 
         <VipAlert v-if="idleExpired" tone="warning" title="Session expired"
           >You were signed out after 30 minutes of inactivity for security.</VipAlert

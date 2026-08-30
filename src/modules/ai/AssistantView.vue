@@ -119,7 +119,7 @@ function onKeydown(e: KeyboardEvent): void {
       <div class="asst__side-head">
         <div class="asst__brand">
           <span class="asst__brand-mark"><VipIcon name="sparkles" :size="16" /></span>
-          <span class="asst__brand-name">VIP Assistant</span>
+          <span class="asst__brand-name">Veltrix One Assistant</span>
         </div>
         <VipButton variant="primary" size="sm" icon="plus" block @click="newConversation"> New conversation </VipButton>
       </div>
