@@ -17,6 +17,13 @@ http {
   gzip_min_length 1024;
   gzip_types application/javascript application/json image/svg+xml text/css text/plain;
 
+  # Render terminates public TLS before forwarding to this container. Preserve
+  # its original scheme header and fall back to the local Nginx scheme in tests.
+  map $http_x_forwarded_proto $client_forwarded_proto {
+    default $http_x_forwarded_proto;
+    "" $scheme;
+  }
+
   client_body_temp_path /tmp/client_temp;
   proxy_temp_path /tmp/proxy_temp;
   fastcgi_temp_path /tmp/fastcgi_temp;
@@ -33,6 +40,7 @@ http {
     listen 8080;
     root /usr/share/nginx/html;
     index index.html;
+    client_max_body_size 100m;
 
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
@@ -45,6 +53,40 @@ http {
       access_log off;
       default_type text/plain;
       return 200 "ok\n";
+    }
+
+    # The public demo must keep authentication and the readable CSRF cookie on
+    # one browser origin. Render serves this proxy; Railway remains the API
+    # runtime. Do not expose docs, metrics, or arbitrary backend paths here.
+    location /auth/ {
+      proxy_pass __API_ORIGIN__;
+      proxy_http_version 1.1;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Proto $client_forwarded_proto;
+      proxy_read_timeout 120s;
+    }
+
+    location /api/ {
+      proxy_pass __API_ORIGIN__;
+      proxy_http_version 1.1;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Proto $client_forwarded_proto;
+      proxy_buffering off;
+      proxy_read_timeout 900s;
+    }
+
+    location = /health {
+      proxy_pass __API_ORIGIN__/health;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Proto $client_forwarded_proto;
+    }
+
+    location = /ready {
+      proxy_pass __API_ORIGIN__/ready;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Proto $client_forwarded_proto;
     }
 
     location ~* \.(?:css|js|svg|png|jpg|jpeg|woff2?)$ {

@@ -9,7 +9,7 @@
  */
 
 export type ApiMode = 'mock' | 'live'
-export type AppEnv = 'development' | 'staging' | 'production'
+export type AppEnv = 'development' | 'demo' | 'staging' | 'production'
 
 export interface AppConfig {
   apiMode: ApiMode
@@ -43,21 +43,23 @@ function parseInt10(value: string | undefined, fallback: number): number {
 /** Pure builder so it can be unit-tested with arbitrary raw env objects. */
 export function buildConfig(raw: Partial<Record<string, string>>): AppConfig {
   const appEnv = (raw.VITE_APP_ENV ?? 'development') as AppEnv
-  if (!['development', 'staging', 'production'].includes(appEnv)) {
+  if (!['development', 'demo', 'staging', 'production'].includes(appEnv)) {
     throw new EnvConfigError(`Invalid VITE_APP_ENV: "${raw.VITE_APP_ENV}"`)
   }
   const isProd = appEnv === 'production'
+  const isPublic = appEnv === 'demo' || isProd
+  const requiresLive = isPublic || appEnv === 'staging'
 
   const mode = (raw.VITE_API_MODE ?? 'mock') as ApiMode
   if (mode !== 'mock' && mode !== 'live') {
     throw new EnvConfigError(`Invalid VITE_API_MODE: "${raw.VITE_API_MODE}" (expected "mock" | "live")`)
   }
-  if ((isProd || appEnv === 'staging') && mode !== 'live') {
+  if (requiresLive && mode !== 'live') {
     throw new EnvConfigError(`${appEnv} builds require VITE_API_MODE=live; mock services are development-only.`)
   }
 
   const baseUrl = (raw.VITE_API_BASE_URL ?? '').trim()
-  if (baseUrl) {
+  if (baseUrl && baseUrl !== '/') {
     try {
       const parsed = new URL(baseUrl)
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('unsupported protocol')
@@ -68,10 +70,10 @@ export function buildConfig(raw: Partial<Record<string, string>>): AppConfig {
   const allowMockFallback = raw.VITE_ALLOW_MOCK_FALLBACK === 'true'
   let resolvedMode: ApiMode = mode
   if (mode === 'live' && !baseUrl) {
-    // Fail closed for staging/production (and CI) so live mode never silently
+    // Fail closed for demo/staging/production (and CI) so live mode never silently
     // degrades to mock (QA VIP-FE-M008). Only local development with an explicit
     // opt-in flag may fall back.
-    if (isProd || appEnv === 'staging' || !allowMockFallback) {
+    if (requiresLive || !allowMockFallback) {
       throw new EnvConfigError(
         `VITE_API_MODE=live requires VITE_API_BASE_URL (env: ${appEnv}). ` +
           'Set VITE_ALLOW_MOCK_FALLBACK=true only for local development.',
@@ -88,7 +90,7 @@ export function buildConfig(raw: Partial<Record<string, string>>): AppConfig {
     apiBaseUrl: baseUrl,
     apiTimeoutMs: parseInt10(raw.VITE_API_TIMEOUT_MS, 20_000),
     appEnv,
-    enableDevtools: parseBool(raw.VITE_ENABLE_DEVTOOLS, !isProd),
+    enableDevtools: parseBool(raw.VITE_ENABLE_DEVTOOLS, !isPublic),
     enableMockLatency: parseBool(raw.VITE_ENABLE_MOCK_LATENCY, true),
     authCsrfCookieName: raw.VITE_AUTH_CSRF_COOKIE_NAME || 'vip_csrf_token',
     authCsrfHeaderName: raw.VITE_AUTH_CSRF_HEADER_NAME || 'X-CSRF-Token',

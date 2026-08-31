@@ -17,6 +17,14 @@ describe('env config', () => {
     expect(c.isProd).toBe(true)
   })
 
+  it('supports an explicit demo build through the same-origin proxy', () => {
+    const c = buildConfig({ VITE_API_MODE: 'live', VITE_API_BASE_URL: '/', VITE_APP_ENV: 'demo' })
+    expect(c.apiMode).toBe('live')
+    expect(c.apiBaseUrl).toBe('/')
+    expect(c.enableDevtools).toBe(false)
+    expect(c.isProd).toBe(false)
+  })
+
   it('falls back to mock in dev ONLY with the explicit opt-in flag', () => {
     const c = buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'development', VITE_ALLOW_MOCK_FALLBACK: 'true' })
     expect(c.apiMode).toBe('mock')
@@ -36,7 +44,10 @@ describe('env config', () => {
     expect(() => buildConfig({ VITE_API_MODE: 'live', VITE_APP_ENV: 'production' })).toThrow(EnvConfigError)
   })
 
-  it('rejects mock services in staging and production', () => {
+  it('rejects mock services in demo, staging and production', () => {
+    expect(() =>
+      buildConfig({ VITE_APP_ENV: 'demo', VITE_API_MODE: 'mock', VITE_API_BASE_URL: 'https://api.x.com' }),
+    ).toThrow(EnvConfigError)
     expect(() =>
       buildConfig({ VITE_APP_ENV: 'staging', VITE_API_MODE: 'mock', VITE_API_BASE_URL: 'https://api.x.com' }),
     ).toThrow(EnvConfigError)

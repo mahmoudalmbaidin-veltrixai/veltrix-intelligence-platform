@@ -1,7 +1,7 @@
 """VIP-BUG-005: verify the effective security-header contract on real responses.
 
 Asserts behavior (actual response headers), not just that config strings exist.
-HSTS must be absent in non-production (never asserted over local HTTP).
+HSTS must be absent in local environments (never asserted over local HTTP).
 """
 
 from __future__ import annotations
@@ -34,6 +34,28 @@ def test_hsts_absent_outside_production(settings: Settings) -> None:
     with _client(settings) as client:
         response = client.get("/health")
     assert "strict-transport-security" not in {k.lower() for k in response.headers}
+
+
+def test_hsts_present_in_demo() -> None:
+    settings = Settings(
+        APP_ENV="demo",
+        DATABASE_URL="postgresql+asyncpg://user:pass@db/vip",
+        REDIS_URL="redis://cache/0",
+        CORS_ALLOWED_ORIGINS="https://veltrix-one-demo.onrender.com",
+        TRUSTED_HOSTS="testserver",
+        CSRF_TRUSTED_ORIGINS="https://veltrix-one-demo.onrender.com",
+        AUTH_COOKIE_SECURE=True,
+        METRICS_ENABLED=False,
+        CONNECTION_ENCRYPTION_KEY="connection-key",
+        DASHBOARD_DOWNLOAD_SIGNING_KEY="dashboard-key",
+        PIPELINE_DOWNLOAD_SIGNING_KEY="pipeline-key",
+        FILE_DOWNLOAD_SIGNING_KEY="file-key",
+    )
+    with _client(settings) as client:
+        response = client.get("/health")
+    assert response.headers["strict-transport-security"] == (
+        "max-age=63072000; includeSubDomains; preload"
+    )
 
 
 def test_docs_paths_exempt_from_strict_csp(settings: Settings) -> None:

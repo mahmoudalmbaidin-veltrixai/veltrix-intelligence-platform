@@ -211,8 +211,10 @@ async def seed_dashboard_demo() -> None:
 
 def require_nonproduction() -> None:
     settings = get_settings()
-    if settings.APP_ENV.value not in {"development", "test"}:
-        raise SystemExit("This command is available only in development and test environments.")
+    if settings.APP_ENV.value not in {"development", "test", "demo"}:
+        raise SystemExit(
+            "This command is available only in development, test, and explicit demo environments."
+        )
 
 
 async def seed_multitenancy_demo() -> None:

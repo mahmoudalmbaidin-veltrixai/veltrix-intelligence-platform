@@ -11,7 +11,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from vip_api.api.router import register_routers
 from vip_api.auth.password import PasswordService
-from vip_api.core.config import AppEnvironment, Settings, get_settings
+from vip_api.core.config import Settings, get_settings
 from vip_api.core.errors import register_exception_handlers
 from vip_api.core.logging import configure_logging
 from vip_api.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
@@ -84,7 +84,7 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     )
     app.add_middleware(
         SecurityHeadersMiddleware,
-        is_production=app_settings.APP_ENV is AppEnvironment.PRODUCTION,
+        is_production=app_settings.is_public_environment,
     )
 
     register_exception_handlers(app)

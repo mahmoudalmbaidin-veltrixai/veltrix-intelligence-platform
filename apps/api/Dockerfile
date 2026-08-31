@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apk add --no-cache font-dejavu
+RUN apk add --no-cache font-dejavu su-exec
 
 RUN addgroup --system vip && adduser --system --ingroup vip --home /app vip
 
@@ -20,8 +20,9 @@ COPY scripts ./scripts
 RUN python -m pip install --no-cache-dir "pip==26.1.2" \
     && python -m pip install --no-cache-dir -r requirements.runtime.lock \
     && python -m pip install --no-cache-dir --no-deps . \
-    && chmod +x /app/scripts/docker-entrypoint.sh \
-    && chown -R vip:vip /app
+    && mkdir -p /data/vip-artifacts /data/vip-email-outbox /data/vip-pipeline-artifacts /data/vip-files \
+    && chmod +x /app/scripts/docker-entrypoint.sh /app/scripts/demo-process-group.sh \
+    && chown -R vip:vip /app /data
 
 USER vip
 EXPOSE 8000

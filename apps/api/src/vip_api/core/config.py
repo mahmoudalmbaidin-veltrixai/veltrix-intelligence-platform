@@ -13,6 +13,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class AppEnvironment(StrEnum):
     DEVELOPMENT = "development"
     TEST = "test"
+    DEMO = "demo"
     STAGING = "staging"
     PRODUCTION = "production"
 
@@ -257,41 +258,54 @@ class Settings(BaseSettings):
             raise ValueError("LOG_LEVEL must be a standard Python logging level")
         if not self.API_V1_PREFIX.startswith("/"):
             raise ValueError("API_V1_PREFIX must start with '/'")
-        if self.APP_ENV is AppEnvironment.PRODUCTION and self.AI_DEVELOPMENT_MOCK_MODE:
-            raise ValueError("AI development mock mode cannot be enabled in production")
+        public_environment = self.APP_ENV in {
+            AppEnvironment.DEMO,
+            AppEnvironment.PRODUCTION,
+        }
+        if public_environment and self.AI_DEVELOPMENT_MOCK_MODE:
+            raise ValueError("AI development mock mode cannot be enabled in a public environment")
         if not self.database_url.startswith("postgresql+asyncpg://"):
             raise ValueError("DATABASE_URL must use the postgresql+asyncpg scheme")
         if not self.redis_url.startswith(("redis://", "rediss://")):
             raise ValueError("REDIS_URL must use the redis or rediss scheme")
-        if self.APP_ENV is AppEnvironment.PRODUCTION:
+        if public_environment:
             if self.DEBUG:
-                raise ValueError("DEBUG must be false in production")
+                raise ValueError("DEBUG must be false in a public environment")
             if not self.GOVERNANCE_FAIL_CLOSED:
-                raise ValueError("GOVERNANCE_FAIL_CLOSED must be true in production")
+                raise ValueError("GOVERNANCE_FAIL_CLOSED must be true in a public environment")
             if not self.AUDIT_EVENTS_ENABLED or not self.AUDIT_DENIED_ACCESS:
                 raise ValueError(
-                    "Governance audit events and denied-access auditing are required in production"
+                    "Governance audit events and denied-access auditing are required in a public "
+                    "environment"
                 )
             if "*" in self.CORS_ALLOWED_ORIGINS:
-                raise ValueError("Wildcard CORS origins are forbidden in production")
+                raise ValueError("Wildcard CORS origins are forbidden in a public environment")
             if "*" in self.TRUSTED_HOSTS:
-                raise ValueError("TRUSTED_HOSTS must be explicit in production")
+                raise ValueError("TRUSTED_HOSTS must be explicit in a public environment")
             if not self.AUTH_COOKIE_SECURE:
-                raise ValueError("AUTH_COOKIE_SECURE must be true in production")
+                raise ValueError("AUTH_COOKIE_SECURE must be true in a public environment")
             if self.CONNECTION_ENCRYPTION_KEY is None:
-                raise ValueError("CONNECTION_ENCRYPTION_KEY is required in production")
+                raise ValueError("CONNECTION_ENCRYPTION_KEY is required in a public environment")
             if self.DASHBOARD_DOWNLOAD_SIGNING_KEY is None:
-                raise ValueError("DASHBOARD_DOWNLOAD_SIGNING_KEY is required in production")
+                raise ValueError(
+                    "DASHBOARD_DOWNLOAD_SIGNING_KEY is required in a public environment"
+                )
             if self.PIPELINE_DOWNLOAD_SIGNING_KEY is None:
-                raise ValueError("PIPELINE_DOWNLOAD_SIGNING_KEY is required in production")
+                raise ValueError(
+                    "PIPELINE_DOWNLOAD_SIGNING_KEY is required in a public environment"
+                )
+            if self.FILE_DOWNLOAD_SIGNING_KEY is None:
+                raise ValueError("FILE_DOWNLOAD_SIGNING_KEY is required in a public environment")
+            if self.METRICS_ENABLED and self.METRICS_BEARER_TOKEN is None:
+                raise ValueError(
+                    "METRICS_BEARER_TOKEN is required when metrics are enabled in a public "
+                    "environment"
+                )
+        if self.APP_ENV is AppEnvironment.PRODUCTION:
             if self.FILE_MALWARE_SCANNER == "noop":
                 raise ValueError("A production malware scanner must be configured")
-            if self.FILE_DOWNLOAD_SIGNING_KEY is None:
-                raise ValueError("FILE_DOWNLOAD_SIGNING_KEY is required in production")
             if self.DASHBOARD_EMAIL_PROVIDER != "smtp":
                 raise ValueError("SMTP dashboard delivery is required in production")
-            if self.METRICS_ENABLED and self.METRICS_BEARER_TOKEN is None:
-                raise ValueError("METRICS_BEARER_TOKEN is required when metrics are enabled")
         if self.AUTH_COOKIE_SAMESITE == "none" and not self.AUTH_COOKIE_SECURE:
             raise ValueError("SameSite=None cookies must be secure")
         if self.PASSWORD_MIN_LENGTH > self.PASSWORD_MAX_LENGTH:
@@ -329,6 +343,13 @@ class Settings(BaseSettings):
         if self.ENABLE_DOCS is not None:
             return self.ENABLE_DOCS
         return self.APP_ENV in {AppEnvironment.DEVELOPMENT, AppEnvironment.TEST}
+
+    @property
+    def is_public_environment(self) -> bool:
+        return self.APP_ENV in {
+            AppEnvironment.DEMO,
+            AppEnvironment.PRODUCTION,
+        }
 
     @property
     def database_url(self) -> str:

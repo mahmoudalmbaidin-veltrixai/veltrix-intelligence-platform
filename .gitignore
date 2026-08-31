@@ -67,6 +67,8 @@ data/runtime/
 # Local credentials and secret material
 credentials/
 .credentials/
+/credentials*
+/secrets*
 *.credentials
 *.token
 *.tokens

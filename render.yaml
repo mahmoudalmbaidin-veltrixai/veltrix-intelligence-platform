@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: veltrix-one-demo
+    runtime: docker
+    plan: free
+    branch: release/demo
+    dockerContext: .
+    dockerfilePath: ./infra/containers/web/Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: VITE_APP_ENV
+        value: demo
+      - key: VITE_API_MODE
+        value: live
+      - key: VITE_API_BASE_URL
+        value: /
+      - key: VITE_ENABLE_DEVTOOLS
+        value: 'false'
+      - key: VITE_ENABLE_MOCK_LATENCY
+        value: 'false'
+      - key: API_ORIGIN
+        sync: false

@@ -17,6 +17,43 @@ def test_production_rejects_wildcard_hosts_and_origins() -> None:
         )
 
 
+def test_demo_requires_public_environment_security_controls() -> None:
+    with pytest.raises(ValidationError, match="AUTH_COOKIE_SECURE"):
+        Settings(
+            APP_ENV="demo",
+            DATABASE_URL="postgresql+asyncpg://user:pass@db/vip",
+            REDIS_URL="redis://cache/0",
+            CORS_ALLOWED_ORIGINS="https://veltrix-one-demo.onrender.com",
+            TRUSTED_HOSTS="veltrix-one-api.up.railway.app",
+            METRICS_ENABLED=False,
+            CONNECTION_ENCRYPTION_KEY="connection-key",
+            DASHBOARD_DOWNLOAD_SIGNING_KEY="dashboard-key",
+            PIPELINE_DOWNLOAD_SIGNING_KEY="pipeline-key",
+            FILE_DOWNLOAD_SIGNING_KEY="file-key",
+        )
+
+
+def test_demo_allows_documented_noop_scanner_and_disabled_email() -> None:
+    settings = Settings(
+        APP_ENV="demo",
+        DATABASE_URL="postgresql+asyncpg://user:pass@db/vip",
+        REDIS_URL="redis://cache/0",
+        CORS_ALLOWED_ORIGINS="https://veltrix-one-demo.onrender.com",
+        TRUSTED_HOSTS="veltrix-one-api.up.railway.app",
+        CSRF_TRUSTED_ORIGINS="https://veltrix-one-demo.onrender.com",
+        AUTH_COOKIE_SECURE=True,
+        METRICS_ENABLED=False,
+        CONNECTION_ENCRYPTION_KEY="connection-key",
+        DASHBOARD_DOWNLOAD_SIGNING_KEY="dashboard-key",
+        PIPELINE_DOWNLOAD_SIGNING_KEY="pipeline-key",
+        FILE_DOWNLOAD_SIGNING_KEY="file-key",
+        FILE_MALWARE_SCANNER="noop",
+        DASHBOARD_EMAIL_PROVIDER="disabled",
+    )
+    assert settings.is_public_environment is True
+    assert settings.docs_enabled is False
+
+
 def test_csv_settings_are_parsed() -> None:
     settings = Settings(
         APP_ENV="test",
